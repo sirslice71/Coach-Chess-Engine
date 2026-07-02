@@ -11,6 +11,8 @@ import TranspositionTable from "./transpositiontable.js";
 import { TTFlag }
     from "./transpositiontable.js";
 
+const MAX_Q_PLY = 16;
+
 export default class Search {
 
     constructor(board, legalMoveGenerator, evaluation) {
@@ -607,7 +609,7 @@ export default class Search {
 
         if (depth === 0) {
 
-            return this.quiescence(alpha, beta, ply);
+            return this.quiescence(alpha, beta, ply, 0);
 
         }
 
@@ -818,7 +820,7 @@ export default class Search {
     // Quiescence Search
     //----------------------------------
 
-    quiescence(alpha, beta, ply = 0) {
+    quiescence(alpha, beta, ply = 0, qPly = 0) {
 
         this.leafNodes++;
 
@@ -856,6 +858,12 @@ export default class Search {
             if (standPat > alpha) {
 
                 alpha = standPat;
+
+            }
+
+            if (qPly >= MAX_Q_PLY) {
+
+                return alpha;
 
             }
 
@@ -916,7 +924,9 @@ export default class Search {
 
                     -alpha,
 
-                    ply + 1
+                    ply + 1,
+
+                    qPly + 1
 
                 );
 
