@@ -119,9 +119,11 @@ export default class MoveOrdering {
 
             score += 100000;
 
-            score += move.capturedValue;
+            score +=
+                this.pieceValue(move.capturedPiece);
 
-            score -= move.pieceValue / 10;
+            score -=
+                this.pieceValue(move.piece) / 10;
 
         }
 

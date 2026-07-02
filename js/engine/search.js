@@ -601,7 +601,7 @@ export default class Search {
 
         if (depth === 0) {
 
-            return this.quiescence(alpha, beta);
+            return this.quiescence(alpha, beta, ply);
 
         }
 
@@ -810,56 +810,91 @@ export default class Search {
     // Quiescence Search
     //----------------------------------
 
-    quiescence(alpha, beta) {
+    quiescence(alpha, beta, ply = 0) {
 
         this.leafNodes++;
+
+        const inCheck = this.board.isInCheck();
 
         //----------------------------------
         // Stand Pat
         //----------------------------------
 
-        let standPat =
-            this.evaluation.evaluate().total;
+        if (!inCheck) {
 
-        if (this.board.sideToMove < 0) {
+            let standPat =
+                this.evaluation.evaluate().total;
 
-            standPat = -standPat;
+            if (this.board.sideToMove < 0) {
+
+                standPat = -standPat;
+
+            }
+
+            //----------------------------------
+            // Beta Cutoff
+            //----------------------------------
+
+            if (standPat >= beta) {
+
+                return beta;
+
+            }
+
+            //----------------------------------
+            // Raise Alpha
+            //----------------------------------
+
+            if (standPat > alpha) {
+
+                alpha = standPat;
+
+            }
 
         }
 
         //----------------------------------
-        // Beta Cutoff
-        //----------------------------------
-
-        if (standPat >= beta) {
-
-            return beta;
-
-        }
-
-        //----------------------------------
-        // Raise Alpha
-        //----------------------------------
-
-        if (standPat > alpha) {
-
-            alpha = standPat;
-
-        }
-
-        //----------------------------------
-        // Search Captures
+        // Search Captures or Check Evasions
         //----------------------------------
 
         const moves =
 
-            this.legalMoveGenerator.generateCaptures();
+            inCheck
 
-        this.moveOrdering.order(
+                ? this.legalMoveGenerator.generateMoves()
 
-            moves
+                : this.legalMoveGenerator.generateCaptures();
 
-        );
+        if (inCheck && moves.length === 0) {
+
+            return -SearchConstants.MATE + ply;
+
+        }
+
+        if (inCheck) {
+
+            this.moveOrdering.order(
+
+                moves,
+
+                this.getKillers(ply),
+
+                null,
+
+                this.history
+
+            );
+
+        }
+        else {
+
+            this.moveOrdering.order(
+
+                moves
+
+            );
+
+        }
 
         for (const move of moves) {
 
@@ -871,7 +906,9 @@ export default class Search {
 
                     -beta,
 
-                    -alpha
+                    -alpha,
+
+                    ply + 1
 
                 );
 
