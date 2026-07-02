@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0">
+
+<title>Coach Chess Engine</title>
+
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div id="app">
+
+    <aside id="leftPanel">
+
+        <h2>Coach</h2>
+
+        <div class="controls">
+
+            <button id="newGameBtn">New Game</button>
+
+            <button id="undoBtn">Undo</button>
+
+            <button id="flipBtn">Flip Board</button>
+
+            <button id="hintBtn">Hint</button>
+
+        </div>
+
+        <div class="difficulty">
+
+            <label>Coach Strength</label>
+
+            <select id="difficulty">
+
+                <option value="2">Beginner</option>
+                <option value="4">Intermediate</option>
+                <option value="6" selected>Strong</option>
+                <option value="8">Expert</option>
+
+            </select>
+
+        </div>
+
+        <div id="thinkingBox">
+        
+            <div id="engine-panel"></div>
+
+            <hr>
+
+            <div id="developerPanel">
+
+            <h4>Evaluation Breakdown</h4>
+
+            <hr>
+
+            <div>Material: <span id="devMaterial">0.00</span></div>
+
+            <div>Opening: <span id="devOpening">0.00</span></div>
+
+            <div>Piece Squares: <span id="devPieceSquares">0.00</span></div>
+
+            <div>Position: <span id="devPosition">0.00</span></div>
+
+            <div>King: <span id="devKing">0.00</span></div>
+
+            <div>Pawns: <span id="devPawns">0.00</span></div>
+
+            <div>Mobility: <span id="devMobility">0.00</span></div>
+
+            <div>Tactics: <span id="devTactics">0.00</span></div>
+            
+            </div>
+
+        </div>
+
+    </aside>
+
+<main>
+
+    <div id="boardContainer">
+
+        <div id="board"></div>
+
+    </div>
+
+</main>
+
+    <aside id="rightPanel">
+
+        <h3>Move History</h3>
+
+        <div id="moveHistory"></div>
+
+        <h3>Captured Pieces</h3>
+
+        <div id="capturedWhite"></div>
+
+        <div id="capturedBlack"></div>
+
+    </aside>
+
+</div>
+
+<script type="module" src="./js/main.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,387 @@
+# CONTRIBUTING.md
+
+Version: 1.0
+Project: Coach Chess Engine
+
+---
+
+# Welcome
+
+Thank you for your interest in contributing to the Coach Chess Engine.
+
+Coach is a long-term project focused on two equally important goals:
+
+- Build a strong classical chess engine.
+- Build the world's best explainable chess engine.
+
+Every contribution should move the project closer to one or both of those goals.
+
+---
+
+# Before You Begin
+
+Please read these documents before making significant changes:
+
+1. README.md
+2. AGENTS.md
+3. COACH_ENGINE.md
+4. ROADMAP.md
+5. ARCHITECTURE.md
+6. ENGINE_PRINCIPLES.md
+
+These documents explain the philosophy and architecture of the project.
+
+---
+
+# Coach Philosophy
+
+Coach values:
+
+Correctness
+
+↓
+
+Architecture
+
+↓
+
+Performance
+
+↓
+
+Playing Strength
+
+↓
+
+Teaching
+
+Do not sacrifice a higher priority for a lower one.
+
+---
+
+# Types of Contributions
+
+Examples include:
+
+Search improvements
+
+Evaluation improvements
+
+Performance optimizations
+
+Bug fixes
+
+Developer tools
+
+Documentation
+
+Testing
+
+Coach Lab enhancements
+
+Self-play infrastructure
+
+---
+
+# Development Workflow
+
+Every contribution should follow the same workflow.
+
+Observe
+
+↓
+
+Measure
+
+↓
+
+Understand
+
+↓
+
+Implement
+
+↓
+
+Verify
+
+↓
+
+Benchmark
+
+↓
+
+Play Games
+
+↓
+
+Document
+
+Do not skip steps.
+
+---
+
+# Coding Standards
+
+Prefer:
+
+Readable code
+
+Small functions
+
+Reusable systems
+
+Incremental improvements
+
+Avoid:
+
+Magic numbers
+
+Duplicated logic
+
+Premature optimization
+
+Large unrelated commits
+
+---
+
+# Performance Guidelines
+
+Every evaluation feature executes millions of times.
+
+Before adding a heuristic ask:
+
+Can it become incremental?
+
+Can it be cached?
+
+Can it be simplified?
+
+Is the Elo gain worth the cost?
+
+---
+
+# Search Guidelines
+
+Search should calculate.
+
+Evaluation should understand.
+
+Coach Lab should explain.
+
+Maintain this separation.
+
+---
+
+# Evaluation Guidelines
+
+Every evaluation term should:
+
+Represent one chess concept.
+
+Be measurable.
+
+Be explainable.
+
+Appear in Coach Lab eventually.
+
+---
+
+# Testing Requirements
+
+Board Changes
+
+Required
+
+✓ verify()
+
+✓ perft()
+
+✓ Hash verification
+
+---
+
+Search Changes
+
+Required
+
+✓ verify()
+
+✓ bench()
+
+✓ Real games
+
+---
+
+Evaluation Changes
+
+Required
+
+✓ verify()
+
+✓ Coach Lab
+
+✓ Real games
+
+Regression positions when applicable
+
+---
+
+# Documentation
+
+Every major feature should update:
+
+ROADMAP.md
+
+PROJECT_HISTORY.md
+
+KNOWN_WEAKNESSES.md (if applicable)
+
+SEARCH_GUIDE.md or EVALUATION_GUIDE.md
+
+Good documentation is considered part of the implementation.
+
+---
+
+# Commit Guidelines
+
+Each commit should represent one logical improvement.
+
+Good Examples
+
+"Implement bishop mobility evaluation"
+
+"Optimize move ordering"
+
+"Add pawn chain evaluation"
+
+Poor Examples
+
+"Lots of fixes"
+
+"Engine improvements"
+
+---
+
+# Pull Requests
+
+Every pull request should answer:
+
+What problem does this solve?
+
+Why is this approach preferred?
+
+Expected Elo impact?
+
+Expected performance impact?
+
+Verification performed?
+
+Benchmark results?
+
+Real-game observations?
+
+---
+
+# Bug Reports
+
+Good bug reports include:
+
+FEN
+
+Move history
+
+Expected behavior
+
+Actual behavior
+
+Coach Lab output
+
+Search depth
+
+Benchmark information (if relevant)
+
+---
+
+# Feature Requests
+
+Feature requests should include:
+
+Problem statement
+
+Motivation
+
+Alternative approaches
+
+Expected computational cost
+
+Expected playing strength improvement
+
+---
+
+# Coach Lab
+
+Coach Lab is the preferred debugging tool.
+
+Before modifying evaluation:
+
+Run Coach Lab.
+
+Understand the evaluation.
+
+Then make changes.
+
+---
+
+# Project Priorities
+
+Current priorities are defined in ROADMAP.md.
+
+Contributors are encouraged to work on:
+
+Opening understanding
+
+King safety
+
+Mobility
+
+Piece activity
+
+Coach Lab
+
+Search improvements
+
+---
+
+# Long-Term Vision
+
+Coach is expected to evolve toward:
+
+- Strong classical play
+- Explainable evaluation
+- Self-play
+- Automated regression testing
+- Parameter tuning
+- NNUE support
+
+Contributions that support this vision are especially valuable.
+
+---
+
+# Final Thoughts
+
+Every contribution should leave Coach:
+
+Stronger
+
+Faster
+
+Smarter
+
+More reliable
+
+Or better at teaching.
+
+If a contribution improves none of these, reconsider whether it belongs in the project.
+
+Thank you for helping build Coach.
