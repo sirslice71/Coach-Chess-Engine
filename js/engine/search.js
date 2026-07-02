@@ -1326,7 +1326,23 @@ export default class Search {
 
                 connected:
                     after.eval.pawns.connected -
-                    before.eval.pawns.connected
+                    before.eval.pawns.connected,
+
+                passed:
+                    after.eval.pawns.passed -
+                    before.eval.pawns.passed,
+
+                isolated:
+                    after.eval.pawns.isolated -
+                    before.eval.pawns.isolated,
+
+                doubled:
+                    after.eval.pawns.doubled -
+                    before.eval.pawns.doubled,
+
+                pawns:
+                    after.eval.pawns.total -
+                    before.eval.pawns.total
 
             };
 
@@ -1362,7 +1378,7 @@ export default class Search {
 
                 "Bishop Freedom Δ": delta.bishopFreedom,
 
-                "Coord Δ": delta.coordination,
+                "Early Rook Discipline Δ": delta.coordination,
 
                 "Queen Discipline Δ": delta.queenDiscipline,
 
@@ -1394,7 +1410,15 @@ export default class Search {
 
                 "PieceSq Δ": delta.pieceSquares,
 
-                "Connected Δ": delta.connected
+                "Connected Pawns Δ": delta.connected,
+
+                "Passed Pawns Δ": delta.passed,
+
+                "Isolated Pawns Δ": delta.isolated,
+
+                "Doubled Pawns Δ": delta.doubled,
+
+                "Pawn Total Δ": delta.pawns
 
             });
 
@@ -1678,6 +1702,22 @@ export default class Search {
         console.log("");
 
         //----------------------------------
+        // Material
+        //----------------------------------
+
+        this.printSection(
+
+            "Material",
+
+            [],
+
+            "Material Total",
+
+            delta.material
+
+        );
+
+        //----------------------------------
         // Opening
         //----------------------------------
 
@@ -1697,7 +1737,7 @@ export default class Search {
 
                 { label: "Castling Urgency", value: delta.castlingUrgency },
 
-                { label: "Coordination", value: delta.coordination }
+                { label: "Early Rook Discipline", value: delta.coordination }
 
             ],
 

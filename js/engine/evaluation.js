@@ -72,7 +72,7 @@ export default class Evaluation {
 
             opening: {
 
-                centerControl: 0,
+                centerOccupation: 0,
 
                 development: 0,
 
@@ -486,42 +486,6 @@ export default class Evaluation {
         return mobility;
 
     }
-
-    //----------------------------------
-    // Eval Center Occupation
-    //----------------------------------
-
-    evaluateCenterOccupation() {
-
-        let score = 0;
-
-        //----------------------------------
-        // White center pawns
-        //----------------------------------
-
-        if (this.board.pieceAt(35) === Piece.WP) { // d4
-            score += Eval.CENTER_PAWN;
-        }
-
-        if (this.board.pieceAt(36) === Piece.WP) { // e4
-            score += Eval.CENTER_PAWN;
-        }
-
-        //----------------------------------
-        // Black center pawns
-        //----------------------------------
-
-        if (this.board.pieceAt(27) === Piece.BP) { // d5
-            score -= Eval.CENTER_PAWN;
-        }
-
-        if (this.board.pieceAt(28) === Piece.BP) { // e5
-            score -= Eval.CENTER_PAWN;
-        }
-
-        return score;
-
-    }  
 
     //----------------------------------
     // Evaluate Development

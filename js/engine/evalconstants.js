@@ -8,19 +8,9 @@ export const Eval = Object.freeze({
     // Opening
     //----------------------------------
 
-    CENTER: 4,
-
-    DEVELOPMENT: 3,
-
-    TEMPO: 2,
-
     DEVELOP_MINOR: 10,
 
     DEVELOPMENT_COMPLETE: 20,
-
-    REPEAT_MINOR: -8,
-
-    EARLY_ROOK: -10,
 
     //----------------------------------
     // Opening Principles
@@ -30,15 +20,7 @@ export const Eval = Object.freeze({
 
     EARLY_ROOK: -15,
 
-    CONNECTED_ROOKS: 12,
-
     CENTER_PAWN: 16,
-
-    //----------------------------------
-    // Piece Freedom
-    //----------------------------------
-
-    BISHOP_FREEDOM: 12,
 
     //----------------------------------
     // King
@@ -55,18 +37,8 @@ export const Eval = Object.freeze({
     KING_SHIELD_MISSING: -6,
 
     //----------------------------------
-    // Position
-    //----------------------------------
-
-    BISHOP_PAIR: 20,
-
-    ROOK_CONNECTION: 10,
-
-    //----------------------------------
     // Mobility
     //----------------------------------
-
-    MOBILITY: 1,
 
     KNIGHT_MOBILITY: 1,
 
@@ -82,15 +54,7 @@ export const Eval = Object.freeze({
 
     ISOLATED_PAWN: -12,
 
-    DOUBLED_PAWN: -10,
-
-    //----------------------------------
-    // Rooks
-    //----------------------------------
-
-    ROOK_OPEN_FILE: 15,
-
-    ROOK_SEMI_OPEN_FILE: 8
+    DOUBLED_PAWN: -10
     
 
 });
