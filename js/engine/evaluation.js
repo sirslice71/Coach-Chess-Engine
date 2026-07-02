@@ -26,6 +26,26 @@ from "./pst.js";
 
 import { Piece } from "../core/piece.js";
 
+const KNIGHT_MOBILITY_OFFSETS = [
+
+    [-2, -1], [-2, 1],
+
+    [-1, -2], [-1, 2],
+
+    [1, -2], [1, 2],
+
+    [2, -1], [2, 1]
+
+];
+
+const BISHOP_MOBILITY_DIRECTIONS = [
+
+    [-1, -1], [-1, 1],
+
+    [1, -1], [1, 1]
+
+];
+
 export default class Evaluation {
 
     constructor(board) {
@@ -119,6 +139,10 @@ export default class Evaluation {
             mobility: {
 
                 legalMoves: 0,
+
+                knights: 0,
+
+                bishops: 0,
 
                 total: 0
 
@@ -233,8 +257,17 @@ export default class Evaluation {
         // Mobility
         //----------------------------------
 
+        const mobilityScore =
+            this.evaluateMinorPieceMobility();
+
+        score.mobility.knights =
+            mobilityScore.knights;
+
+        score.mobility.bishops =
+            mobilityScore.bishops;
+
         score.mobility.total =
-            score.mobility.legalMoves;
+            mobilityScore.total;
 
         //----------------------------------
         // Tactics
@@ -271,6 +304,186 @@ export default class Evaluation {
             score.tactics.total;
 
         return score;
+
+    }
+
+    //----------------------------------
+    // Evaluate Minor-Piece Mobility
+    //----------------------------------
+
+    evaluateMinorPieceMobility() {
+
+        let whiteKnightMobility = 0;
+        let blackKnightMobility = 0;
+        let whiteBishopMobility = 0;
+        let blackBishopMobility = 0;
+
+        for (const square of this.board.whitePieces.knights) {
+
+            whiteKnightMobility +=
+                this.countKnightMobility(square, true);
+
+        }
+
+        for (const square of this.board.blackPieces.knights) {
+
+            blackKnightMobility +=
+                this.countKnightMobility(square, false);
+
+        }
+
+        for (const square of this.board.whitePieces.bishops) {
+
+            whiteBishopMobility +=
+                this.countBishopMobility(square, true);
+
+        }
+
+        for (const square of this.board.blackPieces.bishops) {
+
+            blackBishopMobility +=
+                this.countBishopMobility(square, false);
+
+        }
+
+        const knights =
+            (whiteKnightMobility - blackKnightMobility) *
+            Eval.KNIGHT_MOBILITY;
+
+        const bishops =
+            (whiteBishopMobility - blackBishopMobility) *
+            Eval.BISHOP_MOBILITY;
+
+        return {
+
+            knights,
+
+            bishops,
+
+            total: knights + bishops
+
+        };
+
+    }
+
+    countKnightMobility(square, white) {
+
+        const rank = square >> 3;
+        const file = square & 7;
+
+        let mobility = 0;
+
+        for (const [rankOffset, fileOffset] of KNIGHT_MOBILITY_OFFSETS) {
+
+            const targetRank = rank + rankOffset;
+            const targetFile = file + fileOffset;
+
+            if (
+
+                targetRank < 0 ||
+
+                targetRank > 7 ||
+
+                targetFile < 0 ||
+
+                targetFile > 7
+
+            ) {
+
+                continue;
+
+            }
+
+            const targetPiece =
+                this.board.pieceAt(
+
+                    targetRank * 8 + targetFile
+
+                );
+
+            if (
+
+                targetPiece === Piece.EMPTY ||
+
+                (white ? targetPiece < 0 : targetPiece > 0)
+
+            ) {
+
+                mobility++;
+
+            }
+
+        }
+
+        return mobility;
+
+    }
+
+    countBishopMobility(square, white) {
+
+        const rank = square >> 3;
+        const file = square & 7;
+
+        let mobility = 0;
+
+        for (const [rankStep, fileStep] of BISHOP_MOBILITY_DIRECTIONS) {
+
+            let targetRank = rank + rankStep;
+            let targetFile = file + fileStep;
+
+            while (
+
+                targetRank >= 0 &&
+
+                targetRank <= 7 &&
+
+                targetFile >= 0 &&
+
+                targetFile <= 7
+
+            ) {
+
+                const targetPiece =
+                    this.board.pieceAt(
+
+                        targetRank * 8 + targetFile
+
+                    );
+
+                if (targetPiece === Piece.EMPTY) {
+
+                    mobility++;
+
+                }
+
+                else {
+
+                    if (
+
+                        white
+
+                            ? targetPiece < 0
+
+                            : targetPiece > 0
+
+                    ) {
+
+                        mobility++;
+
+                    }
+
+                    break;
+
+                }
+
+                targetRank += rankStep;
+                targetFile += fileStep;
+
+            }
+
+        }
+
+        return mobility;
 
     }
 

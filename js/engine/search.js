@@ -1308,6 +1308,18 @@ export default class Search {
                     after.eval.king.total -
                     before.eval.king.total,
 
+                knightMobility:
+                    after.eval.mobility.knights -
+                    before.eval.mobility.knights,
+
+                bishopMobility:
+                    after.eval.mobility.bishops -
+                    before.eval.mobility.bishops,
+
+                mobility:
+                    after.eval.mobility.total -
+                    before.eval.mobility.total,
+
                 pieceSquares:
                     after.pst.total -
                     before.pst.total,
@@ -1373,6 +1385,12 @@ export default class Search {
                 "Pawn Shield Δ": delta.pawnShield,
 
                 "King Total Δ": delta.king,
+
+                "Knight Mobility Δ": delta.knightMobility,
+
+                "Bishop Mobility Δ": delta.bishopMobility,
+
+                "Mobility Total Δ": delta.mobility,
 
                 "PieceSq Δ": delta.pieceSquares,
 
@@ -1544,6 +1562,14 @@ export default class Search {
             pawnShield:
                 after.eval.king.pawnShield -
                 before.eval.king.pawnShield,
+
+            knightMobility:
+                after.eval.mobility.knights -
+                before.eval.mobility.knights,
+
+            bishopMobility:
+                after.eval.mobility.bishops -
+                before.eval.mobility.bishops,
 
             mobility:
                 after.eval.mobility.total -
@@ -1754,6 +1780,28 @@ export default class Search {
             "King Total",
 
             delta.king
+
+        );
+
+        //----------------------------------
+        // Mobility
+        //----------------------------------
+
+        this.printSection(
+
+            "Mobility",
+
+            [
+
+                { label: "Knight Mobility", value: delta.knightMobility },
+
+                { label: "Bishop Mobility", value: delta.bishopMobility }
+
+            ],
+
+            "Mobility Total",
+
+            delta.mobility
 
         );
 

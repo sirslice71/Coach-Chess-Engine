@@ -70,6 +70,10 @@ export const Eval = Object.freeze({
 
     MOBILITY: 1,
 
+    KNIGHT_MOBILITY: 1,
+
+    BISHOP_MOBILITY: 1,
+
     //----------------------------------
     // Pawn Structure
     //----------------------------------
