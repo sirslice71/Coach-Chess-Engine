@@ -470,6 +470,12 @@ export default class Search {
 
                 this.rootBestMove = move;
 
+                if (score > alpha) {
+
+                    alpha = score;
+
+                }
+
             }
 
         }
