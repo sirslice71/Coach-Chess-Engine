@@ -1260,6 +1260,10 @@ export default class Search {
                     after.eval.opening.coordination -
                     before.eval.opening.coordination,
 
+                queenDiscipline:
+                    after.eval.opening.queenDiscipline -
+                    before.eval.opening.queenDiscipline,
+
                 opening:
                     after.eval.opening.total -
                     before.eval.opening.total,
@@ -1329,6 +1333,8 @@ export default class Search {
                 "Develop Δ": delta.development,
 
                 "Coord Δ": delta.coordination,
+
+                "Queen Discipline Δ": delta.queenDiscipline,
 
                 "Opening Δ": delta.opening,
 
@@ -1442,6 +1448,10 @@ export default class Search {
             coordination:
                 after.eval.opening.coordination -
                 before.eval.opening.coordination,
+
+            queenDiscipline:
+                after.eval.opening.queenDiscipline -
+                before.eval.opening.queenDiscipline,
 
             opening:
                 after.eval.opening.total -
@@ -1616,6 +1626,8 @@ export default class Search {
                 { label: "Development", value: delta.development },
 
                 { label: "Bishop Freedom", value: delta.bishopFreedom },
+
+                { label: "Queen Discipline", value: delta.queenDiscipline },
 
                 { label: "Coordination", value: delta.coordination }
 

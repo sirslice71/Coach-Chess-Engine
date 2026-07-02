@@ -58,6 +58,8 @@ export default class Evaluation {
 
                 bishopFreedom: 0,
 
+                queenDiscipline: 0,
+
                 tempo: 0,
 
                 coordination: 0,
@@ -159,6 +161,9 @@ export default class Evaluation {
         score.opening.bishopFreedom =
             this.evaluateBishopFreedom();
 
+        score.opening.queenDiscipline =
+            this.evaluateQueenDiscipline();
+
         score.opening.total =
 
             score.opening.centerOccupation +
@@ -166,6 +171,8 @@ export default class Evaluation {
             score.opening.development +
 
             score.opening.bishopFreedom +
+
+            score.opening.queenDiscipline +
 
             score.opening.tempo +
 
@@ -1315,26 +1322,6 @@ export default class Evaluation {
         }
 
         //----------------------------------
-        // Early queen (only if undeveloped pieces remain)
-        //----------------------------------
-
-        if (
-            (this.board.pieceAt(58) === Piece.WB ||
-            this.board.pieceAt(61) === Piece.WB) &&
-            this.board.pieceAt(59) !== Piece.WQ
-        ) {
-            score += Eval.EARLY_QUEEN;
-        }
-
-        if (
-            (this.board.pieceAt(2) === Piece.BB ||
-            this.board.pieceAt(5) === Piece.BB) &&
-            this.board.pieceAt(3) !== Piece.BQ
-        ) {
-            score -= Eval.EARLY_QUEEN;
-        }
-
-        //----------------------------------
         // Early rooks (only if undeveloped pieces remain)
         //----------------------------------
 
@@ -1370,6 +1357,58 @@ export default class Evaluation {
             if (this.board.pieceAt(7) !== Piece.BR) {
                 score -= Eval.EARLY_ROOK;
             }
+        }
+
+        return score;
+
+    }
+
+    evaluateQueenDiscipline() {
+
+        let score = 0;
+
+        const whiteDevelopmentIncomplete =
+            this.board.pieceAt(57) === Piece.WN ||
+            this.board.pieceAt(62) === Piece.WN ||
+            this.board.pieceAt(58) === Piece.WB ||
+            this.board.pieceAt(61) === Piece.WB;
+
+        const whiteCastled =
+            this.board.whiteKing === 62 ||
+            this.board.whiteKing === 58;
+
+        const whiteQueenMoved =
+            this.board.whitePieces.queens.length > 0 &&
+            this.board.pieceAt(59) !== Piece.WQ;
+
+        if (
+            whiteQueenMoved &&
+            whiteDevelopmentIncomplete &&
+            !whiteCastled
+        ) {
+            score += Eval.QUEEN_DISCIPLINE;
+        }
+
+        const blackDevelopmentIncomplete =
+            this.board.pieceAt(1) === Piece.BN ||
+            this.board.pieceAt(6) === Piece.BN ||
+            this.board.pieceAt(2) === Piece.BB ||
+            this.board.pieceAt(5) === Piece.BB;
+
+        const blackCastled =
+            this.board.blackKing === 6 ||
+            this.board.blackKing === 2;
+
+        const blackQueenMoved =
+            this.board.blackPieces.queens.length > 0 &&
+            this.board.pieceAt(3) !== Piece.BQ;
+
+        if (
+            blackQueenMoved &&
+            blackDevelopmentIncomplete &&
+            !blackCastled
+        ) {
+            score -= Eval.QUEEN_DISCIPLINE;
         }
 
         return score;

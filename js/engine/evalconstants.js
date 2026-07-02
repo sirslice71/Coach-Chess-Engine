@@ -18,15 +18,13 @@ export const Eval = Object.freeze({
 
     REPEAT_MINOR: -8,
 
-    EARLY_QUEEN: -12,
-
     EARLY_ROOK: -10,
 
     //----------------------------------
     // Opening Principles
     //----------------------------------
 
-    EARLY_QUEEN: -12,
+    QUEEN_DISCIPLINE: -18,
 
     EARLY_ROOK: -15,
 
