@@ -210,6 +210,9 @@ export default class Evaluation {
         // King
         //----------------------------------
 
+        score.king.pawnShield =
+            this.evaluatePawnShield();
+
         score.king.total =
 
             score.king.castled +
@@ -1331,6 +1334,74 @@ export default class Evaluation {
             if (this.board.pieceAt(7) !== Piece.BR) {
                 score -= Eval.EARLY_ROOK;
             }
+        }
+
+        return score;
+
+    }
+
+    evaluatePawnShield() {
+
+        const phase = this.gamePhase();
+
+        if (phase === 0) {
+            return 0;
+        }
+
+        const whiteShield =
+            this.evaluatePawnShieldForSide(true);
+
+        const blackShield =
+            this.evaluatePawnShieldForSide(false);
+
+        return Math.round(
+            (whiteShield - blackShield) *
+            phase / 24
+        );
+
+    }
+
+    evaluatePawnShieldForSide(white) {
+
+        if (!this.isCastled(white)) {
+            return 0;
+        }
+
+        const kingSquare = white
+            ? this.board.whiteKing
+            : this.board.blackKing;
+
+        const pawn = white
+            ? Piece.WP
+            : Piece.BP;
+
+        const homeStart = white
+            ? (kingSquare === 62 ? 53 : 49)
+            : (kingSquare === 6 ? 13 : 9);
+
+        const advancedStart = white
+            ? homeStart - 8
+            : homeStart + 8;
+
+        let score = 0;
+
+        for (let offset = 0; offset < 3; offset++) {
+
+            if (
+                this.board.pieceAt(homeStart + offset) === pawn
+            ) {
+                continue;
+            }
+
+            if (
+                this.board.pieceAt(advancedStart + offset) === pawn
+            ) {
+                score += Eval.KING_SHIELD_ADVANCED;
+            }
+            else {
+                score += Eval.KING_SHIELD_MISSING;
+            }
+
         }
 
         return score;

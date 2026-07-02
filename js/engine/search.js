@@ -1300,6 +1300,14 @@ export default class Search {
                     after.pst.king -
                     before.pst.king,
 
+                pawnShield:
+                    after.eval.king.pawnShield -
+                    before.eval.king.pawnShield,
+
+                king:
+                    after.eval.king.total -
+                    before.eval.king.total,
+
                 pieceSquares:
                     after.pst.total -
                     before.pst.total,
@@ -1361,6 +1369,10 @@ export default class Search {
                 "Queen PST Δ": delta.queenPST,
 
                 "King PST Δ": delta.kingPST,
+
+                "Pawn Shield Δ": delta.pawnShield,
+
+                "King Total Δ": delta.king,
 
                 "PieceSq Δ": delta.pieceSquares,
 
@@ -1528,6 +1540,10 @@ export default class Search {
             king:
                 after.eval.king.total -
                 before.eval.king.total,
+
+            pawnShield:
+                after.eval.king.pawnShield -
+                before.eval.king.pawnShield,
 
             mobility:
                 after.eval.mobility.total -
@@ -1718,6 +1734,26 @@ export default class Search {
             "Pawn Total",
 
             delta.pawns
+
+        );
+
+        //----------------------------------
+        // King Safety
+        //----------------------------------
+
+        this.printSection(
+
+            "King Safety",
+
+            [
+
+                { label: "Pawn Shield", value: delta.pawnShield }
+
+            ],
+
+            "King Total",
+
+            delta.king
 
         );
 
