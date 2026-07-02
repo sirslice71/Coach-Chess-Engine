@@ -654,7 +654,7 @@ export default class Evaluation {
 
     }
 
-    debugPieceSquares() {
+    debugPieceSquares(logPawns = false) {
 
         const score = {
 
@@ -683,11 +683,13 @@ export default class Evaluation {
             const index = square;
             const value = PawnTable[index];
 
-            console.log(
+            if (logPawns) {
+                console.log(
 
-                `White Pawn ${square} -> PST[${index}] = ${value}`
+                    `White Pawn ${square} -> PST[${index}] = ${value}`
 
-            );
+                );
+            }
 
             score.pawn += value;
 
@@ -702,11 +704,13 @@ export default class Evaluation {
             const index = mirror(square);
             const value = PawnTable[index];
 
-            console.log(
+            if (logPawns) {
+                console.log(
 
-                `Black Pawn ${square} -> PST[${index}] = ${value}`
+                    `Black Pawn ${square} -> PST[${index}] = ${value}`
 
-            );
+                );
+            }
 
             score.pawn -= value;
 

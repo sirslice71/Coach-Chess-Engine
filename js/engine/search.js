@@ -1256,6 +1256,10 @@ export default class Search {
                     after.eval.opening.development -
                     before.eval.opening.development,
 
+                bishopFreedom:
+                    after.eval.opening.bishopFreedom -
+                    before.eval.opening.bishopFreedom,
+
                 coordination:
                     after.eval.opening.coordination -
                     before.eval.opening.coordination,
@@ -1335,6 +1339,8 @@ export default class Search {
                 "Center Δ": delta.center,
 
                 "Develop Δ": delta.development,
+
+                "Bishop Freedom Δ": delta.bishopFreedom,
 
                 "Coord Δ": delta.coordination,
 
@@ -1451,6 +1457,10 @@ export default class Search {
                 after.eval.opening.development -
                 before.eval.opening.development,
 
+            bishopFreedom:
+                after.eval.opening.bishopFreedom -
+                before.eval.opening.bishopFreedom,
+
             coordination:
                 after.eval.opening.coordination -
                 before.eval.opening.coordination,
@@ -1510,6 +1520,10 @@ export default class Search {
             doubled:
                 after.eval.pawns.doubled -
                 before.eval.pawns.doubled,
+
+            pawns:
+                after.eval.pawns.total -
+                before.eval.pawns.total,
 
             king:
                 after.eval.king.total -
