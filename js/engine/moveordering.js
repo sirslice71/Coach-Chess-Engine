@@ -107,7 +107,9 @@ export default class MoveOrdering {
 
         ) {
 
-            return 1000000;
+            move.score = 1000000;
+
+            return move.score;
 
         }
 

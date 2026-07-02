@@ -66,7 +66,13 @@ export default class Move {
 
     isCapture() {
 
-        return (this.flags & MoveFlags.CAPTURE) !== 0;
+        return (
+
+            this.flags &
+
+            (MoveFlags.CAPTURE | MoveFlags.EN_PASSANT)
+
+        ) !== 0;
 
     }
 
