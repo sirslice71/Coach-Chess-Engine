@@ -540,14 +540,14 @@ export default class Evaluation {
 
         if (this.board.pieceAt(57) !== Piece.WN) {
 
-            score += 10;
+            score += Eval.DEVELOP_MINOR;
             whiteMinorDeveloped++;
 
         }
 
         if (this.board.pieceAt(62) !== Piece.WN) {
 
-            score += 10;
+            score += Eval.DEVELOP_MINOR;
             whiteMinorDeveloped++;
 
         }
@@ -558,14 +558,14 @@ export default class Evaluation {
 
         if (this.board.pieceAt(58) !== Piece.WB) {
 
-            score += 10;
+            score += Eval.DEVELOP_MINOR;
             whiteMinorDeveloped++;
 
         }
 
         if (this.board.pieceAt(61) !== Piece.WB) {
 
-            score += 10;
+            score += Eval.DEVELOP_MINOR;
             whiteMinorDeveloped++;
 
         }
@@ -576,14 +576,14 @@ export default class Evaluation {
 
         if (this.board.pieceAt(1) !== Piece.BN) {
 
-            score -= 10;
+            score -= Eval.DEVELOP_MINOR;
             blackMinorDeveloped++;
 
         }
 
         if (this.board.pieceAt(6) !== Piece.BN) {
 
-            score -= 10;
+            score -= Eval.DEVELOP_MINOR;
             blackMinorDeveloped++;
 
         }
@@ -594,14 +594,14 @@ export default class Evaluation {
 
         if (this.board.pieceAt(2) !== Piece.BB) {
 
-            score -= 10;
+            score -= Eval.DEVELOP_MINOR;
             blackMinorDeveloped++;
 
         }
 
         if (this.board.pieceAt(5) !== Piece.BB) {
 
-            score -= 10;
+            score -= Eval.DEVELOP_MINOR;
             blackMinorDeveloped++;
 
         }
@@ -612,13 +612,13 @@ export default class Evaluation {
 
         if (whiteMinorDeveloped === 4) {
 
-            score += 20;
+            score += Eval.DEVELOPMENT_COMPLETE;
 
         }
 
         if (blackMinorDeveloped === 4) {
 
-            score -= 20;
+            score -= Eval.DEVELOPMENT_COMPLETE;
 
         }
 
@@ -830,42 +830,6 @@ export default class Evaluation {
 
         );
 
-        //----------------------------------
-        // Development Completion
-        //----------------------------------
-
-        const whiteDeveloped =
-
-            this.board.pieceAt(57) !== Piece.WN &&
-
-            this.board.pieceAt(62) !== Piece.WN &&
-
-            this.board.pieceAt(58) !== Piece.WB &&
-
-            this.board.pieceAt(61) !== Piece.WB;
-
-        if (whiteDeveloped) {
-
-            score += 20;
-
-        }
-
-        const blackDeveloped =
-
-            this.board.pieceAt(1) !== Piece.BN &&
-
-            this.board.pieceAt(6) !== Piece.BN &&
-
-            this.board.pieceAt(2) !== Piece.BB &&
-
-            this.board.pieceAt(5) !== Piece.BB;
-
-        if (blackDeveloped) {
-
-            score -= 20;
-
-        }
-
         return score;
 
     }
@@ -1057,42 +1021,6 @@ export default class Evaluation {
             / 24
 
         );
-
-        //----------------------------------
-        // Development Completion
-        //----------------------------------
-
-        const whiteDeveloped =
-
-            this.board.pieceAt(57) !== Piece.WN &&
-
-            this.board.pieceAt(62) !== Piece.WN &&
-
-            this.board.pieceAt(58) !== Piece.WB &&
-
-            this.board.pieceAt(61) !== Piece.WB;
-
-        if (whiteDeveloped) {
-
-            score.king += 20;
-
-        }
-
-        const blackDeveloped =
-
-            this.board.pieceAt(1) !== Piece.BN &&
-
-            this.board.pieceAt(6) !== Piece.BN &&
-
-            this.board.pieceAt(2) !== Piece.BB &&
-
-            this.board.pieceAt(5) !== Piece.BB;
-
-        if (blackDeveloped) {
-
-            score.king -= 20;
-
-        }
 
         score.total =
 
@@ -1462,48 +1390,6 @@ export default class Evaluation {
         }
 
         let score = 0;
-
-        //----------------------------------
-        // White
-        //----------------------------------
-
-        // Bishops developed
-        if (this.board.pieceAt(58) !== Piece.WB) {
-            score += Eval.DEVELOPED_BISHOP;
-        }
-
-        if (this.board.pieceAt(61) !== Piece.WB) {
-            score += Eval.DEVELOPED_BISHOP;
-        }
-
-        // Knights developed
-        if (this.board.pieceAt(57) !== Piece.WN) {
-            score += Eval.DEVELOPED_KNIGHT;
-        }
-
-        if (this.board.pieceAt(62) !== Piece.WN) {
-            score += Eval.DEVELOPED_KNIGHT;
-        }
-
-        //----------------------------------
-        // Black
-        //----------------------------------
-
-        if (this.board.pieceAt(2) !== Piece.BB) {
-            score -= Eval.DEVELOPED_BISHOP;
-        }
-
-        if (this.board.pieceAt(5) !== Piece.BB) {
-            score -= Eval.DEVELOPED_BISHOP;
-        }
-
-        if (this.board.pieceAt(1) !== Piece.BN) {
-            score -= Eval.DEVELOPED_KNIGHT;
-        }
-
-        if (this.board.pieceAt(6) !== Piece.BN) {
-            score -= Eval.DEVELOPED_KNIGHT;
-        }
 
         //----------------------------------
         // Early rooks (only if undeveloped pieces remain)

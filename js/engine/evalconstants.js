@@ -16,6 +16,8 @@ export const Eval = Object.freeze({
 
     DEVELOP_MINOR: 10,
 
+    DEVELOPMENT_COMPLETE: 20,
+
     REPEAT_MINOR: -8,
 
     EARLY_ROOK: -10,
@@ -29,10 +31,6 @@ export const Eval = Object.freeze({
     EARLY_ROOK: -15,
 
     CONNECTED_ROOKS: 12,
-
-    DEVELOPED_KNIGHT: 8,
-
-    DEVELOPED_BISHOP: 10,
 
     CENTER_PAWN: 16,
 
