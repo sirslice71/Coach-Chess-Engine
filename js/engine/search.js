@@ -1264,6 +1264,10 @@ export default class Search {
                     after.eval.opening.queenDiscipline -
                     before.eval.opening.queenDiscipline,
 
+                castlingUrgency:
+                    after.eval.opening.castlingUrgency -
+                    before.eval.opening.castlingUrgency,
+
                 opening:
                     after.eval.opening.total -
                     before.eval.opening.total,
@@ -1335,6 +1339,8 @@ export default class Search {
                 "Coord Δ": delta.coordination,
 
                 "Queen Discipline Δ": delta.queenDiscipline,
+
+                "Castling Urgency Δ": delta.castlingUrgency,
 
                 "Opening Δ": delta.opening,
 
@@ -1452,6 +1458,10 @@ export default class Search {
             queenDiscipline:
                 after.eval.opening.queenDiscipline -
                 before.eval.opening.queenDiscipline,
+
+            castlingUrgency:
+                after.eval.opening.castlingUrgency -
+                before.eval.opening.castlingUrgency,
 
             opening:
                 after.eval.opening.total -
@@ -1628,6 +1638,8 @@ export default class Search {
                 { label: "Bishop Freedom", value: delta.bishopFreedom },
 
                 { label: "Queen Discipline", value: delta.queenDiscipline },
+
+                { label: "Castling Urgency", value: delta.castlingUrgency },
 
                 { label: "Coordination", value: delta.coordination }
 

@@ -60,6 +60,8 @@ export default class Evaluation {
 
                 queenDiscipline: 0,
 
+                castlingUrgency: 0,
+
                 tempo: 0,
 
                 coordination: 0,
@@ -164,6 +166,9 @@ export default class Evaluation {
         score.opening.queenDiscipline =
             this.evaluateQueenDiscipline();
 
+        score.opening.castlingUrgency =
+            this.evaluateCastlingUrgency();
+
         score.opening.total =
 
             score.opening.centerOccupation +
@@ -173,6 +178,8 @@ export default class Evaluation {
             score.opening.bishopFreedom +
 
             score.opening.queenDiscipline +
+
+            score.opening.castlingUrgency +
 
             score.opening.tempo +
 
@@ -434,34 +441,6 @@ export default class Evaluation {
         else {
 
             score -= 15;
-
-        }
-
-        //----------------------------------
-        // Castled Bonus
-        //----------------------------------
-
-        if (
-
-            this.board.whiteKing === 62 ||
-
-            this.board.whiteKing === 58
-
-        ) {
-
-            score += 25;
-
-        }
-
-        if (
-
-            this.board.blackKing === 6 ||
-
-            this.board.blackKing === 2
-
-        ) {
-
-            score -= 25;
 
         }
 
@@ -1268,14 +1247,6 @@ export default class Evaluation {
         // White
         //----------------------------------
 
-        // King castled
-        if (
-            this.board.whiteKing === 62 ||
-            this.board.whiteKing === 58
-        ) {
-            score += Eval.CASTLED;
-        }
-
         // Bishops developed
         if (this.board.pieceAt(58) !== Piece.WB) {
             score += Eval.DEVELOPED_BISHOP;
@@ -1297,13 +1268,6 @@ export default class Evaluation {
         //----------------------------------
         // Black
         //----------------------------------
-
-        if (
-            this.board.blackKing === 6 ||
-            this.board.blackKing === 2
-        ) {
-            score -= Eval.CASTLED;
-        }
 
         if (this.board.pieceAt(2) !== Piece.BB) {
             score -= Eval.DEVELOPED_BISHOP;
@@ -1331,7 +1295,10 @@ export default class Evaluation {
             this.board.pieceAt(57) === Piece.WN ||
             this.board.pieceAt(62) === Piece.WN;
 
-        if (whiteStillDeveloping) {
+        if (
+            whiteStillDeveloping &&
+            !this.isCastled(true)
+        ) {
 
             if (this.board.pieceAt(56) !== Piece.WR) {
                 score += Eval.EARLY_ROOK;
@@ -1348,7 +1315,10 @@ export default class Evaluation {
             this.board.pieceAt(1) === Piece.BN ||
             this.board.pieceAt(6) === Piece.BN;
 
-        if (blackStillDeveloping) {
+        if (
+            blackStillDeveloping &&
+            !this.isCastled(false)
+        ) {
 
             if (this.board.pieceAt(0) !== Piece.BR) {
                 score -= Eval.EARLY_ROOK;
@@ -1363,6 +1333,137 @@ export default class Evaluation {
 
     }
 
+    evaluateCastlingUrgency() {
+
+        if (!this.isOpening()) {
+            return 0;
+        }
+
+        let score = 0;
+
+        const whiteDevelopmentStarted =
+            this.board.pieceAt(57) !== Piece.WN ||
+            this.board.pieceAt(62) !== Piece.WN ||
+            this.board.pieceAt(58) !== Piece.WB ||
+            this.board.pieceAt(61) !== Piece.WB;
+
+        if (this.isCastled(true)) {
+            score += Eval.CASTLING_COMPLETE;
+        }
+        else if (whiteDevelopmentStarted) {
+
+            const readiness =
+                this.castlingLaneStatus(true);
+
+            if (readiness === 2) {
+                score += Eval.CASTLING_READY;
+            }
+            else if (readiness === 1) {
+                score += Eval.CASTLING_PARTIAL;
+            }
+
+        }
+
+        const blackDevelopmentStarted =
+            this.board.pieceAt(1) !== Piece.BN ||
+            this.board.pieceAt(6) !== Piece.BN ||
+            this.board.pieceAt(2) !== Piece.BB ||
+            this.board.pieceAt(5) !== Piece.BB;
+
+        if (this.isCastled(false)) {
+            score -= Eval.CASTLING_COMPLETE;
+        }
+        else if (blackDevelopmentStarted) {
+
+            const readiness =
+                this.castlingLaneStatus(false);
+
+            if (readiness === 2) {
+                score -= Eval.CASTLING_READY;
+            }
+            else if (readiness === 1) {
+                score -= Eval.CASTLING_PARTIAL;
+            }
+
+        }
+
+        return score;
+
+    }
+
+    castlingLaneStatus(white) {
+
+        const rights = this.board.castlingRights;
+        let status = 0;
+
+        const kingSide = white
+            ? rights.whiteKingSide
+            : rights.blackKingSide;
+
+        if (kingSide) {
+
+            const first = white ? 61 : 5;
+            const second = white ? 62 : 6;
+
+            const clear =
+                (this.board.pieceAt(first) === Piece.EMPTY ? 1 : 0) +
+                (this.board.pieceAt(second) === Piece.EMPTY ? 1 : 0);
+
+            if (clear === 2) {
+                return 2;
+            }
+
+            if (clear > 0) {
+                status = 1;
+            }
+
+        }
+
+        const queenSide = white
+            ? rights.whiteQueenSide
+            : rights.blackQueenSide;
+
+        if (queenSide) {
+
+            const first = white ? 57 : 1;
+            const second = white ? 58 : 2;
+            const third = white ? 59 : 3;
+
+            const clear =
+                (this.board.pieceAt(first) === Piece.EMPTY ? 1 : 0) +
+                (this.board.pieceAt(second) === Piece.EMPTY ? 1 : 0) +
+                (this.board.pieceAt(third) === Piece.EMPTY ? 1 : 0);
+
+            if (clear === 3) {
+                return 2;
+            }
+
+            if (clear > 0) {
+                status = 1;
+            }
+
+        }
+
+        return status;
+
+    }
+
+    isCastled(white) {
+
+        if (white) {
+            return (
+                this.board.whiteKing === 62 ||
+                this.board.whiteKing === 58
+            );
+        }
+
+        return (
+            this.board.blackKing === 6 ||
+            this.board.blackKing === 2
+        );
+
+    }
+
     evaluateQueenDiscipline() {
 
         let score = 0;
@@ -1374,8 +1475,7 @@ export default class Evaluation {
             this.board.pieceAt(61) === Piece.WB;
 
         const whiteCastled =
-            this.board.whiteKing === 62 ||
-            this.board.whiteKing === 58;
+            this.isCastled(true);
 
         const whiteQueenMoved =
             this.board.whitePieces.queens.length > 0 &&
@@ -1396,8 +1496,7 @@ export default class Evaluation {
             this.board.pieceAt(5) === Piece.BB;
 
         const blackCastled =
-            this.board.blackKing === 6 ||
-            this.board.blackKing === 2;
+            this.isCastled(false);
 
         const blackQueenMoved =
             this.board.blackPieces.queens.length > 0 &&

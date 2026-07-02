@@ -28,8 +28,6 @@ export const Eval = Object.freeze({
 
     EARLY_ROOK: -15,
 
-    DELAYED_CASTLING: -10,
-
     CONNECTED_ROOKS: 12,
 
     DEVELOPED_KNIGHT: 8,
@@ -48,9 +46,11 @@ export const Eval = Object.freeze({
     // King
     //----------------------------------
 
-    CASTLED: 15,
+    CASTLING_PARTIAL: -4,
 
-    LATE_CASTLING: -15,
+    CASTLING_READY: -8,
+
+    CASTLING_COMPLETE: 18,
 
     //----------------------------------
     // Position
