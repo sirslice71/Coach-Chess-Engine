@@ -448,7 +448,13 @@ export default class Zobrist {
         // Capture
         //----------------------------------
 
-        if (move.capturedPiece !== Piece.EMPTY) {
+        if (
+
+            move.capturedPiece !== Piece.EMPTY &&
+
+            !(move.flags & MoveFlags.EN_PASSANT)
+
+        ) {
 
             hash = this.togglePiece(
 
