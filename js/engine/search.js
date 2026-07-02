@@ -98,6 +98,12 @@ export default class Search {
 
         this.killers = [];
 
+        for (const row of this.history) {
+
+            row.fill(0);
+
+        }
+
         this.resetStatistics();
 
         this.rootBestMove = null;
@@ -739,23 +745,25 @@ export default class Search {
                     //----------------------------------
                     // History Heuristic
                     //----------------------------------
-                    /*
-                    this.history
+                    if (!move.isPromotion()) {
 
-                        [
+                        this.history
 
-                            move.fromSquare
+                            [
 
-                        ]
+                                move.fromSquare
 
-                        [
+                            ]
 
-                            move.toSquare
+                            [
 
-                        ]
+                                move.toSquare
 
-                    += depth * depth;
-                    */
+                            ]
+
+                        += depth * depth;
+
+                    }
                 }
 
                 break;
@@ -985,12 +993,6 @@ export default class Search {
         this.tt.clear();
 
         this.killers = [];
-
-        for (const row of this.history) {
-
-            row.fill(0);
-
-        }
 
         this.resetStatistics();
 
