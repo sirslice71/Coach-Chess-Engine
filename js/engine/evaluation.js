@@ -25,6 +25,7 @@ import {
 from "./pst.js";
 
 import { Piece } from "../core/piece.js";
+import Attack from "./attack.js";
 
 const KNIGHT_MOBILITY_OFFSETS = [
 
@@ -273,6 +274,9 @@ export default class Evaluation {
         // Tactics
         //----------------------------------
 
+        score.tactics.hanging =
+            this.evaluateHangingPieces();
+
         score.tactics.total =
 
             score.tactics.pins +
@@ -302,6 +306,100 @@ export default class Evaluation {
             score.mobility.total +
 
             score.tactics.total;
+
+        return score;
+
+    }
+
+    //----------------------------------
+    // Evaluate Hanging Pieces
+    //----------------------------------
+
+    evaluateHangingPieces() {
+
+        let score = 0;
+
+        score += this.evaluateHangingPieceList(
+            this.board.whitePieces.knights,
+            true,
+            Eval.HANGING_KNIGHT
+        );
+
+        score += this.evaluateHangingPieceList(
+            this.board.whitePieces.bishops,
+            true,
+            Eval.HANGING_BISHOP
+        );
+
+        score += this.evaluateHangingPieceList(
+            this.board.whitePieces.rooks,
+            true,
+            Eval.HANGING_ROOK
+        );
+
+        score += this.evaluateHangingPieceList(
+            this.board.whitePieces.queens,
+            true,
+            Eval.HANGING_QUEEN
+        );
+
+        score += this.evaluateHangingPieceList(
+            this.board.blackPieces.knights,
+            false,
+            Eval.HANGING_KNIGHT
+        );
+
+        score += this.evaluateHangingPieceList(
+            this.board.blackPieces.bishops,
+            false,
+            Eval.HANGING_BISHOP
+        );
+
+        score += this.evaluateHangingPieceList(
+            this.board.blackPieces.rooks,
+            false,
+            Eval.HANGING_ROOK
+        );
+
+        score += this.evaluateHangingPieceList(
+            this.board.blackPieces.queens,
+            false,
+            Eval.HANGING_QUEEN
+        );
+
+        return score;
+
+    }
+
+    evaluateHangingPieceList(squares, white, penalty) {
+
+        let score = 0;
+
+        for (const square of squares) {
+
+            const attacked =
+                Attack.isSquareAttacked(
+                    this.board,
+                    square,
+                    !white
+                );
+
+            if (!attacked) {
+                continue;
+            }
+
+            const defended =
+                Attack.isSquareAttacked(
+                    this.board,
+                    square,
+                    white
+                );
+
+            if (!defended) {
+                score += white ? penalty : -penalty;
+            }
+
+        }
 
         return score;
 

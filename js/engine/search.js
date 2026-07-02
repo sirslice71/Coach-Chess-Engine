@@ -1342,7 +1342,15 @@ export default class Search {
 
                 pawns:
                     after.eval.pawns.total -
-                    before.eval.pawns.total
+                    before.eval.pawns.total,
+
+                hanging:
+                    after.eval.tactics.hanging -
+                    before.eval.tactics.hanging,
+
+                tactics:
+                    after.eval.tactics.total -
+                    before.eval.tactics.total
 
             };
 
@@ -1418,7 +1426,11 @@ export default class Search {
 
                 "Doubled Pawns Δ": delta.doubled,
 
-                "Pawn Total Δ": delta.pawns
+                "Pawn Total Δ": delta.pawns,
+
+                "Hanging Pieces Δ": delta.hanging,
+
+                "Tactics Total Δ": delta.tactics
 
             });
 
@@ -1598,6 +1610,14 @@ export default class Search {
             mobility:
                 after.eval.mobility.total -
                 before.eval.mobility.total,
+
+            hanging:
+                after.eval.tactics.hanging -
+                before.eval.tactics.hanging,
+
+            tactics:
+                after.eval.tactics.total -
+                before.eval.tactics.total,
 
             total:
                 after.eval.total -
@@ -1842,6 +1862,26 @@ export default class Search {
             "Mobility Total",
 
             delta.mobility
+
+        );
+
+        //----------------------------------
+        // Tactics
+        //----------------------------------
+
+        this.printSection(
+
+            "Tactics",
+
+            [
+
+                { label: "Hanging Pieces", value: delta.hanging }
+
+            ],
+
+            "Tactics Total",
+
+            delta.tactics
 
         );
 

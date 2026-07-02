@@ -45,6 +45,18 @@ export const Eval = Object.freeze({
     BISHOP_MOBILITY: 1,
 
     //----------------------------------
+    // Threats
+    //----------------------------------
+
+    HANGING_KNIGHT: -10,
+
+    HANGING_BISHOP: -10,
+
+    HANGING_ROOK: -16,
+
+    HANGING_QUEEN: -24,
+
+    //----------------------------------
     // Pawn Structure
     //----------------------------------
 
