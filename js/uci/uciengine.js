@@ -13,6 +13,9 @@ import {
 const UCI_HASH_DEFAULT_MB = 32;
 const UCI_HASH_MIN_MB = 1;
 const UCI_HASH_MAX_MB = 512;
+const UCI_MOVE_OVERHEAD_DEFAULT_MS = 50;
+const UCI_MOVE_OVERHEAD_MIN_MS = 0;
+const UCI_MOVE_OVERHEAD_MAX_MS = 1000;
 
 function withMutedConsole(fn) {
 
@@ -169,7 +172,8 @@ export function allocateMoveTime({
     wtime = 0,
     btime = 0,
     winc = 0,
-    binc = 0
+    binc = 0,
+    moveOverheadMs = UCI_MOVE_OVERHEAD_DEFAULT_MS
 }) {
 
     const remainingTime =
@@ -182,11 +186,23 @@ export function allocateMoveTime({
         return 1;
     }
 
+    const overhead =
+        Math.max(
+            UCI_MOVE_OVERHEAD_MIN_MS,
+            Math.min(
+                UCI_MOVE_OVERHEAD_MAX_MS,
+                Math.floor(moveOverheadMs)
+            )
+        );
+
     const safetyBuffer =
         remainingTime > 1000 ? 100 : 50;
 
+    const reservedTime =
+        safetyBuffer + overhead;
+
     const usableTime =
-        Math.max(1, remainingTime - safetyBuffer);
+        Math.max(1, remainingTime - reservedTime);
 
     const base =
         usableTime / 30;
@@ -244,6 +260,22 @@ function clampHashSize(value) {
 
 }
 
+function clampMoveOverhead(value, fallback = UCI_MOVE_OVERHEAD_DEFAULT_MS) {
+
+    if (!Number.isFinite(value)) {
+        return fallback;
+    }
+
+    return Math.max(
+        UCI_MOVE_OVERHEAD_MIN_MS,
+        Math.min(
+            UCI_MOVE_OVERHEAD_MAX_MS,
+            Math.floor(value)
+        )
+    );
+
+}
+
 function parseSetOption(tokens) {
 
     const nameIndex =
@@ -280,6 +312,8 @@ export class UciSession {
         this.quitRequested = false;
         this.debugEnabled = false;
         this.hashSizeMB = UCI_HASH_DEFAULT_MB;
+        this.moveOverheadMs =
+            UCI_MOVE_OVERHEAD_DEFAULT_MS;
 
         this.resetEngine();
 
@@ -318,6 +352,7 @@ export class UciSession {
                     "id name Coach Chess Engine",
                     "id author Sir Slice / Sir Slice",
                     `option name Hash type spin default ${UCI_HASH_DEFAULT_MB} min ${UCI_HASH_MIN_MB} max ${UCI_HASH_MAX_MB}`,
+                    `option name Move Overhead type spin default ${UCI_MOVE_OVERHEAD_DEFAULT_MS} min ${UCI_MOVE_OVERHEAD_MIN_MS} max ${UCI_MOVE_OVERHEAD_MAX_MS}`,
                     "option name Clear Hash type button",
                     "uciok"
                 ];
@@ -456,6 +491,21 @@ export class UciSession {
 
         }
 
+        if (option.name === "Move Overhead") {
+
+            this.moveOverheadMs =
+                clampMoveOverhead(
+                    Number.parseInt(
+                        option.value,
+                        10
+                    ),
+                    this.moveOverheadMs
+                );
+
+            return [];
+
+        }
+
         if (option.name === "Clear Hash") {
 
             withMutedConsole(() =>
@@ -579,7 +629,9 @@ export class UciSession {
                                 tokens[bincIndex + 1],
                                 10
                             ) || 0
-                            : 0
+                            : 0,
+                    moveOverheadMs:
+                        this.moveOverheadMs
                 });
 
             const deadlineMs =

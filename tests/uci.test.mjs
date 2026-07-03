@@ -175,12 +175,17 @@ test("UCI process handshake and depth-1 search return protocol-safe output", asy
     assert.ok(lines.includes("id name Coach Chess Engine"));
     assert.ok(lines.includes("id author Sir Slice / Sir Slice"));
     assert.ok(lines.includes("option name Hash type spin default 32 min 1 max 512"));
+    assert.ok(lines.includes("option name Move Overhead type spin default 50 min 0 max 1000"));
     assert.ok(lines.includes("option name Clear Hash type button"));
     assert.ok(lines.includes("uciok"));
     assert.ok(lines.includes("readyok"));
 
     assert.ok(
         lines.indexOf("option name Hash type spin default 32 min 1 max 512") <
+        lines.indexOf("uciok")
+    );
+    assert.ok(
+        lines.indexOf("option name Move Overhead type spin default 50 min 0 max 1000") <
         lines.indexOf("uciok")
     );
 
@@ -344,8 +349,8 @@ test("time allocation uses the correct side clock and increment", () => {
             binc: 0
         });
 
-    assert.equal(whiteBudget, 11496);
-    assert.equal(blackBudget, 31);
+    assert.equal(whiteBudget, 11495);
+    assert.equal(blackBudget, 30);
 
 });
 
@@ -378,8 +383,8 @@ test("time allocation is capped and stays safe in low time", () => {
             binc: 0
         });
 
-    assert.equal(cappedBudget, 95);
-    assert.equal(lowTimeBudget, 10);
+    assert.equal(cappedBudget, 90);
+    assert.equal(lowTimeBudget, 1);
     assert.equal(severeLowTimeBudget, 10);
 
 });
@@ -394,7 +399,7 @@ test("time allocation returns sensible budgets for common time controls", () => 
             winc: 0,
             binc: 0
         }),
-        1996
+        1995
     );
 
     assert.equal(
@@ -405,7 +410,7 @@ test("time allocation returns sensible budgets for common time controls", () => 
             winc: 1000,
             binc: 1000
         }),
-        2746
+        2745
     );
 
     assert.equal(
@@ -416,7 +421,7 @@ test("time allocation returns sensible budgets for common time controls", () => 
             winc: 0,
             binc: 0
         }),
-        9996
+        9995
     );
 
     assert.equal(
@@ -427,7 +432,7 @@ test("time allocation returns sensible budgets for common time controls", () => 
             winc: 2000,
             binc: 2000
         }),
-        11496
+        11495
     );
 
     assert.equal(
@@ -438,8 +443,34 @@ test("time allocation returns sensible budgets for common time controls", () => 
             winc: 5000,
             binc: 5000
         }),
-        33746
+        33745
     );
+
+});
+
+test("time allocation with higher move overhead reduces the clock budget", () => {
+
+    const defaultBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 60000,
+            btime: 60000,
+            winc: 0,
+            binc: 0
+        });
+
+    const overheadBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 60000,
+            btime: 60000,
+            winc: 0,
+            binc: 0,
+            moveOverheadMs: 250
+        });
+
+    assert.ok(overheadBudget <= defaultBudget);
+    assert.equal(overheadBudget, 1988);
 
 });
 
@@ -679,6 +710,116 @@ test("setoption Hash clamps low, high, and non-numeric values safely", () => {
         session.hashSizeMB,
         32
     );
+
+});
+
+test("setoption Move Overhead updates internal session state", () => {
+
+    const session =
+        new UciSession();
+
+    assert.equal(
+        session.moveOverheadMs,
+        50
+    );
+
+    session.handleCommand(
+        "setoption name Move Overhead value 250"
+    );
+
+    assert.equal(
+        session.moveOverheadMs,
+        250
+    );
+
+});
+
+test("setoption Move Overhead clamps low, high, and non-numeric values safely", () => {
+
+    const session =
+        new UciSession();
+
+    session.handleCommand(
+        "setoption name Move Overhead value -25"
+    );
+
+    assert.equal(
+        session.moveOverheadMs,
+        0
+    );
+
+    session.handleCommand(
+        "setoption name Move Overhead value 9999"
+    );
+
+    assert.equal(
+        session.moveOverheadMs,
+        1000
+    );
+
+    session.handleCommand(
+        "setoption name Move Overhead value nope"
+    );
+
+    assert.equal(
+        session.moveOverheadMs,
+        1000
+    );
+
+});
+
+test("Move Overhead does not affect go movetime", () => {
+
+    const originalNow =
+        performance.now;
+
+    try {
+
+        performance.now = () => 5000;
+
+        const session =
+            new UciSession();
+
+        const move =
+            session.engine.legalMoveGenerator
+                .generateMoves()[0];
+
+        let lastDeadlineMs = null;
+
+        session.engine.search.bestMove =
+            (_depth, options = {}) => {
+
+                lastDeadlineMs =
+                    options.deadlineMs;
+
+                session.engine.search.lastSearchScore = 0;
+
+                return {
+                    move,
+                    pv: [move],
+                    depth: 1,
+                    nodes: 1
+                };
+
+            };
+
+        session.handleCommand(
+            "setoption name Move Overhead value 250"
+        );
+
+        session.handleCommand(
+            "go movetime 100"
+        );
+
+        assert.equal(lastDeadlineMs, 5095);
+
+    }
+
+    finally {
+
+        performance.now = originalNow;
+
+    }
 
 });
 
