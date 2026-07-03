@@ -1549,7 +1549,7 @@ export default class Evaluation {
 
     evaluateCastlingUrgency() {
 
-        if (!this.isOpening()) {
+        if (!this.shouldEvaluateCastlingUrgency()) {
             return 0;
         }
 
@@ -1612,6 +1612,41 @@ export default class Evaluation {
         }
 
         return score;
+
+    }
+
+    shouldEvaluateCastlingUrgency() {
+
+        if (this.isOpening()) {
+            return true;
+        }
+
+        const rights = this.board.castlingRights;
+
+        if (
+            rights.whiteKingSide ||
+            rights.whiteQueenSide ||
+            rights.blackKingSide ||
+            rights.blackQueenSide
+        ) {
+            return true;
+        }
+
+        const phase = this.gamePhase();
+
+        if (phase < 8) {
+            return false;
+        }
+
+        const whiteAbandoned =
+            !this.isCastled(true) &&
+            this.board.whiteKing !== 60;
+
+        const blackAbandoned =
+            !this.isCastled(false) &&
+            this.board.blackKing !== 4;
+
+        return whiteAbandoned || blackAbandoned;
 
     }
 
