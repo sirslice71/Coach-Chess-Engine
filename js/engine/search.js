@@ -1024,7 +1024,7 @@ export default class Search {
 
                     Move: r.notation,
 
-                    Eval:
+                    "Search Eval (White)":
                         (
                             this.toWhiteRelativeScore(
                                 r.score,
@@ -1082,7 +1082,7 @@ export default class Search {
 
         console.log("Depth       :", result.depth);
         console.log("Best Move   :", result.notation);
-        console.log("Evaluation  :", result.evaluation);
+        console.log("Search Eval (White):", result.evaluation);
 
         console.log("");
 
@@ -1480,11 +1480,11 @@ export default class Search {
 
                 Move: move.toString(),
 
-                Static: (staticScore / 100).toFixed(2),
+                "Static Eval (White)": (staticScore / 100).toFixed(2),
 
-                Search: (searchScore / 100).toFixed(2),
+                "Search Eval (White)": (searchScore / 100).toFixed(2),
 
-                "Search Δ": (deltaSearch / 100).toFixed(2),
+                "Search - Static Δ": (deltaSearch / 100).toFixed(2),
 
                 "Total Δ": delta.total,
 
@@ -1552,17 +1552,17 @@ export default class Search {
 
                 rootSideToMove > 0
 
-                    ? parseFloat(b.Search) -
-                        parseFloat(a.Search)
+                    ? parseFloat(b["Search Eval (White)"]) -
+                        parseFloat(a["Search Eval (White)"])
 
-                    : parseFloat(a.Search) -
-                        parseFloat(b.Search)
+                    : parseFloat(a["Search Eval (White)"]) -
+                        parseFloat(b["Search Eval (White)"])
 
         );
 
         console.log("");
         console.log("========================================");
-        console.log("          COACH LAB 3.0");
+        console.log("   COACH LAB 3.0 - WHITE-RELATIVE");
         console.log("========================================");
         console.log("");
 
@@ -1746,7 +1746,7 @@ export default class Search {
         console.log("");
 
         console.log("======================================");
-        console.log("         COACH LAB 3.0");
+        console.log(" COACH LAB 3.0 - DETAILED MOVE VIEW");
         console.log("======================================");
         console.log("");
 
@@ -1812,7 +1812,7 @@ export default class Search {
 
         console.log("");
         console.log("==========================================================");
-        console.log("                 COACH LAB 4.0");
+        console.log("         COACH LAB 4.0 - WHITE-RELATIVE");
         console.log("==========================================================");
         console.log("");
 
@@ -1821,21 +1821,19 @@ export default class Search {
         console.log(move);
         console.log("");
 
-        console.log("Static Evaluation");
-        console.log("-----------------");
+        console.log("Post-Move Static Eval (White-relative)");
+        console.log("--------------------------------------");
         console.log(`${(after.eval.total / 100).toFixed(2)}`);
         console.log("");
 
-        console.log("Search Evaluation");
-        console.log("-----------------");
-        console.log(`${(searchScore / 100).toFixed(2)}`);
+        console.log("Search Eval (White-relative)");
+        console.log("----------------------------");
+        console.log("Not computed in detailed lab(move) mode");
         console.log("");
 
-        console.log("Search Improvement");
-        console.log("------------------");
-        console.log(
-            `${((searchScore - after.eval.total) / 100).toFixed(2)}`
-        );
+        console.log("Static Δ From Current Position");
+        console.log("------------------------------");
+        console.log(`${(delta.total / 100).toFixed(2)}`);
 
         console.log("");
 
@@ -2012,18 +2010,13 @@ export default class Search {
         console.log("==========================================================");
 
         console.log(
-            "FINAL STATIC SCORE".padEnd(28),
+            "POST-MOVE STATIC SCORE".padEnd(28),
             `${after.eval.total >= 0 ? "+" : ""}${after.eval.total}`
         );
 
         console.log(
-            "SEARCH SCORE".padEnd(28),
-            `${searchScore >= 0 ? "+" : ""}${searchScore}`
-        );
-
-        console.log(
-            "SEARCH GAIN".padEnd(28),
-            `${searchScore - after.eval.total >= 0 ? "+" : ""}${searchScore - after.eval.total}`
+            "STATIC DELTA".padEnd(28),
+            `${delta.total >= 0 ? "+" : ""}${delta.total}`
         );
 
         console.log("==========================================================");

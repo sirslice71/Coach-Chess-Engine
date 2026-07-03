@@ -28,7 +28,7 @@ export default class EnginePanel {
             </div>
 
             <div class="engineRow">
-                <span>Evaluation</span>
+                <span>Search Eval (White)</span>
                 <span id="engineEval">0.00</span>
             </div>
 
