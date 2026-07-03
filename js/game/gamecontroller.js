@@ -45,7 +45,7 @@ export default class GameController {
     // Coach Moves
     //----------------------------------
 
-    coachMove(depth = 4) {
+    coachMove(depth = 5) {
 
         console.time("Coach TOTAL");
 
@@ -179,7 +179,7 @@ export default class GameController {
 
     startCoachVsCoach(
 
-        depth = 4,
+        depth = 5,
 
         delay = 500
 
