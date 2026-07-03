@@ -24,6 +24,8 @@ export default class TranspositionTable {
 
     constructor(sizeMB = 32) {
 
+        this.sizeMB = sizeMB;
+
         const ENTRY_SIZE = 32;
 
         const bytes =

@@ -174,8 +174,15 @@ test("UCI process handshake and depth-1 search return protocol-safe output", asy
 
     assert.ok(lines.includes("id name Coach Chess Engine"));
     assert.ok(lines.includes("id author Sir Slice / Sir Slice"));
+    assert.ok(lines.includes("option name Hash type spin default 32 min 1 max 512"));
+    assert.ok(lines.includes("option name Clear Hash type button"));
     assert.ok(lines.includes("uciok"));
     assert.ok(lines.includes("readyok"));
+
+    assert.ok(
+        lines.indexOf("option name Hash type spin default 32 min 1 max 512") <
+        lines.indexOf("uciok")
+    );
 
     const infoLine =
         lines.find(line => line.startsWith("info depth 1 "));
@@ -539,9 +546,108 @@ test("setoption does not crash even if ignored", () => {
 
     assert.deepEqual(
         session.handleCommand(
-            "setoption name Hash value 64"
+            "setoption name Unknown Option value 64"
         ),
         []
+    );
+
+});
+
+test("setoption Hash updates internal TT size safely", () => {
+
+    const session =
+        new UciSession();
+
+    assert.equal(
+        session.hashSizeMB,
+        32
+    );
+
+    session.handleCommand(
+        "setoption name Hash value 64"
+    );
+
+    assert.equal(
+        session.hashSizeMB,
+        64
+    );
+
+    assert.equal(
+        session.engine.search.tt.sizeMB,
+        64
+    );
+
+});
+
+test("setoption Hash clamps low, high, and non-numeric values safely", () => {
+
+    const session =
+        new UciSession();
+
+    session.handleCommand(
+        "setoption name Hash value 0"
+    );
+
+    assert.equal(
+        session.hashSizeMB,
+        1
+    );
+
+    session.handleCommand(
+        "setoption name Hash value 9999"
+    );
+
+    assert.equal(
+        session.hashSizeMB,
+        512
+    );
+
+    session.handleCommand(
+        "setoption name Hash value nope"
+    );
+
+    assert.equal(
+        session.hashSizeMB,
+        32
+    );
+
+});
+
+test("setoption Clear Hash clears TT safely", () => {
+
+    const session =
+        new UciSession();
+
+    session.engine.search.tt.store(
+        1n,
+        1,
+        0,
+        0,
+        null
+    );
+
+    assert.equal(
+        session.engine.search.tt.stores,
+        1
+    );
+
+    session.handleCommand(
+        "setoption name Clear Hash"
+    );
+
+    assert.equal(
+        session.engine.search.tt.stores,
+        0
+    );
+
+    assert.equal(
+        session.engine.search.tt.hits,
+        0
+    );
+
+    assert.equal(
+        session.engine.search.tt.probes,
+        0
     );
 
 });

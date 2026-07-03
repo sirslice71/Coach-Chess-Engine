@@ -4,10 +4,15 @@ import MoveGenerator from "../engine/movegen.js";
 import LegalMoveGenerator from "../engine/legalmovegen.js";
 import Evaluation from "../engine/evaluation.js";
 import Search from "../engine/search.js";
+import TranspositionTable from "../engine/transpositiontable.js";
 import { Piece } from "../core/piece.js";
 import {
     algebraic,
 } from "../core/square.js";
+
+const UCI_HASH_DEFAULT_MB = 32;
+const UCI_HASH_MIN_MB = 1;
+const UCI_HASH_MAX_MB = 512;
 
 function withMutedConsole(fn) {
 
@@ -214,12 +219,58 @@ export function allocateMoveTime({
 
 }
 
+function clampHashSize(value) {
+
+    if (!Number.isFinite(value)) {
+        return UCI_HASH_DEFAULT_MB;
+    }
+
+    return Math.max(
+        UCI_HASH_MIN_MB,
+        Math.min(
+            UCI_HASH_MAX_MB,
+            Math.floor(value)
+        )
+    );
+
+}
+
+function parseSetOption(tokens) {
+
+    const nameIndex =
+        tokens.indexOf("name");
+
+    if (nameIndex === -1) {
+        return null;
+    }
+
+    const valueIndex =
+        tokens.indexOf("value");
+
+    const nameTokens =
+        valueIndex === -1
+            ? tokens.slice(nameIndex + 1)
+            : tokens.slice(nameIndex + 1, valueIndex);
+
+    const valueTokens =
+        valueIndex === -1
+            ? []
+            : tokens.slice(valueIndex + 1);
+
+    return {
+        name: nameTokens.join(" ").trim(),
+        value: valueTokens.join(" ").trim()
+    };
+
+}
+
 export class UciSession {
 
     constructor() {
 
         this.quitRequested = false;
         this.debugEnabled = false;
+        this.hashSizeMB = UCI_HASH_DEFAULT_MB;
 
         this.resetEngine();
 
@@ -229,6 +280,11 @@ export class UciSession {
 
         this.engine =
             createEngineCore(fen);
+
+        this.engine.search.tt =
+            new TranspositionTable(
+                this.hashSizeMB
+            );
 
     }
 
@@ -252,6 +308,8 @@ export class UciSession {
                 return [
                     "id name Coach Chess Engine",
                     "id author Sir Slice / Sir Slice",
+                    `option name Hash type spin default ${UCI_HASH_DEFAULT_MB} min ${UCI_HASH_MIN_MB} max ${UCI_HASH_MAX_MB}`,
+                    "option name Clear Hash type button",
                     "uciok"
                 ];
 
@@ -281,7 +339,9 @@ export class UciSession {
 
             case "setoption":
 
-                return [];
+                return this.handleSetOption(
+                    tokens.slice(1)
+                );
 
             case "debug":
 
@@ -356,6 +416,48 @@ export class UciSession {
         for (const moveText of moveTokens) {
             applyUciMove(this.engine, moveText);
         }
+
+    }
+
+    handleSetOption(tokens) {
+
+        const option =
+            parseSetOption(tokens);
+
+        if (!option) {
+            return [];
+        }
+
+        if (option.name === "Hash") {
+
+            const sizeMB =
+                clampHashSize(
+                    Number.parseInt(
+                        option.value,
+                        10
+                    )
+                );
+
+            this.hashSizeMB = sizeMB;
+
+            this.engine.search.tt =
+                new TranspositionTable(sizeMB);
+
+            return [];
+
+        }
+
+        if (option.name === "Clear Hash") {
+
+            withMutedConsole(() =>
+                this.engine.search.tt.clear()
+            );
+
+            return [];
+
+        }
+
+        return [];
 
     }
 
