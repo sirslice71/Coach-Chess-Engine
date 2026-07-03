@@ -20,6 +20,8 @@ export const Eval = Object.freeze({
 
     EARLY_ROOK: -15,
 
+    CONNECTED_ROOKS: 15,
+
     CENTER_PAWN: 16,
 
     //----------------------------------

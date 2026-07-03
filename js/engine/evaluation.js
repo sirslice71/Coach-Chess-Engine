@@ -688,37 +688,15 @@ export default class Evaluation {
         // Connected Rooks
         //----------------------------------
 
-        if (
+        if (this.hasConnectedRooks(true)) {
 
-            this.board.pieceAt(59) === Piece.WQ ||
-
-            this.board.pieceAt(60) === Piece.WK
-
-        ) {
-
-            // Queen or king still blocking
-
-        }
-        else {
-
-            score += 15;
+            score += Eval.CONNECTED_ROOKS;
 
         }
 
-        if (
+        if (this.hasConnectedRooks(false)) {
 
-            this.board.pieceAt(3) === Piece.BQ ||
-
-            this.board.pieceAt(4) === Piece.BK
-
-        ) {
-
-            // still blocked
-
-        }
-        else {
-
-            score -= 15;
+            score -= Eval.CONNECTED_ROOKS;
 
         }
 
@@ -1700,6 +1678,69 @@ export default class Evaluation {
 
     }
 
+    hasConnectedRooks(white) {
+
+        const rooks = white
+            ? this.board.whitePieces.rooks
+            : this.board.blackPieces.rooks;
+
+        if (rooks.length < 2) {
+            return false;
+        }
+
+        for (let i = 0; i < rooks.length - 1; i++) {
+
+            for (let j = i + 1; j < rooks.length; j++) {
+
+                const first = rooks[i];
+                const second = rooks[j];
+
+                const sameRank =
+                    (first >> 3) === (second >> 3);
+
+                const sameFile =
+                    (first & 7) === (second & 7);
+
+                if (!sameRank && !sameFile) {
+                    continue;
+                }
+
+                const step = sameRank
+                    ? (first < second ? 1 : -1)
+                    : (first < second ? 8 : -8);
+
+                let clear = true;
+
+                for (
+                    let square = first + step;
+                    square !== second;
+                    square += step
+                ) {
+
+                    if (
+                        this.board.pieceAt(square) !==
+                        Piece.EMPTY
+                    ) {
+
+                        clear = false;
+                        break;
+
+                    }
+
+                }
+
+                if (clear) {
+                    return true;
+                }
+
+            }
+
+        }
+
+        return false;
+
+    }
+
     evaluateQueenDiscipline() {
 
         let score = 0;
@@ -1723,6 +1764,7 @@ export default class Evaluation {
             !whiteCastled
         ) {
             score += Eval.QUEEN_DISCIPLINE;
+
         }
 
         const blackDevelopmentIncomplete =
@@ -1744,6 +1786,7 @@ export default class Evaluation {
             !blackCastled
         ) {
             score -= Eval.QUEEN_DISCIPLINE;
+
         }
 
         return score;
