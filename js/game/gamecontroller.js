@@ -97,6 +97,137 @@ export default class GameController {
 
     }
 
+    isFirstCoachWhiteMove() {
+
+        return (
+            this.humanSide < 0 &&
+            this.board.sideToMove > 0 &&
+            this.gameMoves.length === 0
+        );
+
+    }
+
+    isFirstCoachBlackReply() {
+
+        return (
+            this.humanSide > 0 &&
+            this.board.sideToMove < 0 &&
+            this.gameMoves.length === 1
+        );
+
+    }
+
+    openingVarietyLimit() {
+
+        if (this.isFirstCoachWhiteMove()) {
+            return 5;
+        }
+
+        if (this.isFirstCoachBlackReply()) {
+            return 3;
+        }
+
+        return 0;
+
+    }
+
+    chooseOpeningVarietyMove(result, rootSideToMove) {
+
+        const limit =
+            this.openingVarietyLimit();
+
+        if (
+            limit === 0 ||
+            !result.rootMoves ||
+            result.rootMoves.length === 0
+        ) {
+            return result;
+        }
+
+        const rankedMoves =
+            result.rootMoves
+                .map(candidate => ({
+                    ...candidate,
+                    staticScore:
+                        this.openingVarietyStaticScore(
+                            candidate.move,
+                            rootSideToMove
+                        )
+                }))
+                .sort((a, b) => {
+
+                    if (b.score !== a.score) {
+                        return b.score - a.score;
+                    }
+
+                    return b.staticScore - a.staticScore;
+
+                });
+
+        const candidates =
+            rankedMoves.slice(0, limit);
+
+        const bestScore =
+            candidates[0].score;
+
+        const safeMoves =
+            candidates.filter(candidate =>
+                candidate.score >=
+                bestScore - 75
+            );
+
+        const pool =
+            safeMoves.length > 0
+                ? safeMoves
+                : [candidates[0]];
+
+        const choice =
+            pool[
+                Math.floor(
+                    Math.random() * pool.length
+                )
+            ];
+
+        result.move = choice.move;
+        result.notation = choice.notation;
+        result.evaluation =
+            (
+                this.search.toWhiteRelativeScore(
+                    choice.score,
+                    rootSideToMove
+                ) / 100
+            ).toFixed(2);
+        result.pv = [choice.move];
+
+        console.debug(
+            "Coach opening variety candidates",
+            pool.map(candidate => ({
+                move: candidate.notation,
+                score: candidate.score,
+                staticScore: candidate.staticScore
+            }))
+        );
+
+        return result;
+
+    }
+
+    openingVarietyStaticScore(move, rootSideToMove) {
+
+        this.board.makeMove(move);
+
+        const whiteScore =
+            this.search.evaluation.evaluate().total;
+
+        this.board.undoMove();
+
+        return this.search.toSideToMoveScore(
+            whiteScore,
+            rootSideToMove
+        );
+
+    }
+
     //----------------------------------
     // New Game
     //----------------------------------
@@ -133,6 +264,9 @@ export default class GameController {
 
         console.time("Coach TOTAL");
 
+        const rootSideToMove =
+            this.board.sideToMove;
+
         //----------------------------------
         // Search
         //----------------------------------
@@ -143,6 +277,11 @@ export default class GameController {
 
         const result =
             this.search.bestMove(depth);
+
+        this.chooseOpeningVarietyMove(
+            result,
+            rootSideToMove
+        );
 
         console.timeEnd("Search");
 
