@@ -20,7 +20,7 @@ go depth 1
 quit
 ```
 
-## Windows launcher
+## Windows launchers
 
 For Windows GUIs, use:
 
@@ -28,11 +28,25 @@ For Windows GUIs, use:
 coach-uci.cmd
 ```
 
-The launcher:
+For GUIs that require an `.exe` file, use:
+
+```text
+coach-uci.exe
+```
+
+`coach-uci.cmd`:
 
 - runs `node uci.js`
 - works from outside the repo root
 - prints a clear message if Node.js is not on PATH
+
+`coach-uci.exe`:
+
+- locates its own directory
+- runs `node uci.js` from that directory
+- passes stdin/stdout/stderr through for UCI communication
+- prints no extra text during normal successful operation
+- prints a clear stderr error if Node.js is not on PATH
 
 If a GUI accepts batch or command launchers directly, point it to:
 
@@ -40,10 +54,40 @@ If a GUI accepts batch or command launchers directly, point it to:
 coach-uci.cmd
 ```
 
+If a GUI requires an executable path only, point it to:
+
+```text
+coach-uci.exe
+```
+
 If a GUI prefers an executable plus arguments, point it to:
 
 - executable: `node.exe`
 - argument: `uci.js`
+
+## Building the Windows .exe launcher
+
+From the repository root:
+
+```text
+build-coach-uci-exe.cmd
+```
+
+This builds:
+
+```text
+coach-uci.exe
+```
+
+next to `uci.js`.
+
+For this launcher version, Node.js must still be installed and available on PATH at runtime.
+
+If Fritz or PowerShell cannot find Node.js:
+
+- install Node.js LTS
+- reopen Fritz and any terminal windows
+- run `coach-uci.exe` again
 
 ## Supported UCI commands
 
@@ -56,7 +100,10 @@ If a GUI prefers an executable plus arguments, point it to:
 - `position fen <fen> moves ...`
 - `go depth N`
 - `go movetime X`
-- `go wtime <ms> btime <ms> [winc <ms>] [binc <ms>]`
+- `go wtime <ms> btime <ms> [winc <ms>] [binc <ms>] [movestogo <n>]`
+- `setoption name Hash value N`
+- `setoption name Clear Hash`
+- `setoption name Move Overhead value N`
 - `quit`
 
 ## Unsupported commands
@@ -64,7 +111,7 @@ If a GUI prefers an executable plus arguments, point it to:
 - `stop`
 - `ponder`
 - `infinite`
-- `setoption`
+- unsupported `setoption` names
 
 Unsupported forms should remain UCI-safe and return protocol-safe output.
 
@@ -86,3 +133,21 @@ Common Windows GUIs that should work with this launcher style include:
 - Fritz
 
 In those GUIs, add Coach as a UCI engine and point the engine path at `coach-uci.cmd` if batch launchers are supported.
+
+For Fritz, point the engine path at:
+
+```text
+coach-uci.exe
+```
+
+If Coach lives at:
+
+```text
+<USERPROFILE>\OneDrive\Desktop\Coach Current
+```
+
+then the Fritz engine path should be:
+
+```text
+<USERPROFILE>\OneDrive\Desktop\Coach Current\coach-uci.exe
+```
