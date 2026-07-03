@@ -7,22 +7,7 @@ import Search from "../engine/search.js";
 import { Piece } from "../core/piece.js";
 import {
     algebraic,
-    fromAlgebraic
 } from "../core/square.js";
-
-function installZobristShim(zobrist) {
-
-    if (!globalThis.window) {
-        globalThis.window = {};
-    }
-
-    if (!globalThis.window.chess) {
-        globalThis.window.chess = {};
-    }
-
-    globalThis.window.chess.zobrist = zobrist;
-
-}
 
 function withMutedConsole(fn) {
 
@@ -64,27 +49,24 @@ function withMutedConsole(fn) {
 export function createEngineCore(fen = null) {
 
     const board = new Board();
-
-    const moveGenerator =
-        new MoveGenerator(board);
-
-    const legalMoveGenerator =
-        new LegalMoveGenerator(
-            board,
-            moveGenerator
-        );
-
-    const evaluation =
-        new Evaluation(board);
-
     const search =
         new Search(
             board,
-            legalMoveGenerator,
-            evaluation
+            new LegalMoveGenerator(
+                board,
+                new MoveGenerator(board)
+            ),
+            new Evaluation(board)
         );
 
-    installZobristShim(search.zobrist);
+    const moveGenerator =
+        search.legalMoveGenerator.moveGenerator;
+
+    const legalMoveGenerator =
+        search.legalMoveGenerator;
+
+    const evaluation =
+        search.evaluation;
 
     if (fen && fen !== "startpos") {
         FEN.import(board, fen);
@@ -372,6 +354,5 @@ export class UciSession {
 }
 
 export {
-    withMutedConsole,
-    installZobristShim
+    withMutedConsole
 };
