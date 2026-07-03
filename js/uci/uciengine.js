@@ -278,34 +278,77 @@ export class UciSession {
         const depthIndex =
             tokens.indexOf("depth");
 
+        const movetimeIndex =
+            tokens.indexOf("movetime");
+
+        let result = null;
+
         if (
-            depthIndex === -1 ||
-            depthIndex === tokens.length - 1
+            depthIndex !== -1 &&
+            depthIndex < tokens.length - 1
         ) {
 
+            const depth =
+                Math.max(
+                    1,
+                    Number.parseInt(
+                        tokens[depthIndex + 1],
+                        10
+                    ) || 1
+                );
+
+            result =
+                withMutedConsole(() =>
+                    this.engine.search.bestMove(
+                        depth,
+                        { quiet: true }
+                    )
+                );
+
+        }
+
+        else if (
+            movetimeIndex !== -1 &&
+            movetimeIndex < tokens.length - 1
+        ) {
+
+            const movetime =
+                Math.max(
+                    1,
+                    Number.parseInt(
+                        tokens[movetimeIndex + 1],
+                        10
+                    ) || 1
+                );
+
+            const deadlineMs =
+                performance.now() +
+                Math.max(0, movetime - 5);
+
+            result =
+                withMutedConsole(() =>
+                    this.engine.search.bestMove(
+                        64,
+                        {
+                            deadlineMs,
+                            quiet: true
+                        }
+                    )
+                );
+
+        }
+
+        else {
+
             return [
-                "info string Phase 1 supports only 'go depth N'",
+                "info string Phase 3A supports 'go depth N' and 'go movetime X'",
                 "bestmove 0000"
             ];
 
         }
 
-        const depth =
-            Math.max(
-                1,
-                Number.parseInt(
-                    tokens[depthIndex + 1],
-                    10
-                ) || 1
-            );
-
         const rootSideToMove =
             this.engine.board.sideToMove;
-
-        const result =
-            withMutedConsole(() =>
-                this.engine.search.bestMove(depth)
-            );
 
         const whiteRelativeScore =
             this.engine.search.lastSearchScore;

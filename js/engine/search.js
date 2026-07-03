@@ -13,6 +13,8 @@ import { TTFlag }
 
 const MAX_Q_PLY = 16;
 
+class SearchTimeout extends Error {}
+
 export default class Search {
 
     constructor(board, legalMoveGenerator, evaluation) {
@@ -103,6 +105,9 @@ export default class Search {
             () => new Int32Array(64)
 
         );
+
+        this.searchDeadlineMs = null;
+        this.searchQuiet = false;
         
     }
 
@@ -132,10 +137,16 @@ export default class Search {
 
     }
 
-    searchRoot(maxDepth = 1) {
+    searchRoot(maxDepth = 1, options = {}) {
 
         const rootSideToMove =
             this.board.sideToMove;
+
+        this.searchDeadlineMs =
+            options.deadlineMs ?? null;
+
+        this.searchQuiet =
+            options.quiet ?? false;
 
         this.killers = [];
 
@@ -154,8 +165,12 @@ export default class Search {
         const iterations = [];
 
         let result = null;
+        let completedDepth = 0;
 
         let previousScore = 0;
+
+        const fallbackMove =
+            this.pickFallbackMove();
 
         //----------------------------------
         // Iterative Deepening
@@ -170,6 +185,8 @@ export default class Search {
             depth++
 
         ) {
+
+            this.checkSearchDeadline();
 
             const iterationStart = performance.now();
 
@@ -187,15 +204,29 @@ export default class Search {
 
             }
 
-            result = this.searchIteration(
+            try {
 
-                depth,
+                result = this.searchIteration(
 
-                alpha,
+                    depth,
 
-                beta
+                    alpha,
 
-            );
+                    beta
+
+                );
+
+            }
+
+            catch (error) {
+
+                if (error instanceof SearchTimeout) {
+                    break;
+                }
+
+                throw error;
+
+            }
 
             //----------------------------------
             // Aspiration failed?
@@ -217,15 +248,30 @@ export default class Search {
 
                 this.aspirationResearches++;
 
-                result = this.searchIteration(
-                    depth,
-                    -SearchConstants.INFINITY,
-                    SearchConstants.INFINITY
-                );
+                try {
+
+                    result = this.searchIteration(
+                        depth,
+                        -SearchConstants.INFINITY,
+                        SearchConstants.INFINITY
+                    );
+
+                }
+
+                catch (error) {
+
+                    if (error instanceof SearchTimeout) {
+                        break;
+                    }
+
+                    throw error;
+
+                }
 
             }
 
             previousScore = result.bestScore;
+            completedDepth = depth;
 
             const iterationTime =
 
@@ -274,25 +320,53 @@ export default class Search {
 
         }
 
-        const pv = this.buildPV();
+        if (!result) {
 
-        console.log("");
+            result = {
+                bestMove: fallbackMove,
+                bestScore: 0,
+                rootMoves:
+                    fallbackMove
+                        ? [
+                            {
+                                move: fallbackMove,
+                                notation: fallbackMove.toString(),
+                                score: 0
+                            }
+                        ]
+                        : []
+            };
 
-        console.table(iterations);
+        }
 
-        console.log("");
+        const pv =
+            completedDepth > 0 && result.bestMove
+                ? this.buildPV()
+                : result.bestMove
+                    ? [result.bestMove]
+                    : [];
 
-        console.log(
+        if (!this.searchQuiet) {
 
-            "PV:",
+            console.log("");
 
-            pv.map(
+            console.table(iterations);
 
-                move => move.toString()
+            console.log("");
 
-            ).join(" ")
+            console.log(
 
-        );
+                "PV:",
+
+                pv.map(
+
+                    move => move.toString()
+
+                ).join(" ")
+
+            );
+
+        }
 
         //----------------------------------
         // Statistics
@@ -320,23 +394,30 @@ export default class Search {
         // Profile
         //----------------------------------
 
-        console.log("");
-        console.log("===== SEARCH PROFILE =====");
-        console.log("Generate :", this.generateTime.toFixed(2), "ms");
-        console.log("Order    :", this.orderTime.toFixed(2), "ms");
-        console.log("MakeMove :", this.makeMoveTime.toFixed(2), "ms");
-        console.log("UndoMove :", this.undoMoveTime.toFixed(2), "ms");
-        console.log("==========================");
-        console.log("");
-        console.log("Board makeMove :", this.board.profileMakeMove.toFixed(2));
-        console.log("Board undoMove :", this.board.profileUndoMove.toFixed(2));
-        console.log("Update lists   :", this.board.profileUpdatePieceLists.toFixed(2));
+        if (!this.searchQuiet) {
+
+            console.log("");
+            console.log("===== SEARCH PROFILE =====");
+            console.log("Generate :", this.generateTime.toFixed(2), "ms");
+            console.log("Order    :", this.orderTime.toFixed(2), "ms");
+            console.log("MakeMove :", this.makeMoveTime.toFixed(2), "ms");
+            console.log("UndoMove :", this.undoMoveTime.toFixed(2), "ms");
+            console.log("==========================");
+            console.log("");
+            console.log("Board makeMove :", this.board.profileMakeMove.toFixed(2));
+            console.log("Board undoMove :", this.board.profileUndoMove.toFixed(2));
+            console.log("Update lists   :", this.board.profileUpdatePieceLists.toFixed(2));
+
+        }
 
         this.lastSearchScore =
             this.toWhiteRelativeScore(
                 result.bestScore,
                 rootSideToMove
             );
+
+        this.searchDeadlineMs = null;
+        this.searchQuiet = false;
 
         //----------------------------------
         // Return
@@ -358,7 +439,7 @@ export default class Search {
 
                 (this.lastSearchScore / 100).toFixed(2),
 
-            depth: maxDepth,
+            depth: completedDepth,
 
             nodes: this.nodes,
 
@@ -459,6 +540,8 @@ export default class Search {
         //----------------------------------
 
         for (const move of moves) {
+
+            this.checkSearchDeadline();
 
             t = performance.now();
 
@@ -574,7 +657,9 @@ export default class Search {
     //----------------------------------
 
     negamax(depth, alpha, beta, ply = 0, isRoot = false) {
-                
+
+        this.checkSearchDeadline();
+
         this.nodes++;
 
         const alphaOriginal = alpha;
@@ -876,6 +961,8 @@ export default class Search {
 
     quiescence(alpha, beta, ply = 0, qPly = 0) {
 
+        this.checkSearchDeadline();
+
         this.leafNodes++;
 
         const inCheck = this.board.isInCheck();
@@ -1004,13 +1091,42 @@ export default class Search {
     // Best Move
     //----------------------------------
 
-    bestMove(depth = 1) {
+    bestMove(depth = 1, options = {}) {
 
         EngineDebug.searchLog(
             "***** NEW BESTMOVE *****"
         );
 
-        return this.searchRoot(depth);
+        return this.searchRoot(depth, options);
+
+    }
+
+    shouldStopSearch() {
+
+        return (
+            this.searchDeadlineMs !== null &&
+            (this.nodes & 1023) === 0 &&
+            performance.now() >= this.searchDeadlineMs
+        );
+
+    }
+
+    checkSearchDeadline() {
+
+        if (this.shouldStopSearch()) {
+            throw new SearchTimeout();
+        }
+
+    }
+
+    pickFallbackMove() {
+
+        const moves =
+            this.legalMoveGenerator.generateMoves();
+
+        return moves.length
+            ? moves[0]
+            : null;
 
     }
 

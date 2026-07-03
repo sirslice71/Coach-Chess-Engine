@@ -201,3 +201,137 @@ test("UCI process handshake and depth-1 search return protocol-safe output", asy
     );
 
 });
+
+test("UCI process movetime search returns a legal bestmove", async () => {
+
+    const child = spawn(
+        process.execPath,
+        ["uci.js"],
+        {
+            cwd: process.cwd(),
+            stdio: ["pipe", "pipe", "pipe"]
+        }
+    );
+
+    let stdout = "";
+
+    child.stdout.setEncoding("utf8");
+
+    child.stdout.on("data", chunk => {
+        stdout += chunk;
+    });
+
+    child.stdin.write("position startpos moves e2e4 e7e5\n");
+    child.stdin.write("go movetime 100\n");
+    child.stdin.write("quit\n");
+    child.stdin.end();
+
+    await new Promise((resolve, reject) => {
+
+        child.on("error", reject);
+        child.on("close", resolve);
+
+    });
+
+    const lines =
+        stdout
+            .split(/\r?\n/)
+            .map(line => line.trim())
+            .filter(Boolean);
+
+    const bestMoveLine =
+        lines.find(line => line.startsWith("bestmove "));
+
+    assert.ok(bestMoveLine);
+
+    const bestMove =
+        bestMoveLine.slice("bestmove ".length);
+
+    const engine =
+        createEngineCore();
+
+    applyUciMove(engine, "e2e4");
+    applyUciMove(engine, "e7e5");
+
+    assert.ok(
+        legalUciMoves(engine).has(bestMove),
+        `Expected legal bestmove, got ${bestMove}`
+    );
+
+});
+
+test("UCI process tiny movetime still returns protocol-safe bestmove", async () => {
+
+    const child = spawn(
+        process.execPath,
+        ["uci.js"],
+        {
+            cwd: process.cwd(),
+            stdio: ["pipe", "pipe", "pipe"]
+        }
+    );
+
+    let stdout = "";
+
+    child.stdout.setEncoding("utf8");
+
+    child.stdout.on("data", chunk => {
+        stdout += chunk;
+    });
+
+    child.stdin.write("position startpos\n");
+    child.stdin.write("go movetime 1\n");
+    child.stdin.write("quit\n");
+    child.stdin.end();
+
+    await new Promise((resolve, reject) => {
+
+        child.on("error", reject);
+        child.on("close", resolve);
+
+    });
+
+    const lines =
+        stdout
+            .split(/\r?\n/)
+            .map(line => line.trim())
+            .filter(Boolean);
+
+    const bestMoveLine =
+        lines.find(line => line.startsWith("bestmove "));
+
+    assert.ok(bestMoveLine);
+
+    const bestMove =
+        bestMoveLine.slice("bestmove ".length);
+
+    const engine =
+        createEngineCore();
+
+    assert.ok(
+        bestMove === "0000" ||
+        legalUciMoves(engine).has(bestMove),
+        `Expected legal bestmove or 0000, got ${bestMove}`
+    );
+
+});
+
+test("unsupported go forms remain UCI-safe", () => {
+
+    const session =
+        new UciSession();
+
+    const responses =
+        session.handleCommand(
+            "go wtime 300000 btime 300000"
+        );
+
+    assert.deepEqual(
+        responses,
+        [
+            "info string Phase 3A supports 'go depth N' and 'go movetime X'",
+            "bestmove 0000"
+        ]
+    );
+
+});
