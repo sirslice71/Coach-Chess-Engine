@@ -452,6 +452,55 @@ console.log(window.chess.search);
 
 ui.initialize();
 
+function selectedCoachDepth() {
+
+    const select =
+        document.getElementById("difficulty");
+
+    const depth =
+        Number.parseInt(select.value, 10);
+
+    return Number.isFinite(depth)
+        ? depth
+        : 5;
+
+}
+
+function chooseNewGameSide() {
+
+    const answer = prompt(
+        "New Game\n\nChoose your color:\nW = Play as White\nB = Play as Black\n\nPress Cancel to keep the current game."
+    );
+
+    if (answer === null) {
+        return null;
+    }
+
+    const normalized =
+        answer.trim().toLowerCase();
+
+    if (
+        normalized === "w" ||
+        normalized === "white"
+    ) {
+        return 1;
+    }
+
+    if (
+        normalized === "b" ||
+        normalized === "black"
+    ) {
+        return -1;
+    }
+
+    alert(
+        "New Game canceled.\n\nPlease enter W for White or B for Black."
+    );
+
+    return null;
+
+}
+
 //----------------------------------
 // Button Events
 //----------------------------------
@@ -470,18 +519,16 @@ document
 
         () => {
 
-            const answer = confirm(
+            const humanSide =
+                chooseNewGameSide();
 
-                "Start a new game?\n\nCurrent game progress will be lost."
-
-            );
-
-            if (!answer)
+            if (humanSide === null)
                 return;
 
-            board.initializePosition();
-
-            ui.draw();
+            gameController.startNewGame(
+                humanSide,
+                selectedCoachDepth()
+            );
 
         }
 

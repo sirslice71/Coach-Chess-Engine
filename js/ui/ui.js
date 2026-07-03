@@ -101,6 +101,10 @@ export default class UI {
 
     squareClicked(square) {
 
+        if (!window.chess.gameController.isHumanTurn()) {
+            return;
+        }
+
         const piece = this.board.pieceAt(square);
 
         // Nothing selected yet
@@ -180,7 +184,7 @@ export default class UI {
 
                     window.chess.gameController.autoCoach &&
 
-                    this.board.sideToMove < 0
+                    !window.chess.gameController.isHumanTurn()
 
                 ) {
 

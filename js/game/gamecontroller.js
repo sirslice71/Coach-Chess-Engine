@@ -39,6 +39,61 @@ export default class GameController {
 
         this.gameMoves = [];
 
+        this.humanSide = 1;
+
+    }
+
+    //----------------------------------
+    // Human Side
+    //----------------------------------
+
+    setHumanSide(side) {
+
+        this.humanSide =
+            side > 0 ? 1 : -1;
+
+    }
+
+    isHumanTurn() {
+
+        return this.board.sideToMove ===
+            this.humanSide;
+
+    }
+
+    //----------------------------------
+    // New Game
+    //----------------------------------
+
+    startNewGame(
+        humanSide = 1,
+        depth = 5
+    ) {
+
+        this.stopCoachVsCoach();
+
+        this.setHumanSide(humanSide);
+
+        this.board.initializePosition();
+
+        this.gameMoves = [];
+
+        this.ui.selectedSquare = -1;
+        this.ui.draw();
+        this.ui.enginePanel.setStatus("Ready");
+
+        if (this.humanSide < 0) {
+
+            setTimeout(() => {
+
+                if (!this.isHumanTurn()) {
+                    this.coachMove(depth);
+                }
+
+            }, 50);
+
+        }
+
     }
 
     //----------------------------------
