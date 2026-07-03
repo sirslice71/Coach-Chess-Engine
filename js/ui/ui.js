@@ -63,13 +63,13 @@ export default class UI {
 
             for (let col = 0; col < 8; col++) {
 
-                const squareIndex = row * 8 + col;
+                const displayIndex = row * 8 + col;
 
                 const square = document.createElement("div");
 
                 square.className = "square";
 
-                square.dataset.square = squareIndex;
+                square.dataset.square = displayIndex;
 
                 if ((row + col) % 2 === 0) {
                     square.classList.add("light");
@@ -87,7 +87,11 @@ export default class UI {
 
                 square.addEventListener("click", () => {
 
-                    this.squareClicked(squareIndex);
+                    this.squareClicked(
+                        this.displaySquareToBoardSquare(
+                            displayIndex
+                        )
+                    );
 
                 });
 
@@ -180,23 +184,9 @@ export default class UI {
                 // Auto Coach Move
                 //----------------------------------
 
-                if (
-
-                    window.chess.gameController.autoCoach &&
-
-                    !window.chess.gameController.isHumanTurn()
-
-                ) {
-
-                    // Let browser repaint first
-
-                    setTimeout(() => {
-
-                        window.chess.gameController.coachMove();
-
-                    }, 50);
-
-                }
+                window.chess.gameController.scheduleCoachMove(
+                    this.currentCoachDepth()
+                );
 
                 return;
 
@@ -242,11 +232,20 @@ export default class UI {
 
         const squares = this.boardElement.children;
 
-        for (let i = 0; i < 64; i++) {
+        for (let displayIndex = 0; displayIndex < 64; displayIndex++) {
 
-            const piece = this.board.pieceAt(i);
+            const boardSquare =
+                this.displaySquareToBoardSquare(
+                    displayIndex
+                );
 
-            const square = squares[i];
+            const piece =
+                this.board.pieceAt(boardSquare);
+
+            const square = squares[displayIndex];
+
+            square.dataset.square =
+                boardSquare;
 
             square.innerHTML = "";
 
@@ -271,9 +270,44 @@ export default class UI {
 
     flipBoard() {
 
-        this.flipped = !this.flipped;
+        this.setFlipped(!this.flipped);
 
         this.draw();
+
+    }
+
+    setFlipped(flipped) {
+
+        this.flipped = !!flipped;
+
+    }
+
+    displaySquareToBoardSquare(displaySquare) {
+
+        return this.flipped
+            ? 63 - displaySquare
+            : displaySquare;
+
+    }
+
+    boardSquareToDisplaySquare(boardSquare) {
+
+        return this.flipped
+            ? 63 - boardSquare
+            : boardSquare;
+
+    }
+
+    currentCoachDepth() {
+
+        if (
+            window.chess &&
+            typeof window.chess.getCoachDepth === "function"
+        ) {
+            return window.chess.getCoachDepth();
+        }
+
+        return 5;
 
     }
 
@@ -293,7 +327,11 @@ export default class UI {
 
         this.clearSelection();
 
-        this.boardElement.children[squareNumber]
+        this.boardElement.children[
+            this.boardSquareToDisplaySquare(
+                squareNumber
+            )
+        ]
             .classList.add("selected");
 
         this.selectedSquare = squareNumber;
@@ -311,12 +349,20 @@ export default class UI {
 
             if (move.isCapture()) {
 
-                this.boardElement.children[move.toSquare]
+                this.boardElement.children[
+                    this.boardSquareToDisplaySquare(
+                        move.toSquare
+                    )
+                ]
                     .classList.add("capture");
 
             } else {
 
-                this.boardElement.children[move.toSquare]
+                this.boardElement.children[
+                    this.boardSquareToDisplaySquare(
+                        move.toSquare
+                    )
+                ]
                     .classList.add("legal");
 
             }

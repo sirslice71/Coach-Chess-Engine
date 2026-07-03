@@ -197,6 +197,12 @@ window.chess = {
 
     },
 
+    getCoachDepth() {
+
+        return selectedCoachDepth();
+
+    },
+
     material() {
 
         return {

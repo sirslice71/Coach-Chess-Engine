@@ -41,6 +41,10 @@ export default class GameController {
 
         this.humanSide = 1;
 
+        this.interval = null;
+
+        this.coachMovePending = false;
+
     }
 
     //----------------------------------
@@ -61,6 +65,38 @@ export default class GameController {
 
     }
 
+    shouldCoachPlay() {
+
+        return (
+            this.autoCoach &&
+            !this.isHumanTurn()
+        );
+
+    }
+
+    scheduleCoachMove(depth = 5) {
+
+        if (
+            !this.shouldCoachPlay() ||
+            this.coachMovePending
+        ) {
+            return;
+        }
+
+        this.coachMovePending = true;
+
+        setTimeout(() => {
+
+            this.coachMovePending = false;
+
+            if (this.shouldCoachPlay()) {
+                this.coachMove(depth);
+            }
+
+        }, 50);
+
+    }
+
     //----------------------------------
     // New Game
     //----------------------------------
@@ -78,21 +114,14 @@ export default class GameController {
 
         this.gameMoves = [];
 
+        this.coachMovePending = false;
+
         this.ui.selectedSquare = -1;
+        this.ui.flipped = this.humanSide < 0;
         this.ui.draw();
         this.ui.enginePanel.setStatus("Ready");
 
-        if (this.humanSide < 0) {
-
-            setTimeout(() => {
-
-                if (!this.isHumanTurn()) {
-                    this.coachMove(depth);
-                }
-
-            }, 50);
-
-        }
+        this.scheduleCoachMove(depth);
 
     }
 
