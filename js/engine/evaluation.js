@@ -1564,6 +1564,11 @@ export default class Evaluation {
         if (this.isCastled(true)) {
             score += Eval.CASTLING_COMPLETE;
         }
+        else if (this.board.whiteKing !== 60) {
+
+            score += Eval.CASTLING_ABORTED;
+
+        }
         else if (whiteDevelopmentStarted) {
 
             const readiness =
@@ -1586,6 +1591,11 @@ export default class Evaluation {
 
         if (this.isCastled(false)) {
             score -= Eval.CASTLING_COMPLETE;
+        }
+        else if (this.board.blackKing !== 4) {
+
+            score -= Eval.CASTLING_ABORTED;
+
         }
         else if (blackDevelopmentStarted) {
 

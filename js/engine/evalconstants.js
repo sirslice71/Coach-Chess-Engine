@@ -34,6 +34,8 @@ export const Eval = Object.freeze({
 
     CASTLING_COMPLETE: 18,
 
+    CASTLING_ABORTED: -60,
+
     KING_SHIELD_ADVANCED: -3,
 
     KING_SHIELD_MISSING: -6,
