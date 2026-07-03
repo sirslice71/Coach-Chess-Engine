@@ -238,6 +238,9 @@ export default class Evaluation {
         score.king.pawnShield =
             this.evaluatePawnShield();
 
+        score.king.safety =
+            this.evaluateKingSafety();
+
         score.king.total =
 
             score.king.castled +
@@ -1544,6 +1547,87 @@ export default class Evaluation {
         }
 
         return score;
+
+    }
+
+    evaluateKingSafety() {
+
+        const phase = this.gamePhase();
+
+        if (phase < 8) {
+            return 0;
+        }
+
+        const whiteSafety =
+            this.evaluateKingExposureForSide(true);
+
+        const blackSafety =
+            this.evaluateKingExposureForSide(false);
+
+        return Math.round(
+            (whiteSafety - blackSafety) *
+            phase / 24
+        );
+
+    }
+
+    evaluateKingExposureForSide(white) {
+
+        const kingSquare = white
+            ? this.board.whiteKing
+            : this.board.blackKing;
+
+        const homeSquare = white
+            ? 60
+            : 4;
+
+        if (
+            kingSquare === homeSquare ||
+            this.isCastled(white) ||
+            !this.hasCastledRookStructure(white)
+        ) {
+            return 0;
+        }
+
+        const enemyHeavyPieces = white
+            ? this.board.blackPieces.queens.length +
+                this.board.blackPieces.rooks.length
+            : this.board.whitePieces.queens.length +
+                this.board.whitePieces.rooks.length;
+
+        if (enemyHeavyPieces === 0) {
+            return 0;
+        }
+
+        return Eval.KING_EXPOSED;
+
+    }
+
+    hasCastledRookStructure(white) {
+
+        if (white) {
+
+            const kingSideCastle =
+                this.board.pieceAt(61) === Piece.WR &&
+                this.board.pieceAt(63) !== Piece.WR;
+
+            const queenSideCastle =
+                this.board.pieceAt(59) === Piece.WR &&
+                this.board.pieceAt(56) !== Piece.WR;
+
+            return kingSideCastle || queenSideCastle;
+
+        }
+
+        const kingSideCastle =
+            this.board.pieceAt(5) === Piece.BR &&
+            this.board.pieceAt(7) !== Piece.BR;
+
+        const queenSideCastle =
+            this.board.pieceAt(3) === Piece.BR &&
+            this.board.pieceAt(0) !== Piece.BR;
+
+        return kingSideCastle || queenSideCastle;
 
     }
 

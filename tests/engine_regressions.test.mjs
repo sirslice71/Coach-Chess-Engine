@@ -372,6 +372,24 @@ test("depth-5 castling regression prefers castling over the king walk", () => {
 
 });
 
+test("static evaluation prefers rook recapture over exposed king recapture", () => {
+
+    const fen =
+        "rq3rk1/p1pn1Pp1/2p1p2p/3pQ3/1P1P4/2P1PP2/P6P/RN3RK1 b - - 0 1";
+
+    const kingRecapture =
+        searchMoveScore(fen, "g8-f7", 1);
+
+    const rookRecapture =
+        searchMoveScore(fen, "f8-f7", 1);
+
+    assert.ok(
+        rookRecapture < kingRecapture,
+        `Expected Rxf7 to evaluate better than Kxf7, got ${rookRecapture} vs ${kingRecapture}`
+    );
+
+});
+
 test("depth-5 Nxe5 rook regression keeps the tactical bishop move", () => {
 
     const result =

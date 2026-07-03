@@ -1404,6 +1404,10 @@ export default class Search {
                     after.eval.king.pawnShield -
                     before.eval.king.pawnShield,
 
+                kingSafety:
+                    after.eval.king.safety -
+                    before.eval.king.safety,
+
                 king:
                     after.eval.king.total -
                     before.eval.king.total,
@@ -1511,6 +1515,8 @@ export default class Search {
                 "King PST Δ": delta.kingPST,
 
                 "Pawn Shield Δ": delta.pawnShield,
+
+                "King Safety Δ": delta.kingSafety,
 
                 "King Total Δ": delta.king,
 
@@ -1706,6 +1712,10 @@ export default class Search {
             pawnShield:
                 after.eval.king.pawnShield -
                 before.eval.king.pawnShield,
+
+            kingSafety:
+                after.eval.king.safety -
+                before.eval.king.safety,
 
             knightMobility:
                 after.eval.mobility.knights -
@@ -1941,7 +1951,9 @@ export default class Search {
 
             [
 
-                { label: "Pawn Shield", value: delta.pawnShield }
+                { label: "Pawn Shield", value: delta.pawnShield },
+
+                { label: "King Safety", value: delta.kingSafety }
 
             ],
 

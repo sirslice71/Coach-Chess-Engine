@@ -40,6 +40,8 @@ export const Eval = Object.freeze({
 
     KING_SHIELD_MISSING: -6,
 
+    KING_EXPOSED: -70,
+
     //----------------------------------
     // Mobility
     //----------------------------------
