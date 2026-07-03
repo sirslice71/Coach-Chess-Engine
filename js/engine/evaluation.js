@@ -688,6 +688,49 @@ export default class Evaluation {
         }
 
         //----------------------------------
+        // Penalize early knight development
+        // before any center-pawn move
+        //----------------------------------
+
+        const whiteCenterPawnsUntouched =
+            this.board.pieceAt(51) === Piece.WP &&
+            this.board.pieceAt(52) === Piece.WP;
+
+        if (
+            whiteCenterPawnsUntouched &&
+            !this.isCastled(true)
+        ) {
+
+            if (this.board.pieceAt(57) !== Piece.WN) {
+                score -= Eval.PREMATURE_KNIGHT;
+            }
+
+            if (this.board.pieceAt(62) !== Piece.WN) {
+                score -= Eval.PREMATURE_KNIGHT;
+            }
+
+        }
+
+        const blackCenterPawnsUntouched =
+            this.board.pieceAt(11) === Piece.BP &&
+            this.board.pieceAt(12) === Piece.BP;
+
+        if (
+            blackCenterPawnsUntouched &&
+            !this.isCastled(false)
+        ) {
+
+            if (this.board.pieceAt(1) !== Piece.BN) {
+                score += Eval.PREMATURE_KNIGHT;
+            }
+
+            if (this.board.pieceAt(6) !== Piece.BN) {
+                score += Eval.PREMATURE_KNIGHT;
+            }
+
+        }
+
+        //----------------------------------
         // Connected Rooks
         //----------------------------------
 

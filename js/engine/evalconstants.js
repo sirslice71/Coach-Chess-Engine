@@ -10,6 +10,8 @@ export const Eval = Object.freeze({
 
     DEVELOP_MINOR: 10,
 
+    PREMATURE_KNIGHT: 8,
+
     DEVELOPMENT_COMPLETE: 20,
 
     //----------------------------------
