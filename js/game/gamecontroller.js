@@ -131,6 +131,41 @@ export default class GameController {
 
     }
 
+    approvedWhiteOpeningMoves() {
+
+        return new Set([
+            "e2-e4",
+            "d2-d4",
+            "g1-f3",
+            "b1-c3",
+            "c2-c4"
+        ]);
+
+    }
+
+    rankOpeningVarietyMoves(rootMoves, rootSideToMove) {
+
+        return rootMoves
+            .map(candidate => ({
+                ...candidate,
+                staticScore:
+                    this.openingVarietyStaticScore(
+                        candidate.move,
+                        rootSideToMove
+                    )
+            }))
+            .sort((a, b) => {
+
+                if (b.score !== a.score) {
+                    return b.score - a.score;
+                }
+
+                return b.staticScore - a.staticScore;
+
+            });
+
+    }
+
     chooseOpeningVarietyMove(result, rootSideToMove) {
 
         const limit =
@@ -145,27 +180,41 @@ export default class GameController {
         }
 
         const rankedMoves =
-            result.rootMoves
-                .map(candidate => ({
-                    ...candidate,
-                    staticScore:
-                        this.openingVarietyStaticScore(
-                            candidate.move,
-                            rootSideToMove
-                        )
-                }))
-                .sort((a, b) => {
+            this.rankOpeningVarietyMoves(
+                result.rootMoves,
+                rootSideToMove
+            );
 
-                    if (b.score !== a.score) {
-                        return b.score - a.score;
-                    }
+        let candidates;
 
-                    return b.staticScore - a.staticScore;
+        if (this.isFirstCoachWhiteMove()) {
 
-                });
+            const approvedMoves =
+                this.approvedWhiteOpeningMoves();
 
-        const candidates =
-            rankedMoves.slice(0, limit);
+            candidates =
+                rankedMoves.filter(candidate =>
+                    approvedMoves.has(
+                        candidate.move.toString()
+                    )
+                );
+
+            if (candidates.length === 0) {
+
+                console.warn(
+                    "Coach opening variety found no approved White first moves; using normal best move."
+                );
+
+                return result;
+
+            }
+
+        } else {
+
+            candidates =
+                rankedMoves.slice(0, limit);
+
+        }
 
         const bestScore =
             candidates[0].score;
@@ -200,7 +249,7 @@ export default class GameController {
         result.pv = [choice.move];
 
         console.debug(
-            "Coach opening variety candidates",
+            "Coach opening variety pool",
             pool.map(candidate => ({
                 move: candidate.notation,
                 score: candidate.score,
