@@ -345,7 +345,7 @@ test("time allocation uses the correct side clock and increment", () => {
         });
 
     assert.equal(whiteBudget, 11496);
-    assert.equal(blackBudget, 50);
+    assert.equal(blackBudget, 31);
 
 });
 
@@ -369,8 +369,77 @@ test("time allocation is capped and stays safe in low time", () => {
             binc: 0
         });
 
+    const severeLowTimeBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300,
+            btime: 300,
+            winc: 0,
+            binc: 0
+        });
+
     assert.equal(cappedBudget, 95);
     assert.equal(lowTimeBudget, 10);
+    assert.equal(severeLowTimeBudget, 10);
+
+});
+
+test("time allocation returns sensible budgets for common time controls", () => {
+
+    assert.equal(
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 60000,
+            btime: 60000,
+            winc: 0,
+            binc: 0
+        }),
+        1996
+    );
+
+    assert.equal(
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 60000,
+            btime: 60000,
+            winc: 1000,
+            binc: 1000
+        }),
+        2746
+    );
+
+    assert.equal(
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 0,
+            binc: 0
+        }),
+        9996
+    );
+
+    assert.equal(
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 2000,
+            binc: 2000
+        }),
+        11496
+    );
+
+    assert.equal(
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 900000,
+            btime: 900000,
+            winc: 5000,
+            binc: 5000
+        }),
+        33746
+    );
 
 });
 

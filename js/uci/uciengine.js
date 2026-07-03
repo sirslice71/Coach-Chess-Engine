@@ -194,10 +194,19 @@ export function allocateMoveTime({
     const incrementPart =
         increment * 0.75;
 
+    let minimumFloor = 50;
+
+    if (remainingTime <= 500) {
+        minimumFloor = 10;
+    }
+    else if (remainingTime <= 2000) {
+        minimumFloor = 25;
+    }
+
     const minimumBudget =
         Math.min(
             usableTime,
-            remainingTime > 100 ? 50 : 25
+            minimumFloor
         );
 
     const maximumBudget =
