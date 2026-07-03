@@ -44,6 +44,12 @@ export const Eval = Object.freeze({
 
     KING_EXPOSED: -70,
 
+    ROOK_OPEN_FILE: 8,
+
+    ROOK_HALF_OPEN_FILE: 4,
+
+    KING_BLOCKS_ROOK: -12,
+
     //----------------------------------
     // Mobility
     //----------------------------------

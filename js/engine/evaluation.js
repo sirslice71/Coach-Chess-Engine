@@ -217,6 +217,12 @@ export default class Evaluation {
         score.position.pieceSquares =
             this.evaluatePieceSquares();
 
+        score.position.openFiles =
+            this.evaluateRookFileActivity();
+
+        score.position.rookConnection =
+            this.evaluateKingRookCoordination();
+
         score.position.total =
 
             score.position.pieceSquares +
@@ -763,6 +769,116 @@ export default class Evaluation {
             this.board.blackMaterial
 
         );
+
+    }
+
+    evaluateRookFileActivity() {
+
+        const whiteFiles = new Int8Array(8);
+        const blackFiles = new Int8Array(8);
+
+        for (const square of this.board.whitePieces.pawns) {
+            whiteFiles[square & 7]++;
+        }
+
+        for (const square of this.board.blackPieces.pawns) {
+            blackFiles[square & 7]++;
+        }
+
+        let score = 0;
+
+        for (const square of this.board.whitePieces.rooks) {
+
+            const file = square & 7;
+
+            if (whiteFiles[file] !== 0) {
+                continue;
+            }
+
+            score += blackFiles[file] === 0
+                ? Eval.ROOK_OPEN_FILE
+                : Eval.ROOK_HALF_OPEN_FILE;
+
+        }
+
+        for (const square of this.board.blackPieces.rooks) {
+
+            const file = square & 7;
+
+            if (blackFiles[file] !== 0) {
+                continue;
+            }
+
+            score -= whiteFiles[file] === 0
+                ? Eval.ROOK_OPEN_FILE
+                : Eval.ROOK_HALF_OPEN_FILE;
+
+        }
+
+        return score;
+
+    }
+
+    evaluateKingRookCoordination() {
+
+        const phase = this.gamePhase();
+
+        if (phase < 8) {
+            return 0;
+        }
+
+        const whiteCoordination =
+            this.evaluateKingRookCoordinationForSide(true);
+
+        const blackCoordination =
+            this.evaluateKingRookCoordinationForSide(false);
+
+        return Math.round(
+            (whiteCoordination - blackCoordination) *
+            phase / 24
+        );
+
+    }
+
+    evaluateKingRookCoordinationForSide(white) {
+
+        if (this.isCastled(white)) {
+            return 0;
+        }
+
+        const enemyHeavyPieces = white
+            ? this.board.blackPieces.queens.length +
+                this.board.blackPieces.rooks.length
+            : this.board.whitePieces.queens.length +
+                this.board.whitePieces.rooks.length;
+
+        if (enemyHeavyPieces === 0) {
+            return 0;
+        }
+
+        const kingSquare = white
+            ? this.board.whiteKing
+            : this.board.blackKing;
+
+        const kingSideBlock =
+            white
+                ? kingSquare === 61 &&
+                    this.board.pieceAt(63) === Piece.WR
+                : kingSquare === 5 &&
+                    this.board.pieceAt(7) === Piece.BR;
+
+        const queenSideBlock =
+            white
+                ? kingSquare === 59 &&
+                    this.board.pieceAt(56) === Piece.WR
+                : kingSquare === 3 &&
+                    this.board.pieceAt(0) === Piece.BR;
+
+        if (!kingSideBlock && !queenSideBlock) {
+            return 0;
+        }
+
+        return Eval.KING_BLOCKS_ROOK;
 
     }
 

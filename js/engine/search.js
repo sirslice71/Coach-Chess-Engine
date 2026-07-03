@@ -1526,6 +1526,18 @@ export default class Search {
                     after.pst.king -
                     before.pst.king,
 
+                rookFiles:
+                    after.eval.position.openFiles -
+                    before.eval.position.openFiles,
+
+                rookCoordination:
+                    after.eval.position.rookConnection -
+                    before.eval.position.rookConnection,
+
+                position:
+                    after.eval.position.total -
+                    before.eval.position.total,
+
                 pawnShield:
                     after.eval.king.pawnShield -
                     before.eval.king.pawnShield,
@@ -1639,6 +1651,12 @@ export default class Search {
                 "Queen PST Δ": delta.queenPST,
 
                 "King PST Δ": delta.kingPST,
+
+                "Rook Files Δ": delta.rookFiles,
+
+                "King/Rook Coord Δ": delta.rookCoordination,
+
+                "Position Δ": delta.position,
 
                 "Pawn Shield Δ": delta.pawnShield,
 
@@ -1806,6 +1824,18 @@ export default class Search {
             kingPST:
                 after.pst.king -
                 before.pst.king,
+
+            rookFiles:
+                after.eval.position.openFiles -
+                before.eval.position.openFiles,
+
+            rookCoordination:
+                after.eval.position.rookConnection -
+                before.eval.position.rookConnection,
+
+            position:
+                after.eval.position.total -
+                before.eval.position.total,
 
             pieceSquares:
                 after.pst.total -
@@ -2036,6 +2066,28 @@ export default class Search {
             "Piece-Square Total",
 
             delta.pieceSquares
+
+        );
+
+        //----------------------------------
+        // Position
+        //----------------------------------
+
+        this.printSection(
+
+            "Position",
+
+            [
+
+                { label: "Rook File Activity", value: delta.rookFiles },
+
+                { label: "King/Rook Coordination", value: delta.rookCoordination }
+
+            ],
+
+            "Position Total",
+
+            delta.position
 
         );
 
