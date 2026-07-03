@@ -16,6 +16,8 @@ const UCI_HASH_MAX_MB = 512;
 const UCI_MOVE_OVERHEAD_DEFAULT_MS = 50;
 const UCI_MOVE_OVERHEAD_MIN_MS = 0;
 const UCI_MOVE_OVERHEAD_MAX_MS = 1000;
+const UCI_DEFAULT_MOVES_TO_GO = 30;
+const UCI_MAX_MOVES_TO_GO = 100;
 
 function withMutedConsole(fn) {
 
@@ -173,7 +175,8 @@ export function allocateMoveTime({
     btime = 0,
     winc = 0,
     binc = 0,
-    moveOverheadMs = UCI_MOVE_OVERHEAD_DEFAULT_MS
+    moveOverheadMs = UCI_MOVE_OVERHEAD_DEFAULT_MS,
+    movestogo = null
 }) {
 
     const remainingTime =
@@ -204,8 +207,17 @@ export function allocateMoveTime({
     const usableTime =
         Math.max(1, remainingTime - reservedTime);
 
+    const movesToGo =
+        Number.isInteger(movestogo) &&
+        movestogo > 0
+            ? Math.min(
+                UCI_MAX_MOVES_TO_GO,
+                movestogo
+            )
+            : UCI_DEFAULT_MOVES_TO_GO;
+
     const base =
-        usableTime / 30;
+        usableTime / movesToGo;
 
     const incrementPart =
         increment * 0.75;
@@ -556,6 +568,8 @@ export class UciSession {
 
         const btimeIndex =
             tokens.indexOf("btime");
+        const movestogoIndex =
+            tokens.indexOf("movestogo");
 
         let result = null;
 
@@ -630,6 +644,16 @@ export class UciSession {
                                 10
                             ) || 0
                             : 0,
+                    movestogo:
+                        (
+                            movestogoIndex !== -1 &&
+                            movestogoIndex < tokens.length - 1
+                        )
+                            ? Number.parseInt(
+                                tokens[movestogoIndex + 1],
+                                10
+                            )
+                            : null,
                     moveOverheadMs:
                         this.moveOverheadMs
                 });

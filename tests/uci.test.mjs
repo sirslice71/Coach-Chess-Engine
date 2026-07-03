@@ -474,6 +474,109 @@ test("time allocation with higher move overhead reduces the clock budget", () =>
 
 });
 
+test("movestogo changes the clock allocation when valid", () => {
+
+    const moves10Budget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 2000,
+            binc: 2000,
+            movestogo: 10
+        });
+
+    const moves40Budget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 2000,
+            binc: 2000,
+            movestogo: 40
+        });
+
+    assert.equal(moves10Budget, 29985);
+    assert.equal(moves40Budget, 8996);
+    assert.ok(moves10Budget > moves40Budget);
+
+});
+
+test("missing or invalid movestogo falls back to the /30 default", () => {
+
+    const defaultBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 2000,
+            binc: 2000
+        });
+
+    const zeroBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 2000,
+            binc: 2000,
+            movestogo: 0
+        });
+
+    const negativeBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 2000,
+            binc: 2000,
+            movestogo: -5
+        });
+
+    const nullBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 2000,
+            binc: 2000,
+            movestogo: null
+        });
+
+    assert.equal(defaultBudget, 11495);
+    assert.equal(zeroBudget, defaultBudget);
+    assert.equal(negativeBudget, defaultBudget);
+    assert.equal(nullBudget, defaultBudget);
+
+});
+
+test("movestogo is clamped to a safe maximum", () => {
+
+    const maxClampedBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 2000,
+            binc: 2000,
+            movestogo: 999
+        });
+
+    const explicit100Budget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 2000,
+            binc: 2000,
+            movestogo: 100
+        });
+
+    assert.equal(maxClampedBudget, explicit100Budget);
+    assert.equal(explicit100Budget, 4498);
+
+});
+
 test("UCI process clock-based search returns a legal bestmove", async () => {
 
     const child = spawn(
@@ -812,6 +915,57 @@ test("Move Overhead does not affect go movetime", () => {
         );
 
         assert.equal(lastDeadlineMs, 5095);
+
+    }
+
+    finally {
+
+        performance.now = originalNow;
+
+    }
+
+});
+
+test("movestogo does not affect go movetime", () => {
+
+    const originalNow =
+        performance.now;
+
+    try {
+
+        performance.now = () => 7000;
+
+        const session =
+            new UciSession();
+
+        const move =
+            session.engine.legalMoveGenerator
+                .generateMoves()[0];
+
+        let lastDeadlineMs = null;
+
+        session.engine.search.bestMove =
+            (_depth, options = {}) => {
+
+                lastDeadlineMs =
+                    options.deadlineMs;
+
+                session.engine.search.lastSearchScore = 0;
+
+                return {
+                    move,
+                    pv: [move],
+                    depth: 1,
+                    nodes: 1
+                };
+
+            };
+
+        session.handleCommand(
+            "go movetime 100 movestogo 5"
+        );
+
+        assert.equal(lastDeadlineMs, 7095);
 
     }
 
