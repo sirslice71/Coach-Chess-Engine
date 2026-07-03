@@ -4,6 +4,7 @@
 
 import EngineDebug
     from "../dev/enginedebug.js";
+import SEE from "./see.js";
 
 //----------------------------------
 // Move Ordering Scores
@@ -11,6 +12,9 @@ import EngineDebug
 
 const SCORE_PROMOTION = 10000;
 const SCORE_CAPTURE   = 5000;
+const SCORE_CAPTURE_WINNING = 30000;
+const SCORE_CAPTURE_EQUAL   = 20000;
+const SCORE_CAPTURE_LOSING  = 10000;
 
 const SCORE_KILLER1   = 4000;
 const SCORE_KILLER2   = 3900;
@@ -119,7 +123,39 @@ export default class MoveOrdering {
 
         if (move.isCapture()) {
 
-            score += 100000;
+            const seeScore =
+                SEE.evaluateCapture(
+                    this.board,
+                    move
+                );
+
+            move.seeScore = seeScore;
+
+            score += SCORE_CAPTURE;
+
+            if (seeScore > 0) {
+
+                score += SCORE_CAPTURE_WINNING;
+
+            }
+
+            else if (seeScore === 0) {
+
+                score += SCORE_CAPTURE_EQUAL;
+
+            }
+
+            else {
+
+                score += SCORE_CAPTURE_LOSING;
+
+            }
+
+            score +=
+                Math.max(
+                    Math.min(seeScore, 999),
+                    -999
+                );
 
             score +=
                 this.pieceValue(move.capturedPiece);
