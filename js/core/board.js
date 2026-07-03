@@ -1048,6 +1048,10 @@ export default class Board {
                 history.capturedPiece
             );
 
+            this.removeMaterial(
+                history.capturedPiece
+            );
+
         }
 
         //======================================
@@ -1107,6 +1111,10 @@ export default class Board {
                     Piece.BP
                 );
 
+                this.removeMaterial(
+                    Piece.BP
+                );
+
                 this.squares[move.toSquare + 8] =
                     Piece.EMPTY;
 
@@ -1117,6 +1125,10 @@ export default class Board {
 
                 this.removePiece(
                     move.toSquare - 8,
+                    Piece.WP
+                );
+
+                this.removeMaterial(
                     Piece.WP
                 );
 
@@ -1180,6 +1192,14 @@ export default class Board {
             // Add the new piece
             this.addPiece(
                 move.toSquare,
+                move.promotedPiece
+            );
+
+            this.removeMaterial(
+                move.piece
+            );
+
+            this.addMaterial(
                 move.promotedPiece
             );
 
