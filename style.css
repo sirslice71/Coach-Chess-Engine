@@ -188,6 +188,56 @@ select{
 
 }
 
+.moveHistoryRow{
+
+    display:grid;
+
+    grid-template-columns:44px 1fr 1fr;
+
+    gap:10px;
+
+    align-items:center;
+
+    padding:6px 0;
+
+    border-bottom:1px solid rgba(255,255,255,.08);
+
+}
+
+.moveHistoryRow:last-child{
+
+    border-bottom:none;
+
+}
+
+.moveHistoryNumber{
+
+    color:#bbb;
+
+    font-weight:bold;
+
+}
+
+.moveHistoryMove{
+
+    color:var(--text);
+
+    white-space:nowrap;
+
+    overflow:hidden;
+
+    text-overflow:ellipsis;
+
+}
+
+.moveHistoryEmpty{
+
+    color:#bbb;
+
+    font-style:italic;
+
+}
+
 #capturedWhite,
 #capturedBlack{
 

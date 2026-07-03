@@ -576,7 +576,16 @@ document
 
             board.undoMove();
 
+            if (
+                gameController.gameMoves.length > 0
+            ) {
+                gameController.gameMoves.pop();
+            }
+
             ui.draw();
+            ui.updateMoveHistory(
+                gameController.gameMoves
+            );
 
         }
 

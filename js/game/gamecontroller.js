@@ -299,6 +299,7 @@ export default class GameController {
         this.ui.selectedSquare = -1;
         this.ui.flipped = this.humanSide < 0;
         this.ui.draw();
+        this.ui.updateMoveHistory(this.gameMoves);
         this.ui.enginePanel.setStatus("Ready");
 
         this.scheduleCoachMove(depth);
@@ -407,6 +408,7 @@ export default class GameController {
         //----------------------------------
 
         this.recordMove(move);
+        this.ui.updateMoveHistory(this.gameMoves);
 
         //----------------------------------
         // Redraw

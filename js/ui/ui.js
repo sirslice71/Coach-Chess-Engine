@@ -18,6 +18,8 @@ export default class UI {
         this.legalMoveGenerator = legalMoveGenerator;
 
         this.boardElement = document.getElementById("board");
+        this.moveHistoryElement =
+            document.getElementById("moveHistory");
 
         this.selectedSquare = -1;
 
@@ -398,6 +400,89 @@ export default class UI {
 
         document.getElementById("devPieceSquares").textContent =
             (evalScore.position.pieceSquares / 100).toFixed(2);
+
+    }
+
+    updateMoveHistory(gameMoves = []) {
+
+        if (!this.moveHistoryElement) {
+            return;
+        }
+
+        this.moveHistoryElement.innerHTML = "";
+
+        if (gameMoves.length === 0) {
+
+            const emptyState =
+                document.createElement("div");
+
+            emptyState.className =
+                "moveHistoryEmpty";
+
+            emptyState.textContent =
+                "No moves yet.";
+
+            this.moveHistoryElement.appendChild(
+                emptyState
+            );
+
+            return;
+
+        }
+
+        for (
+            let index = 0;
+            index < gameMoves.length;
+            index += 2
+        ) {
+
+            const whiteMove = gameMoves[index];
+            const blackMove = gameMoves[index + 1];
+
+            const row =
+                document.createElement("div");
+
+            row.className = "moveHistoryRow";
+
+            const moveNumber =
+                document.createElement("span");
+
+            moveNumber.className =
+                "moveHistoryNumber";
+
+            moveNumber.textContent =
+                `${Math.floor(index / 2) + 1}.`;
+
+            const whiteText =
+                document.createElement("span");
+
+            whiteText.className =
+                "moveHistoryMove";
+
+            whiteText.textContent =
+                whiteMove ? whiteMove.move : "";
+
+            const blackText =
+                document.createElement("span");
+
+            blackText.className =
+                "moveHistoryMove";
+
+            blackText.textContent =
+                blackMove ? blackMove.move : "...";
+
+            row.appendChild(moveNumber);
+            row.appendChild(whiteText);
+            row.appendChild(blackText);
+
+            this.moveHistoryElement.appendChild(
+                row
+            );
+
+        }
+
+        this.moveHistoryElement.scrollTop =
+            this.moveHistoryElement.scrollHeight;
 
     }
 
