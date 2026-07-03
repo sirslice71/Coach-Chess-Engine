@@ -207,8 +207,9 @@ export default class FEN {
 
         if (board.zobrist) {
 
-            board.hashKey =
-                board.zobrist.generate(board);
+            board.attachZobrist(
+                board.zobrist
+            );
 
         }
 

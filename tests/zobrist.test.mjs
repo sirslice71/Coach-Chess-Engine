@@ -14,7 +14,7 @@ function createEngine(fen) {
 
     zobrist.initialize();
 
-    board.zobrist = zobrist;
+    board.attachZobrist(zobrist);
 
     FEN.import(board, fen);
 
@@ -71,5 +71,24 @@ test("black en passant preserves the incremental hash", () => {
         "4k3/8/8/8/3pP3/8/4P3/4K3 b - e3 0 1",
         "d4-e3"
     );
+
+});
+
+test("FEN import with attached zobrist regenerates a valid hash", () => {
+
+    const board = new Board();
+    const zobrist = new Zobrist();
+
+    zobrist.initialize();
+
+    board.attachZobrist(zobrist);
+
+    FEN.import(
+        board,
+        "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 1"
+    );
+
+    assert.notEqual(board.hashKey, 0n);
+    assert.equal(zobrist.verify(board), true);
 
 });

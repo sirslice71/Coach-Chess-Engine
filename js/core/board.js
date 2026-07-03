@@ -13,7 +13,7 @@ import FEN from "./fen.js";
 
 export default class Board {
 
-    constructor() {
+    constructor(zobrist = null) {
 
         this.squares = new Array(64).fill(Piece.EMPTY);
 
@@ -43,6 +43,10 @@ export default class Board {
         this.moveHistory = [];
         this.repetitionTable = [];
 
+        this.hashKey = 0n;
+
+        this.zobrist = null;
+
         this.initializePosition();
 
         this.profileMakeMove = 0;
@@ -50,15 +54,43 @@ export default class Board {
         this.profileUpdatePieceLists = 0;
         this.profileVerify = 0;
 
-        this.hashKey = 0n;
+        if (zobrist) {
 
-        this.zobrist = null;
+            this.attachZobrist(zobrist);
+
+        }
         
         //----------------------------------
         // Move History
         //----------------------------------
 
         this.moveHistory = [];
+
+    }
+
+    attachZobrist(zobrist) {
+
+        this.zobrist = zobrist;
+
+        this.hashKey =
+            zobrist.generate(this);
+
+        const currentKey =
+            this.repetitionKey();
+
+        if (this.repetitionTable.length === 0) {
+
+            this.repetitionTable = [currentKey];
+
+        }
+
+        else {
+
+            this.repetitionTable[
+                this.repetitionTable.length - 1
+            ] = currentKey;
+
+        }
 
     }
 

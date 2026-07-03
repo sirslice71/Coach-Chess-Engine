@@ -16,7 +16,7 @@ function createEngine(fen) {
 
     zobrist.initialize();
 
-    board.zobrist = zobrist;
+    board.attachZobrist(zobrist);
 
     FEN.import(board, fen);
 

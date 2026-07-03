@@ -66,8 +66,9 @@ export default class Search {
 
             this.zobrist.initialize();
 
-            this.board.zobrist =
-                this.zobrist;
+            this.board.attachZobrist(
+                this.zobrist
+            );
 
         }
 

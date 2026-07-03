@@ -2,7 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 
+import Board from "../js/core/board.js";
 import FEN from "../js/core/fen.js";
+import Zobrist from "../js/engine/zobrist.js";
 import {
     applyUciMove,
     createEngineCore,
@@ -98,6 +100,24 @@ test("UCI session loads explicit FEN positions", () => {
     assert.equal(
         FEN.export(session.engine.board),
         "4k3/8/8/8/8/8/4Q3/4K3 b - - 0 1"
+    );
+
+});
+
+test("attachZobrist generates a consistent hash for the current board", () => {
+
+    const board = new Board();
+    const zobrist = new Zobrist();
+
+    zobrist.initialize();
+
+    board.attachZobrist(zobrist);
+
+    assert.notEqual(board.hashKey, 0n);
+    assert.equal(zobrist.verify(board), true);
+    assert.deepEqual(
+        board.repetitionTable,
+        [board.repetitionKey()]
     );
 
 });
