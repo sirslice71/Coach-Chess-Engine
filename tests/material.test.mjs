@@ -16,11 +16,7 @@ function createEngine(fen) {
 
     zobrist.initialize();
 
-    globalThis.window = {
-        chess: {
-            zobrist
-        }
-    };
+    board.zobrist = zobrist;
 
     FEN.import(board, fen);
 

@@ -51,6 +51,8 @@ export default class Board {
         this.profileVerify = 0;
 
         this.hashKey = 0n;
+
+        this.zobrist = null;
         
         //----------------------------------
         // Move History
@@ -1267,7 +1269,7 @@ export default class Board {
         this.profileMakeMove += performance.now() - start;
 
         this.hashKey =
-            window.chess.zobrist.updateHash(
+            this.zobrist.updateHash(
 
                 this.hashKey,
 
@@ -1487,7 +1489,7 @@ export default class Board {
         this.profileUndoMove += performance.now() - start;
 
         this.hashKey =
-            window.chess.zobrist.generate(this);
+            this.zobrist.generate(this);
 
     }
 

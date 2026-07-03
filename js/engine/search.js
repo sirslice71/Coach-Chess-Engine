@@ -58,9 +58,18 @@ export default class Search {
         // Hashing
         //----------------------------------
 
-        this.zobrist = new Zobrist();
+        this.zobrist =
+            board.zobrist ||
+            new Zobrist();
 
-        this.zobrist.initialize();
+        if (!board.zobrist) {
+
+            this.zobrist.initialize();
+
+            this.board.zobrist =
+                this.zobrist;
+
+        }
 
         //----------------------------------
         // Initial Position Hash

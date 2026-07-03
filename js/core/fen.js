@@ -204,8 +204,13 @@ export default class FEN {
         }
 
         board.updatePieceLists();
-        board.hashKey =
-            window.chess.zobrist.generate(board);
+
+        if (board.zobrist) {
+
+            board.hashKey =
+                board.zobrist.generate(board);
+
+        }
 
     }  
     
