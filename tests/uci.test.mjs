@@ -7,6 +7,7 @@ import FEN from "../js/core/fen.js";
 import Zobrist from "../js/engine/zobrist.js";
 import {
     applyUciMove,
+    allocateMoveTime,
     createEngineCore,
     moveToUci,
     UciSession,
@@ -316,6 +317,169 @@ test("UCI process tiny movetime still returns protocol-safe bestmove", async () 
 
 });
 
+test("time allocation uses the correct side clock and increment", () => {
+
+    const whiteBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 1000,
+            winc: 2000,
+            binc: 0
+        });
+
+    const blackBudget =
+        allocateMoveTime({
+            sideToMove: -1,
+            wtime: 300000,
+            btime: 1000,
+            winc: 2000,
+            binc: 0
+        });
+
+    assert.equal(whiteBudget, 11496);
+    assert.equal(blackBudget, 50);
+
+});
+
+test("time allocation is capped and stays safe in low time", () => {
+
+    const cappedBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 1000,
+            btime: 1000,
+            winc: 5000,
+            binc: 5000
+        });
+
+    const lowTimeBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 60,
+            btime: 60,
+            winc: 0,
+            binc: 0
+        });
+
+    assert.equal(cappedBudget, 95);
+    assert.equal(lowTimeBudget, 10);
+
+});
+
+test("UCI process clock-based search returns a legal bestmove", async () => {
+
+    const child = spawn(
+        process.execPath,
+        ["uci.js"],
+        {
+            cwd: process.cwd(),
+            stdio: ["pipe", "pipe", "pipe"]
+        }
+    );
+
+    let stdout = "";
+
+    child.stdout.setEncoding("utf8");
+
+    child.stdout.on("data", chunk => {
+        stdout += chunk;
+    });
+
+    child.stdin.write("position startpos\n");
+    child.stdin.write("go wtime 1000 btime 1000 winc 0 binc 0\n");
+    child.stdin.write("quit\n");
+    child.stdin.end();
+
+    await new Promise((resolve, reject) => {
+
+        child.on("error", reject);
+        child.on("close", resolve);
+
+    });
+
+    const lines =
+        stdout
+            .split(/\r?\n/)
+            .map(line => line.trim())
+            .filter(Boolean);
+
+    const bestMoveLine =
+        lines.find(line => line.startsWith("bestmove "));
+
+    assert.ok(bestMoveLine);
+
+    const bestMove =
+        bestMoveLine.slice("bestmove ".length);
+
+    const engine =
+        createEngineCore();
+
+    assert.ok(
+        legalUciMoves(engine).has(bestMove),
+        `Expected legal bestmove, got ${bestMove}`
+    );
+
+});
+
+test("UCI process increment-based clock search returns a legal bestmove", async () => {
+
+    const child = spawn(
+        process.execPath,
+        ["uci.js"],
+        {
+            cwd: process.cwd(),
+            stdio: ["pipe", "pipe", "pipe"]
+        }
+    );
+
+    let stdout = "";
+
+    child.stdout.setEncoding("utf8");
+
+    child.stdout.on("data", chunk => {
+        stdout += chunk;
+    });
+
+    child.stdin.write("position startpos moves e2e4 e7e5\n");
+    child.stdin.write("go wtime 300000 btime 300000 winc 2000 binc 2000\n");
+    child.stdin.write("quit\n");
+    child.stdin.end();
+
+    await new Promise((resolve, reject) => {
+
+        child.on("error", reject);
+        child.on("close", resolve);
+
+    });
+
+    const lines =
+        stdout
+            .split(/\r?\n/)
+            .map(line => line.trim())
+            .filter(Boolean);
+
+    const bestMoveLine =
+        lines.find(line => line.startsWith("bestmove "));
+
+    assert.ok(bestMoveLine);
+
+    const bestMove =
+        bestMoveLine.slice("bestmove ".length);
+
+    const engine =
+        createEngineCore();
+
+    applyUciMove(engine, "e2e4");
+    applyUciMove(engine, "e7e5");
+
+    assert.ok(
+        legalUciMoves(engine).has(bestMove),
+        `Expected legal bestmove, got ${bestMove}`
+    );
+
+});
+
 test("unsupported go forms remain UCI-safe", () => {
 
     const session =
@@ -323,13 +487,13 @@ test("unsupported go forms remain UCI-safe", () => {
 
     const responses =
         session.handleCommand(
-            "go wtime 300000 btime 300000"
+            "go infinite"
         );
 
     assert.deepEqual(
         responses,
         [
-            "info string Phase 3A supports 'go depth N' and 'go movetime X'",
+            "info string Phase 3B supports 'go depth N', 'go movetime X', and basic wtime/btime/winc/binc'",
             "bestmove 0000"
         ]
     );

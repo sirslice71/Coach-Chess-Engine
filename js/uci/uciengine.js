@@ -159,6 +159,61 @@ export function applyUciMove(engine, uciString) {
 
 }
 
+export function allocateMoveTime({
+    sideToMove,
+    wtime = 0,
+    btime = 0,
+    winc = 0,
+    binc = 0
+}) {
+
+    const remainingTime =
+        sideToMove > 0 ? wtime : btime;
+
+    const increment =
+        sideToMove > 0 ? winc : binc;
+
+    if (remainingTime <= 0) {
+        return 1;
+    }
+
+    const safetyBuffer =
+        remainingTime > 1000 ? 100 : 50;
+
+    const usableTime =
+        Math.max(1, remainingTime - safetyBuffer);
+
+    const base =
+        usableTime / 30;
+
+    const incrementPart =
+        increment * 0.75;
+
+    const minimumBudget =
+        Math.min(
+            usableTime,
+            remainingTime > 100 ? 50 : 25
+        );
+
+    const maximumBudget =
+        Math.max(
+            minimumBudget,
+            Math.floor(usableTime * 0.10)
+        );
+
+    const rawBudget =
+        Math.floor(base + incrementPart);
+
+    return Math.max(
+        1,
+        Math.min(
+            maximumBudget,
+            Math.max(minimumBudget, rawBudget)
+        )
+    );
+
+}
+
 export class UciSession {
 
     constructor() {
@@ -281,6 +336,12 @@ export class UciSession {
         const movetimeIndex =
             tokens.indexOf("movetime");
 
+        const wtimeIndex =
+            tokens.indexOf("wtime");
+
+        const btimeIndex =
+            tokens.indexOf("btime");
+
         let result = null;
 
         if (
@@ -302,6 +363,72 @@ export class UciSession {
                     this.engine.search.bestMove(
                         depth,
                         { quiet: true }
+                    )
+                );
+
+        }
+
+        else if (
+            wtimeIndex !== -1 &&
+            btimeIndex !== -1 &&
+            wtimeIndex < tokens.length - 1 &&
+            btimeIndex < tokens.length - 1
+        ) {
+
+            const wincIndex =
+                tokens.indexOf("winc");
+
+            const bincIndex =
+                tokens.indexOf("binc");
+
+            const movetime =
+                allocateMoveTime({
+                    sideToMove:
+                        this.engine.board.sideToMove,
+                    wtime:
+                        Number.parseInt(
+                            tokens[wtimeIndex + 1],
+                            10
+                        ) || 0,
+                    btime:
+                        Number.parseInt(
+                            tokens[btimeIndex + 1],
+                            10
+                        ) || 0,
+                    winc:
+                        (
+                            wincIndex !== -1 &&
+                            wincIndex < tokens.length - 1
+                        )
+                            ? Number.parseInt(
+                                tokens[wincIndex + 1],
+                                10
+                            ) || 0
+                            : 0,
+                    binc:
+                        (
+                            bincIndex !== -1 &&
+                            bincIndex < tokens.length - 1
+                        )
+                            ? Number.parseInt(
+                                tokens[bincIndex + 1],
+                                10
+                            ) || 0
+                            : 0
+                });
+
+            const deadlineMs =
+                performance.now() +
+                Math.max(0, movetime - 5);
+
+            result =
+                withMutedConsole(() =>
+                    this.engine.search.bestMove(
+                        64,
+                        {
+                            deadlineMs,
+                            quiet: true
+                        }
                     )
                 );
 
@@ -341,7 +468,7 @@ export class UciSession {
         else {
 
             return [
-                "info string Phase 3A supports 'go depth N' and 'go movetime X'",
+                "info string Phase 3B supports 'go depth N', 'go movetime X', and basic wtime/btime/winc/binc'",
                 "bestmove 0000"
             ];
 
