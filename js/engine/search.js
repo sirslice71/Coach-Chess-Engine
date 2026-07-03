@@ -96,7 +96,36 @@ export default class Search {
         
     }
 
+    whiteRelativeEval() {
+
+        return this.evaluation.evaluate().total;
+
+    }
+
+    toSideToMoveScore(whiteScore, sideToMove = this.board.sideToMove) {
+
+        return sideToMove > 0
+
+            ? whiteScore
+
+            : -whiteScore;
+
+    }
+
+    toWhiteRelativeScore(sideScore, sideToMove = this.board.sideToMove) {
+
+        return sideToMove > 0
+
+            ? sideScore
+
+            : -sideScore;
+
+    }
+
     searchRoot(maxDepth = 1) {
+
+        const rootSideToMove =
+            this.board.sideToMove;
 
         this.killers = [];
 
@@ -206,7 +235,12 @@ export default class Search {
 
                 Eval:
 
-                    (result.bestScore / 100).toFixed(2),
+                    (
+                        this.toWhiteRelativeScore(
+                            result.bestScore,
+                            rootSideToMove
+                        ) / 100
+                    ).toFixed(2),
 
                 Nodes:
 
@@ -288,7 +322,11 @@ export default class Search {
         console.log("Board undoMove :", this.board.profileUndoMove.toFixed(2));
         console.log("Update lists   :", this.board.profileUpdatePieceLists.toFixed(2));
 
-        this.lastSearchScore = result.bestScore;
+        this.lastSearchScore =
+            this.toWhiteRelativeScore(
+                result.bestScore,
+                rootSideToMove
+            );
 
         //----------------------------------
         // Return
@@ -308,7 +346,7 @@ export default class Search {
 
             evaluation:
 
-                (result.bestScore / 100).toFixed(2),
+                (this.lastSearchScore / 100).toFixed(2),
 
             depth: maxDepth,
 
@@ -839,13 +877,9 @@ export default class Search {
         if (!inCheck) {
 
             let standPat =
-                this.evaluation.evaluate().total;
-
-            if (this.board.sideToMove < 0) {
-
-                standPat = -standPat;
-
-            }
+                this.toSideToMoveScore(
+                    this.whiteRelativeEval()
+                );
 
             //----------------------------------
             // Beta Cutoff
@@ -976,6 +1010,9 @@ export default class Search {
 
     analyze(depth = 4) {
 
+        const rootSideToMove =
+            this.board.sideToMove;
+
         const result =
             this.searchRoot(depth);
 
@@ -988,7 +1025,12 @@ export default class Search {
                     Move: r.notation,
 
                     Eval:
-                        (r.score / 100).toFixed(2)
+                        (
+                            this.toWhiteRelativeScore(
+                                r.score,
+                                rootSideToMove
+                            ) / 100
+                        ).toFixed(2)
 
                 })
 
@@ -1260,6 +1302,9 @@ export default class Search {
 
     compareRootMoves(depth = 1) {
 
+        const rootSideToMove =
+            this.board.sideToMove;
+
         const moves = this.legalMoveGenerator.generateMoves();
 
         const results = [];
@@ -1415,7 +1460,11 @@ export default class Search {
 
             const staticScore = after.eval.total;
 
-            const searchScore = score;
+            const searchScore =
+                this.toWhiteRelativeScore(
+                    score,
+                    rootSideToMove
+                );
 
             const deltaSearch = searchScore - staticScore;
 
@@ -1495,9 +1544,13 @@ export default class Search {
 
             (a, b) =>
 
-                parseFloat(b.Search) -
+                rootSideToMove > 0
 
-                parseFloat(a.Search)
+                    ? parseFloat(b.Search) -
+                        parseFloat(a.Search)
+
+                    : parseFloat(a.Search) -
+                        parseFloat(b.Search)
 
         );
 

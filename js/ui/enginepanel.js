@@ -92,7 +92,7 @@ export default class EnginePanel {
             result.notation;
 
         this.eval.textContent =
-            (result.evaluation / 100).toFixed(2);
+            Number(result.evaluation).toFixed(2);
 
         this.depth.textContent =
             result.depth;
