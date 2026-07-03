@@ -219,6 +219,7 @@ export class UciSession {
     constructor() {
 
         this.quitRequested = false;
+        this.debugEnabled = false;
 
         this.resetEngine();
 
@@ -261,6 +262,36 @@ export class UciSession {
             case "ucinewgame":
 
                 this.resetEngine();
+                return [];
+
+            case "stop":
+
+                //----------------------------------
+                // Search is synchronous today, so a
+                // later stdin stop command cannot
+                // interrupt an already-running search.
+                // When idle, stop is a harmless no-op.
+                //----------------------------------
+
+                return [];
+
+            case "ponderhit":
+
+                return [];
+
+            case "setoption":
+
+                return [];
+
+            case "debug":
+
+                this.debugEnabled =
+                    tokens[1] === "on";
+
+                return [];
+
+            case "register":
+
                 return [];
 
             case "position":
@@ -329,6 +360,29 @@ export class UciSession {
     }
 
     handleGo(tokens) {
+
+        if (tokens.includes("infinite")) {
+
+            return [
+                "info string Infinite search is not supported in the current synchronous UCI mode",
+                "bestmove 0000"
+            ];
+
+        }
+
+        if (
+            tokens.includes("nodes") ||
+            tokens.includes("mate") ||
+            tokens.includes("searchmoves") ||
+            tokens.includes("ponder")
+        ) {
+
+            return [
+                "info string This go variant is not supported in the current UCI mode",
+                "bestmove 0000"
+            ];
+
+        }
 
         const depthIndex =
             tokens.indexOf("depth");
@@ -468,7 +522,7 @@ export class UciSession {
         else {
 
             return [
-                "info string Phase 3B supports 'go depth N', 'go movetime X', and basic wtime/btime/winc/binc'",
+                "info string Phase 4B supports 'go depth N', 'go movetime X', and basic wtime/btime/winc/binc'",
                 "bestmove 0000"
             ];
 

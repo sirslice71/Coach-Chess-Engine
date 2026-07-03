@@ -487,15 +487,105 @@ test("unsupported go forms remain UCI-safe", () => {
 
     const responses =
         session.handleCommand(
+            "go nodes 1000"
+        );
+
+    assert.deepEqual(
+        responses,
+        [
+            "info string This go variant is not supported in the current UCI mode",
+            "bestmove 0000"
+        ]
+    );
+
+});
+
+test("go infinite remains protocol-safe and does not start an endless search", () => {
+
+    const session =
+        new UciSession();
+
+    const responses =
+        session.handleCommand(
             "go infinite"
         );
 
     assert.deepEqual(
         responses,
         [
-            "info string Phase 3B supports 'go depth N', 'go movetime X', and basic wtime/btime/winc/binc'",
+            "info string Infinite search is not supported in the current synchronous UCI mode",
             "bestmove 0000"
         ]
+    );
+
+});
+
+test("stop is harmless when no search is running", () => {
+
+    const session =
+        new UciSession();
+
+    assert.deepEqual(
+        session.handleCommand("stop"),
+        []
+    );
+
+});
+
+test("setoption does not crash even if ignored", () => {
+
+    const session =
+        new UciSession();
+
+    assert.deepEqual(
+        session.handleCommand(
+            "setoption name Hash value 64"
+        ),
+        []
+    );
+
+});
+
+test("debug on and debug off do not crash", () => {
+
+    const session =
+        new UciSession();
+
+    assert.deepEqual(
+        session.handleCommand("debug on"),
+        []
+    );
+
+    assert.equal(
+        session.debugEnabled,
+        true
+    );
+
+    assert.deepEqual(
+        session.handleCommand("debug off"),
+        []
+    );
+
+    assert.equal(
+        session.debugEnabled,
+        false
+    );
+
+});
+
+test("register and ponderhit do not crash", () => {
+
+    const session =
+        new UciSession();
+
+    assert.deepEqual(
+        session.handleCommand("register later"),
+        []
+    );
+
+    assert.deepEqual(
+        session.handleCommand("ponderhit"),
+        []
     );
 
 });
