@@ -362,7 +362,7 @@ export class UciSession {
 
                 return [
                     "id name Coach Chess Engine",
-                    "id author Sir Slice / Sir Slice",
+                    "id author Sir Slice",
                     `option name Hash type spin default ${UCI_HASH_DEFAULT_MB} min ${UCI_HASH_MIN_MB} max ${UCI_HASH_MAX_MB}`,
                     `option name Move Overhead type spin default ${UCI_MOVE_OVERHEAD_DEFAULT_MS} min ${UCI_MOVE_OVERHEAD_MIN_MS} max ${UCI_MOVE_OVERHEAD_MAX_MS}`,
                     "option name Clear Hash type button",
