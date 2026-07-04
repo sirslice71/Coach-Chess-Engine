@@ -81,15 +81,7 @@ export default class LegalMoveGenerator {
 
     generateCaptures() {
 
-        return this.generateMoves().filter(
-
-            move =>
-
-                (move.flags & MoveFlags.CAPTURE) ||
-
-                (move.flags & MoveFlags.EN_PASSANT)
-
-        );
+        return this.generateMoves(true);
 
     }
 

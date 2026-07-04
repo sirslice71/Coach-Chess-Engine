@@ -117,7 +117,12 @@ export default class MoveGenerator {
 
     }
 
-    generatePawnMoves(square, piece, moves) {
+    generatePawnMoves(
+        square,
+        piece,
+        moves,
+        capturesOnly = false
+    ) {
 
         const white = piece > 0;
 
@@ -136,6 +141,7 @@ export default class MoveGenerator {
         const oneForward = square + direction;
 
         if (
+            !capturesOnly &&
             oneForward >= 0 &&
             oneForward < 64 &&
             this.board.pieceAt(oneForward) === Piece.EMPTY
@@ -574,7 +580,13 @@ export default class MoveGenerator {
     }
     
 
-    generateSlidingMoves(square, piece, moves, directions) {
+    generateSlidingMoves(
+        square,
+        piece,
+        moves,
+        directions,
+        capturesOnly = false
+    ) {
 
         const ownWhite = piece > 0;
 
@@ -658,9 +670,13 @@ export default class MoveGenerator {
 
                 if (targetPiece === Piece.EMPTY) {
 
-                    moves.push(
-                        new Move(square, target, piece)
-                    );
+                    if (!capturesOnly) {
+
+                        moves.push(
+                            new Move(square, target, piece)
+                        );
+
+                    }
 
                     continue;
 
@@ -704,40 +720,63 @@ export default class MoveGenerator {
 
     }
 
-    generateBishopMoves(square, piece, moves) {
+    generateBishopMoves(
+        square,
+        piece,
+        moves,
+        capturesOnly = false
+    ) {
 
         this.generateSlidingMoves(
             square,
             piece,
             moves,
-            this.BISHOP_DIRECTIONS
+            this.BISHOP_DIRECTIONS,
+            capturesOnly
         );
 
     }
 
-    generateRookMoves(square, piece, moves) {
+    generateRookMoves(
+        square,
+        piece,
+        moves,
+        capturesOnly = false
+    ) {
 
         this.generateSlidingMoves(
             square,
             piece,
             moves,
-            this.ROOK_DIRECTIONS
+            this.ROOK_DIRECTIONS,
+            capturesOnly
         );
 
     }
 
-    generateQueenMoves(square, piece, moves) {
+    generateQueenMoves(
+        square,
+        piece,
+        moves,
+        capturesOnly = false
+    ) {
 
         this.generateSlidingMoves(
             square,
             piece,
             moves,
-            this.QUEEN_DIRECTIONS
+            this.QUEEN_DIRECTIONS,
+            capturesOnly
         );
 
     }
 
-    generateKingMoves(square, piece, moves) {
+    generateKingMoves(
+        square,
+        piece,
+        moves,
+        capturesOnly = false
+    ) {
 
         const ownWhite = piece > 0;
 
@@ -764,13 +803,17 @@ export default class MoveGenerator {
 
             if (targetPiece === Piece.EMPTY) {
 
-                moves.push(
-                    new Move(
-                        square,
-                        target,
-                        piece
-                    )
-                );
+                if (!capturesOnly) {
+
+                    moves.push(
+                        new Move(
+                            square,
+                            target,
+                            piece
+                        )
+                    );
+
+                }
 
                 continue;
 
