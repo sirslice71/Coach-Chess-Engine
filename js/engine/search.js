@@ -108,6 +108,7 @@ export default class Search {
 
         this.searchDeadlineMs = null;
         this.searchQuiet = false;
+        this.profileEnabled = false;
         
     }
 
@@ -147,6 +148,12 @@ export default class Search {
 
         this.searchQuiet =
             options.quiet ?? false;
+
+        this.profileEnabled =
+            options.profile ?? false;
+
+        this.board.profileEnabled =
+            this.profileEnabled;
 
         this.killers = [];
 
@@ -346,7 +353,10 @@ export default class Search {
                     ? [result.bestMove]
                     : [];
 
-        if (!this.searchQuiet) {
+        if (
+            !this.searchQuiet &&
+            this.profileEnabled
+        ) {
 
             console.log("");
 
@@ -418,6 +428,8 @@ export default class Search {
 
         this.searchDeadlineMs = null;
         this.searchQuiet = false;
+        this.profileEnabled = false;
+        this.board.profileEnabled = false;
 
         //----------------------------------
         // Return
@@ -483,15 +495,22 @@ export default class Search {
 
         const rootMoves = [];
 
-        let t = performance.now();
+        let t =
+            this.profileEnabled
+                ? performance.now()
+                : 0;
 
         const moves =
 
             this.legalMoveGenerator.generateMoves();
 
-        this.generateTime +=
+        if (this.profileEnabled) {
 
-            performance.now() - t;
+            this.generateTime +=
+
+                performance.now() - t;
+
+        }
 
         //----------------------------------
         // TT Root Move
@@ -517,7 +536,10 @@ export default class Search {
         // Order
         //----------------------------------
 
-        t = performance.now();
+        t =
+            this.profileEnabled
+                ? performance.now()
+                : 0;
 
         this.moveOrdering.order(
 
@@ -531,9 +553,13 @@ export default class Search {
 
         );
 
-        this.orderTime +=
+        if (this.profileEnabled) {
 
-            performance.now() - t;
+            this.orderTime +=
+
+                performance.now() - t;
+
+        }
 
         //----------------------------------
         // Search Root
@@ -543,13 +569,20 @@ export default class Search {
 
             this.checkSearchDeadline();
 
-            t = performance.now();
+            t =
+                this.profileEnabled
+                    ? performance.now()
+                    : 0;
 
             this.board.makeMove(move);
 
-            this.makeMoveTime +=
+            if (this.profileEnabled) {
 
-                performance.now() - t;
+                this.makeMoveTime +=
+
+                    performance.now() - t;
+
+            }
 
             let score;
 
@@ -573,13 +606,20 @@ export default class Search {
 
             finally {
 
-                t = performance.now();
+                t =
+                    this.profileEnabled
+                        ? performance.now()
+                        : 0;
 
                 this.board.undoMove();
 
-                this.undoMoveTime +=
+                if (this.profileEnabled) {
 
-                    performance.now() - t;
+                    this.undoMoveTime +=
+
+                        performance.now() - t;
+
+                }
 
             }
 
@@ -756,20 +796,36 @@ export default class Search {
         // Generate Moves
         //----------------------------------
 
-        let t = performance.now();
+        let t =
+            this.profileEnabled
+                ? performance.now()
+                : 0;
 
         const moves =
             this.legalMoveGenerator.generateMoves();
 
-        this.generateTime += performance.now() - t;
+        if (this.profileEnabled) {
 
-        t = performance.now();
+            this.generateTime +=
+                performance.now() - t;
+
+        }
+
+        t =
+            this.profileEnabled
+                ? performance.now()
+                : 0;
 
         const killers = this.getKillers(ply);
 
         this.moveOrdering.order(moves, killers, ttMove, this.history);
 
-        this.orderTime += performance.now() - t;
+        if (this.profileEnabled) {
+
+            this.orderTime +=
+                performance.now() - t;
+
+        }
 
         //----------------------------------
         // Mate / Stalemate
@@ -801,12 +857,19 @@ export default class Search {
                 // Make Move
                 //----------------------------------
 
-                t = performance.now();
+                t =
+                    this.profileEnabled
+                        ? performance.now()
+                        : 0;
 
                 this.board.makeMove(move);
 
-                this.makeMoveTime +=
-                    performance.now() - t;
+                if (this.profileEnabled) {
+
+                    this.makeMoveTime +=
+                        performance.now() - t;
+
+                }
 
                 //----------------------------------
                 // Search Child
@@ -829,12 +892,19 @@ export default class Search {
                 // Undo Move
                 //----------------------------------
 
-                t = performance.now();
+                t =
+                    this.profileEnabled
+                        ? performance.now()
+                        : 0;
 
                 this.board.undoMove();
 
-                this.undoMoveTime +=
-                    performance.now() - t;
+                if (this.profileEnabled) {
+
+                    this.undoMoveTime +=
+                        performance.now() - t;
+
+                }
 
 
                 //----------------------------------
@@ -1188,7 +1258,10 @@ export default class Search {
 
         const start = performance.now();
 
-        const result = this.searchRoot(depth);
+        const result = this.searchRoot(
+            depth,
+            { profile: true }
+        );
 
         const elapsed = performance.now() - start;
 

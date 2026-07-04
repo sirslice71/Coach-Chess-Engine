@@ -326,7 +326,10 @@ export default class GameController {
         this.ui.enginePanel.setStatus("Thinking...");
 
         const result =
-            this.search.bestMove(depth);
+            this.search.bestMove(
+                depth,
+                { quiet: true }
+            );
 
         this.chooseOpeningVarietyMove(
             result,

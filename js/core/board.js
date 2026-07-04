@@ -46,6 +46,7 @@ export default class Board {
         this.hashKey = 0n;
 
         this.zobrist = null;
+        this.profileEnabled = false;
 
         this.initializePosition();
 
@@ -922,7 +923,10 @@ export default class Board {
 
     makeMove(move) {
 
-        const start = performance.now();
+        const start =
+            this.profileEnabled
+                ? performance.now()
+                : 0;
 
         const history = {
 
@@ -1279,12 +1283,19 @@ export default class Board {
 
         }
 
-        let t = performance.now();
+        let t =
+            this.profileEnabled
+                ? performance.now()
+                : 0;
 
         // this.updatePieceLists();
 
-        this.profileUpdatePieceLists +=
-            performance.now() - t;
+        if (this.profileEnabled) {
+
+            this.profileUpdatePieceLists +=
+                performance.now() - t;
+
+        }
 
         this.sideToMove *= -1;
 
@@ -1298,7 +1309,12 @@ export default class Board {
             this.repetitionKey()
         );
 
-        this.profileMakeMove += performance.now() - start;
+        if (this.profileEnabled) {
+
+            this.profileMakeMove +=
+                performance.now() - start;
+
+        }
 
         this.hashKey =
             this.zobrist.updateHash(
@@ -1317,7 +1333,10 @@ export default class Board {
 
     undoMove() {
 
-        const start = performance.now();
+        const start =
+            this.profileEnabled
+                ? performance.now()
+                : 0;
 
         if (this.moveHistory.length === 0)
             return;
@@ -1475,12 +1494,19 @@ export default class Board {
 
         this.sideToMove *= -1;
 
-        let t = performance.now();
+        let t =
+            this.profileEnabled
+                ? performance.now()
+                : 0;
 
         this.updatePieceLists();
 
-        this.profileUpdatePieceLists +=
-            performance.now() - t;
+        if (this.profileEnabled) {
+
+            this.profileUpdatePieceLists +=
+                performance.now() - t;
+
+        }
 
         if (EngineDebug.verifyBoard) {
 
@@ -1518,7 +1544,12 @@ export default class Board {
 
         }
 
-        this.profileUndoMove += performance.now() - start;
+        if (this.profileEnabled) {
+
+            this.profileUndoMove +=
+                performance.now() - start;
+
+        }
 
         this.hashKey =
             this.zobrist.generate(this);
