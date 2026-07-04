@@ -283,6 +283,94 @@ test("queen capture regression keeps Qg2 from scoring as a Black win", () => {
 
 });
 
+test("search scores threefold repetition lines as draws when history returns to the same position", () => {
+
+    const fen =
+        "8/1R2Rp1p/5Pkn/8/4N3/5K2/8/5r2 w - - 9 55";
+
+    const {
+        board,
+        search,
+        legalMoveGenerator
+    } = createEngine(fen);
+
+    const historyCycle = [
+        "e4-f2",
+        "f1-a1",
+        "f2-e4",
+        "a1-f1",
+        "f3-e2",
+        "f1-a1"
+    ];
+
+    for (const notation of historyCycle) {
+
+        board.makeMove(
+            findMove(
+                legalMoveGenerator,
+                notation
+            )
+        );
+
+    }
+
+    const rootSideToMove =
+        board.sideToMove;
+
+    const repeatingMove =
+        findMove(
+            legalMoveGenerator,
+            "e2-f3"
+        );
+
+    board.makeMove(repeatingMove);
+
+    const forcedDrawScore =
+        withMutedConsole(
+            () => -search.negamax(
+                3,
+                -SearchConstants.INFINITY,
+                SearchConstants.INFINITY,
+                1
+            )
+        );
+
+    const rookReturn =
+        findMove(
+            legalMoveGenerator,
+            "a1-f1"
+        );
+
+    board.makeMove(rookReturn);
+
+    assert.equal(
+        board.isThreefoldRepetition(),
+        true
+    );
+
+    board.undoMove();
+    board.undoMove();
+
+    assert.equal(
+        search.toWhiteRelativeScore(
+            forcedDrawScore,
+            rootSideToMove
+        ),
+        SearchConstants.DRAW
+    );
+
+    const bestMoveResult =
+        withMutedConsole(
+            () => search.bestMove(4)
+        );
+
+    assert.notEqual(
+        bestMoveResult.move.toString(),
+        "e2-f3"
+    );
+
+});
+
 test("bishop capture regression preserves material, hash, and piece lists through make and undo", () => {
 
     const fen =

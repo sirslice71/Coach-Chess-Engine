@@ -658,21 +658,42 @@ export default class Board {
     // Game ends in Draw
     //-----------------------------------------
 
-    isThreefoldRepetition() {
+    repetitionCount() {
+
+        if (
+            this.repetitionTable.length === 0
+        ) {
+            return 0;
+        }
 
         const current =
-            this.repetitionKey();
+            this.repetitionTable[
+                this.repetitionTable.length - 1
+            ];
 
         let count = 0;
 
-        for (const key of this.repetitionTable) {
+        for (
+            let i = this.repetitionTable.length - 1;
+            i >= 0;
+            i -= 2
+        ) {
 
-            if (key === current)
+            if (
+                this.repetitionTable[i] === current
+            ) {
                 count++;
+            }
 
         }
 
-        return count >= 3;
+        return count;
+
+    }
+
+    isThreefoldRepetition() {
+
+        return this.repetitionCount() >= 3;
 
     }
 

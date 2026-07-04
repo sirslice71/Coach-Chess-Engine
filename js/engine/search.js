@@ -138,6 +138,21 @@ export default class Search {
 
     }
 
+    isRuleDraw() {
+
+        return (
+            this.board.isThreefoldRepetition() ||
+            this.board.isFiftyMoveDraw()
+        );
+
+    }
+
+    hasRepetitionHistory() {
+
+        return this.board.repetitionCount() > 1;
+
+    }
+
     searchRoot(maxDepth = 1, options = {}) {
 
         const rootSideToMove =
@@ -518,11 +533,13 @@ export default class Search {
 
         const ttEntry =
 
-            this.tt.probe(
+            this.hasRepetitionHistory()
+                ? null
+                : this.tt.probe(
 
-                this.board.hashKey
+                    this.board.hashKey
 
-            );
+                );
 
         const ttMove =
 
@@ -663,19 +680,23 @@ export default class Search {
         // Store Root Position
         //----------------------------------
 
-        this.tt.store(
+        if (!this.hasRepetitionHistory()) {
 
-            this.board.hashKey,
+            this.tt.store(
 
-            depth,
+                this.board.hashKey,
 
-            bestScore,
+                depth,
 
-            TTFlag.EXACT,
+                bestScore,
 
-            bestMove
+                TTFlag.EXACT,
 
-        );
+                bestMove
+
+            );
+
+        }
 
         return {
 
@@ -702,7 +723,13 @@ export default class Search {
 
         this.nodes++;
 
+        if (this.isRuleDraw()) {
+            return SearchConstants.DRAW;
+        }
+
         const alphaOriginal = alpha;
+        const repetitionHistory =
+            this.hasRepetitionHistory();
 
         //----------------------------------
         // Transposition Table Probe
@@ -710,11 +737,13 @@ export default class Search {
 
         const ttEntry =
 
-            this.tt.probe(
+            repetitionHistory
+                ? null
+                : this.tt.probe(
 
-                this.board.hashKey
+                    this.board.hashKey
 
-            );
+                );
 
             let ttMove = null;
 
@@ -1007,19 +1036,23 @@ export default class Search {
         // Store Position
         //----------------------------------
 
-        this.tt.store(
+        if (!repetitionHistory) {
 
-            this.board.hashKey,
+            this.tt.store(
 
-            depth,
+                this.board.hashKey,
 
-            bestScore,
+                depth,
 
-            flag,
+                bestScore,
 
-            bestMove
+                flag,
 
-        );
+                bestMove
+
+            );
+
+        }
 
         return bestScore;
 
@@ -1034,6 +1067,10 @@ export default class Search {
         this.checkSearchDeadline();
 
         this.leafNodes++;
+
+        if (this.isRuleDraw()) {
+            return SearchConstants.DRAW;
+        }
 
         const inCheck = this.board.isInCheck();
 
