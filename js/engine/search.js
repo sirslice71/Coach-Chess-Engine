@@ -1104,7 +1104,9 @@ export default class Search {
 
                 null,
 
-                this.history
+                this.history,
+
+                true
 
             );
 

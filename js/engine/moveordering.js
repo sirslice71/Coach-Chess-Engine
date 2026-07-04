@@ -15,6 +15,7 @@ const SCORE_CAPTURE   = 5000;
 const SCORE_CAPTURE_WINNING = 30000;
 const SCORE_CAPTURE_EQUAL   = 20000;
 const SCORE_CAPTURE_LOSING  = 10000;
+const SCORE_KING_EVASION    = 8500;
 
 const SCORE_KILLER1   = 4000;
 const SCORE_KILLER2   = 3900;
@@ -55,7 +56,9 @@ export default class MoveOrdering {
 
         ttMove = null,
 
-        history = null
+        history = null,
+
+        evasionMode = false
 
     ) {
 
@@ -69,7 +72,9 @@ export default class MoveOrdering {
 
                 ttMove,
 
-                history
+                history,
+
+                evasionMode
 
             );
 
@@ -93,7 +98,9 @@ export default class MoveOrdering {
 
         ttMove = null,
 
-        history = null
+        history = null,
+
+        evasionMode = false
 
     ) {
 
@@ -180,6 +187,15 @@ export default class MoveOrdering {
         //----------------------------------
 
         if (!move.isCapture()) {
+
+            if (
+                evasionMode &&
+                Math.abs(move.piece) === 6
+            ) {
+
+                score += SCORE_KING_EVASION;
+
+            }
 
             if (move.key === killers[0]) {
 
