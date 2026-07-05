@@ -1289,6 +1289,32 @@ export default class Evaluation {
         }
 
         //----------------------------------
+        // Passed Pawn Squares
+        //
+        // Computed once per side up front so the
+        // per-pawn loops below can look up passed
+        // status (and each other's passed pawns, for
+        // the connected-passed bonus) without
+        // recomputing the detection loop.
+        //----------------------------------
+
+        const phase = this.gamePhase();
+
+        const whitePassedSquares =
+            this.computePassedPawnSquares(
+                this.board.whitePieces.pawns,
+                this.board.blackPieces.pawns,
+                true
+            );
+
+        const blackPassedSquares =
+            this.computePassedPawnSquares(
+                this.board.blackPieces.pawns,
+                this.board.whitePieces.pawns,
+                false
+            );
+
+        //----------------------------------
         // White Pawns
         //----------------------------------
 
@@ -1336,31 +1362,14 @@ export default class Evaluation {
             // Passed Pawn
             //----------------------------------
 
-            let passed = true;
+            if (whitePassedSquares.has(square)) {
 
-            for (const enemy of this.board.blackPieces.pawns) {
-
-                const enemyFile = enemy & 7;
-
-                if (
-
-                    Math.abs(enemyFile - file) <= 1 &&
-
-                    enemy < square
-
-                ) {
-
-                    passed = false;
-
-                    break;
-
-                }
-
-            }
-
-            if (passed) {
-
-                score.passed += Eval.PASSED_PAWN;
+                score.passed += this.evaluatePassedPawnBonus(
+                    square,
+                    true,
+                    phase,
+                    whitePassedSquares
+                );
 
             }
 
@@ -1448,31 +1457,14 @@ export default class Evaluation {
             // Passed Pawn
             //----------------------------------
 
-            let passed = true;
+            if (blackPassedSquares.has(square)) {
 
-            for (const enemy of this.board.whitePieces.pawns) {
-
-                const enemyFile = enemy & 7;
-
-                if (
-
-                    Math.abs(enemyFile - file) <= 1 &&
-
-                    enemy > square
-
-                ) {
-
-                    passed = false;
-
-                    break;
-
-                }
-
-            }
-
-            if (passed) {
-
-                score.passed -= Eval.PASSED_PAWN;
+                score.passed -= this.evaluatePassedPawnBonus(
+                    square,
+                    false,
+                    phase,
+                    blackPassedSquares
+                );
 
             }
 
@@ -1525,6 +1517,232 @@ export default class Evaluation {
             score.backward;
 
         return score;
+
+    }
+
+    //----------------------------------
+    // Passed Pawn Detection
+    //
+    // A pawn is passed when no enemy pawn on its own
+    // file or an adjacent file stands between it and
+    // its promotion square. Extracted as its own helper
+    // (same logic evaluatePawnStructure() already used
+    // inline) so it can be computed once per side up
+    // front -- the bonus calculation below needs each
+    // side's full set of passed pawns anyway, for the
+    // connected-passed bonus.
+    //----------------------------------
+
+    computePassedPawnSquares(ownPawns, enemyPawns, white) {
+
+        const passedSquares = new Set();
+
+        for (const square of ownPawns) {
+
+            const file = square & 7;
+
+            let passed = true;
+
+            for (const enemy of enemyPawns) {
+
+                const enemyFile = enemy & 7;
+
+                if (Math.abs(enemyFile - file) > 1) {
+                    continue;
+                }
+
+                const blocksWhite = white && enemy < square;
+                const blocksBlack = !white && enemy > square;
+
+                if (blocksWhite || blocksBlack) {
+                    passed = false;
+                    break;
+                }
+
+            }
+
+            if (passed) {
+                passedSquares.add(square);
+            }
+
+        }
+
+        return passedSquares;
+
+    }
+
+    //----------------------------------
+    // Chebyshev (king-move) distance between two
+    // squares. Used only by the passed-pawn king-
+    // support term below.
+    //----------------------------------
+
+    squareDistance(a, b) {
+
+        const rankA = a >> 3;
+        const fileA = a & 7;
+
+        const rankB = b >> 3;
+        const fileB = b & 7;
+
+        return Math.max(
+            Math.abs(rankA - rankB),
+            Math.abs(fileA - fileB)
+        );
+
+    }
+
+    //----------------------------------
+    // Passed Pawn Bonus (v1 endgame conversion helper)
+    //
+    // base:      rank + phase tapered bonus, using the
+    //            same MG/EG blend already used for the
+    //            King piece-square tables.
+    // connected: extra bonus if an adjacent-file passed
+    //            pawn stands within one rank.
+    // protected: extra bonus if the pawn is currently
+    //            defended by any friendly unit.
+    // king:      extra bonus in the endgame when the
+    //            advancing side's own king is close to
+    //            the pawn or the square directly in
+    //            front of it (only checked once the
+    //            pawn is already fairly advanced).
+    // blocked:   penalty if an enemy piece sits directly
+    //            in front of the pawn, larger if that
+    //            piece is the enemy king.
+    //
+    // Values are intentionally modest -- see
+    // evalconstants.js. This is v1, not a full
+    // endgame engine.
+    //----------------------------------
+
+    evaluatePassedPawnBonus(square, white, phase, ownPassedSquares) {
+
+        const rankIndex = square >> 3;
+
+        // Own-perspective advancement: 2 = starting
+        // rank, 7 = one step from promotion.
+        const advancement = white
+            ? 8 - rankIndex
+            : rankIndex + 1;
+
+        const mgBonus =
+            Eval.PASSED_PAWN_BY_RANK_MG[advancement] || 0;
+
+        const egBonus =
+            Eval.PASSED_PAWN_BY_RANK_EG[advancement] || 0;
+
+        let bonus = Math.round(
+            (mgBonus * phase + egBonus * (24 - phase)) / 24
+        );
+
+        const file = square & 7;
+        const rank = square >> 3;
+
+        const frontSquare = white
+            ? square - 8
+            : square + 8;
+
+        //----------------------------------
+        // Connected passed pawn
+        //----------------------------------
+
+        for (const otherSquare of ownPassedSquares) {
+
+            if (otherSquare === square) {
+                continue;
+            }
+
+            const otherFile = otherSquare & 7;
+            const otherRank = otherSquare >> 3;
+
+            if (
+                Math.abs(otherFile - file) === 1 &&
+                Math.abs(otherRank - rank) <= 1
+            ) {
+
+                bonus += Eval.CONNECTED_PASSED_PAWN;
+                break;
+
+            }
+
+        }
+
+        //----------------------------------
+        // Protected passed pawn
+        //----------------------------------
+
+        if (Attack.isSquareAttacked(this.board, square, white)) {
+            bonus += Eval.PROTECTED_PASSED_PAWN;
+        }
+
+        //----------------------------------
+        // King support (endgame only, and only
+        // once the pawn is already fairly advanced)
+        //----------------------------------
+
+        if (advancement >= 5) {
+
+            const kingSquare = white
+                ? this.board.whiteKing
+                : this.board.blackKing;
+
+            const distanceToPawn =
+                this.squareDistance(kingSquare, square);
+
+            const distanceToFront =
+                (frontSquare >= 0 && frontSquare <= 63)
+                    ? this.squareDistance(kingSquare, frontSquare)
+                    : distanceToPawn;
+
+            const bestDistance =
+                Math.min(distanceToPawn, distanceToFront);
+
+            if (bestDistance <= 2) {
+
+                const endgameWeight = (24 - phase) / 24;
+
+                bonus += Math.round(
+                    Eval.KING_SUPPORTS_PASSED_PAWN *
+                    endgameWeight
+                );
+
+            }
+
+        }
+
+        //----------------------------------
+        // Blocker penalty
+        //----------------------------------
+
+        if (frontSquare >= 0 && frontSquare <= 63) {
+
+            const frontPiece =
+                this.board.pieceAt(frontSquare);
+
+            if (frontPiece !== Piece.EMPTY) {
+
+                const isEnemyPiece = white
+                    ? frontPiece < 0
+                    : frontPiece > 0;
+
+                if (isEnemyPiece) {
+
+                    const enemyKingSquare = white
+                        ? this.board.blackKing
+                        : this.board.whiteKing;
+
+                    bonus += (frontSquare === enemyKingSquare)
+                        ? Eval.PASSED_PAWN_BLOCKED_BY_KING
+                        : Eval.PASSED_PAWN_BLOCKED;
+
+                }
+
+            }
+
+        }
+
+        return Math.max(0, bonus);
 
     }
 

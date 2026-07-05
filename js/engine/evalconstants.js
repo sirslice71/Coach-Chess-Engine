@@ -80,7 +80,37 @@ export const Eval = Object.freeze({
 
     ISOLATED_PAWN: -12,
 
-    DOUBLED_PAWN: -10
-    
+    DOUBLED_PAWN: -10,
+
+    //----------------------------------
+    // Passed Pawn Advancement (v1)
+    //
+    // Indexed by own-perspective advancement:
+    // 2 = starting rank, 7 = one step from
+    // promotion. Indices 0-1 are unused (a real
+    // pawn is never on rank 1 or on its own
+    // back rank as a pawn). MG values are kept
+    // modest on purpose so Coach does not shove
+    // random pawns in the middlegame; EG values
+    // scale up sharply so advanced passed pawns
+    // create real promotion urgency once material
+    // thins out. Tapered between the two by the
+    // same phase blend already used for the King
+    // piece-square tables.
+    //----------------------------------
+
+    PASSED_PAWN_BY_RANK_MG: [0, 0, 4, 6, 10, 16, 26, 40],
+
+    PASSED_PAWN_BY_RANK_EG: [0, 0, 10, 18, 30, 50, 90, 140],
+
+    CONNECTED_PASSED_PAWN: 12,
+
+    PROTECTED_PASSED_PAWN: 10,
+
+    KING_SUPPORTS_PASSED_PAWN: 18,
+
+    PASSED_PAWN_BLOCKED: -10,
+
+    PASSED_PAWN_BLOCKED_BY_KING: -18
 
 });
