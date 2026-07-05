@@ -111,6 +111,33 @@ export const Eval = Object.freeze({
 
     PASSED_PAWN_BLOCKED: -10,
 
-    PASSED_PAWN_BLOCKED_BY_KING: -18
+    PASSED_PAWN_BLOCKED_BY_KING: -18,
+
+    //----------------------------------
+    // Lone Runner Damping (v1 rook-ending guard)
+    //
+    // A far-advanced passed pawn is only as good as its
+    // escort. When such a pawn has run deep (own-perspective
+    // advancement >= LONE_RUNNER_MIN_ADVANCEMENT) but its own
+    // king is not near it, no friendly pawn defends it, and it
+    // has no connected passer -- while the enemy still has a
+    // rook in a low-piece (rook) ending -- it is frequently
+    // rounded up before it can promote. Damp the raw
+    // advancement bonus a little, scaled by how far it has run
+    // (advancement - 5) and by how deep into the endgame we
+    // are, so Coach stops over-valuing shoving such a pawn onto
+    // squares where it simply gets caught.
+    //
+    // Deliberately small: it must NOT stop Coach from escorting
+    // or promoting genuinely supported/winning passers -- those
+    // are excluded by the king-support, connected, and
+    // pawn-defence conditions above.
+    //----------------------------------
+
+    LONE_RUNNER_ENDGAME: -12,
+
+    LONE_RUNNER_MIN_ADVANCEMENT: 6,
+
+    LONE_RUNNER_PHASE_MAX: 10
 
 });

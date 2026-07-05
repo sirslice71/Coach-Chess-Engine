@@ -1647,6 +1647,8 @@ export default class Evaluation {
         // Connected passed pawn
         //----------------------------------
 
+        let hasConnectedPasser = false;
+
         for (const otherSquare of ownPassedSquares) {
 
             if (otherSquare === square) {
@@ -1662,6 +1664,7 @@ export default class Evaluation {
             ) {
 
                 bonus += Eval.CONNECTED_PASSED_PAWN;
+                hasConnectedPasser = true;
                 break;
 
             }
@@ -1681,6 +1684,8 @@ export default class Evaluation {
         // once the pawn is already fairly advanced)
         //----------------------------------
 
+        let kingSupported = false;
+
         if (advancement >= 5) {
 
             const kingSquare = white
@@ -1699,6 +1704,8 @@ export default class Evaluation {
                 Math.min(distanceToPawn, distanceToFront);
 
             if (bestDistance <= 2) {
+
+                kingSupported = true;
 
                 const endgameWeight = (24 - phase) / 24;
 
@@ -1742,7 +1749,97 @@ export default class Evaluation {
 
         }
 
+        //----------------------------------
+        // Lone runner damping (rook-ending guard)
+        //
+        // A far-advanced passer with no king escort, no
+        // connected passer and no pawn defence, while the enemy
+        // still has a rook in a low-piece ending, is often
+        // caught before promoting. Shave a little off the raw
+        // advancement bonus, scaled by how far it has run and by
+        // how deep into the endgame we are. See evalconstants.js.
+        //----------------------------------
+
+        if (
+            advancement >= Eval.LONE_RUNNER_MIN_ADVANCEMENT &&
+            phase <= Eval.LONE_RUNNER_PHASE_MAX &&
+            !kingSupported &&
+            !hasConnectedPasser &&
+            this.enemyHasRook(white) &&
+            !this.isDefendedByOwnPawn(square, white)
+        ) {
+
+            const endgameWeight = (24 - phase) / 24;
+
+            bonus += Math.round(
+                Eval.LONE_RUNNER_ENDGAME *
+                (advancement - 5) *
+                endgameWeight
+            );
+
+        }
+
         return Math.max(0, bonus);
+
+    }
+
+    //----------------------------------
+    // Does the enemy of `white` still have a rook? Used only
+    // by the lone-runner passed-pawn damping above to keep it
+    // scoped to rook endings.
+    //----------------------------------
+
+    enemyHasRook(white) {
+
+        return white
+            ? this.board.blackPieces.rooks.length > 0
+            : this.board.whitePieces.rooks.length > 0;
+
+    }
+
+    //----------------------------------
+    // Is `square` defended by a friendly pawn of `white`?
+    // A pawn-defended passer is genuinely strong, so the
+    // lone-runner damping above excludes it. Only checks the
+    // two diagonal defender squares behind the pawn.
+    //----------------------------------
+
+    isDefendedByOwnPawn(square, white) {
+
+        const file = square & 7;
+
+        const ownPawn = white
+            ? Piece.WP
+            : Piece.BP;
+
+        if (white) {
+
+            if (file > 0 &&
+                this.board.pieceAt(square + 7) === ownPawn) {
+                return true;
+            }
+
+            if (file < 7 &&
+                this.board.pieceAt(square + 9) === ownPawn) {
+                return true;
+            }
+
+        }
+        else {
+
+            if (file < 7 &&
+                this.board.pieceAt(square - 7) === ownPawn) {
+                return true;
+            }
+
+            if (file > 0 &&
+                this.board.pieceAt(square - 9) === ownPawn) {
+                return true;
+            }
+
+        }
+
+        return false;
 
     }
 
