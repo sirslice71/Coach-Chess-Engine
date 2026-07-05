@@ -3,7 +3,7 @@ import FEN from "../core/fen.js";
 import MoveGenerator from "../engine/movegen.js";
 import LegalMoveGenerator from "../engine/legalmovegen.js";
 import Evaluation from "../engine/evaluation.js";
-import Search from "../engine/search.js";
+import Search, { SearchTimeout } from "../engine/search.js";
 import TranspositionTable from "../engine/transpositiontable.js";
 import { SearchConstants } from "../engine/searchconstants.js";
 import { Piece } from "../core/piece.js";
@@ -714,23 +714,39 @@ export class UciSession {
     }
 
     //----------------------------------
-    // Run a search call defensively.
+    // Run a search call defensively, for exactly one
+    // known, narrow failure mode -- nothing broader.
     //
     // js/engine/search.js searchRoot() calls
-    // checkSearchDeadline() at the very top of its
-    // iterative-deepening loop, OUTSIDE the try/catch
-    // that normally handles SearchTimeout. If the
-    // deadline has already elapsed before the first
-    // iteration begins (an extremely small movetime or
-    // near-zero clock budget), that throw escapes
-    // uncaught all the way past uciengine.js. That is a
-    // search.js issue, out of scope for this change and
-    // reported separately. This wrapper prevents it from
-    // ever reaching the UCI protocol layer as a wrong
-    // "bestmove 0000" when legal moves actually exist --
-    // it falls back to the first available legal move
-    // instead, with a fresh static-eval score rather than
-    // a stale one.
+    // checkSearchDeadline() once at the very top of its
+    // iterative-deepening loop (before depth 1 begins),
+    // OUTSIDE the try/catch that normally handles
+    // SearchTimeout for every other deadline check inside
+    // the loop. If the deadline has already elapsed
+    // before that first check (an extremely small
+    // movetime or near-zero clock budget, e.g. malformed
+    // input like "go wtime abc btime 60000"), SearchTimeout
+    // escapes uncaught all the way past uciengine.js.
+    //
+    // Every other checkSearchDeadline() call site inside
+    // searchRoot() (mid-iteration, inside negamax,
+    // inside quiescence) is already wrapped by search.js's
+    // own try/catch, which breaks the loop and returns a
+    // normal completed result -- it never reaches here.
+    // So a SearchTimeout that does reach this point can
+    // only be that one before-first-iteration case, not a
+    // generic "search ran out of time" event.
+    //
+    // That gap is a search.js issue, out of scope for this
+    // change and reported separately. This wrapper only
+    // catches that specific, identifiable exception type
+    // (SearchTimeout, exported read-only from search.js for
+    // this purpose) and falls back to the first available
+    // legal move with a fresh static-eval score. Every
+    // other exception -- any real engine/board/search bug --
+    // is rethrown unchanged so it stays visible to uci.js's
+    // top-level handler exactly as before, instead of being
+    // silently converted into a fabricated move.
     //----------------------------------
 
     runSearchSafely(searchFn, fallbackMoves) {
@@ -743,7 +759,10 @@ export class UciSession {
 
         catch (error) {
 
-            if (fallbackMoves.length > 0) {
+            if (
+                error instanceof SearchTimeout &&
+                fallbackMoves.length > 0
+            ) {
 
                 this.engine.search.lastSearchScore =
                     this.engine.evaluation.evaluate().total;

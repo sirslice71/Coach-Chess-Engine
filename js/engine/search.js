@@ -13,7 +13,7 @@ import { TTFlag }
 
 const MAX_Q_PLY = 16;
 
-class SearchTimeout extends Error {}
+export class SearchTimeout extends Error {}
 
 export default class Search {
 
