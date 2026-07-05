@@ -5,6 +5,7 @@ import LegalMoveGenerator from "../engine/legalmovegen.js";
 import Evaluation from "../engine/evaluation.js";
 import Search from "../engine/search.js";
 import TranspositionTable from "../engine/transpositiontable.js";
+import { SearchConstants } from "../engine/searchconstants.js";
 import { Piece } from "../core/piece.js";
 import {
     algebraic,
@@ -712,6 +713,57 @@ export class UciSession {
 
     }
 
+    //----------------------------------
+    // Run a search call defensively.
+    //
+    // js/engine/search.js searchRoot() calls
+    // checkSearchDeadline() at the very top of its
+    // iterative-deepening loop, OUTSIDE the try/catch
+    // that normally handles SearchTimeout. If the
+    // deadline has already elapsed before the first
+    // iteration begins (an extremely small movetime or
+    // near-zero clock budget), that throw escapes
+    // uncaught all the way past uciengine.js. That is a
+    // search.js issue, out of scope for this change and
+    // reported separately. This wrapper prevents it from
+    // ever reaching the UCI protocol layer as a wrong
+    // "bestmove 0000" when legal moves actually exist --
+    // it falls back to the first available legal move
+    // instead, with a fresh static-eval score rather than
+    // a stale one.
+    //----------------------------------
+
+    runSearchSafely(searchFn, fallbackMoves) {
+
+        try {
+
+            return searchFn();
+
+        }
+
+        catch (error) {
+
+            if (fallbackMoves.length > 0) {
+
+                this.engine.search.lastSearchScore =
+                    this.engine.evaluation.evaluate().total;
+
+                return {
+                    move: fallbackMoves[0],
+                    notation: fallbackMoves[0].toString(),
+                    depth: 0,
+                    nodes: 0,
+                    pv: [fallbackMoves[0]]
+                };
+
+            }
+
+            throw error;
+
+        }
+
+    }
+
     handleGo(tokens) {
 
         if (tokens.includes("infinite")) {
@@ -751,12 +803,81 @@ export class UciSession {
         const movestogoIndex =
             tokens.indexOf("movestogo");
 
+        const hasDepth =
+            depthIndex !== -1 &&
+            depthIndex < tokens.length - 1;
+
+        const hasClock =
+            wtimeIndex !== -1 &&
+            btimeIndex !== -1 &&
+            wtimeIndex < tokens.length - 1 &&
+            btimeIndex < tokens.length - 1;
+
+        const hasMovetime =
+            movetimeIndex !== -1 &&
+            movetimeIndex < tokens.length - 1;
+
+        //----------------------------------
+        // Root legal moves are needed up front
+        // (not just inside the wtime/btime branch)
+        // to guard the zero-legal-move case below
+        // for every recognized go variant. Cheap:
+        // one call, reused everywhere it's needed.
+        // Only computed when some recognized variant
+        // is present, so the "unsupported go variant"
+        // fallback below is completely unaffected.
+        //----------------------------------
+
+        const rootLegalMoves =
+            (hasDepth || hasClock || hasMovetime)
+                ? this.engine.legalMoveGenerator.generateMoves()
+                : [];
+
         let result = null;
 
         if (
-            depthIndex !== -1 &&
-            depthIndex < tokens.length - 1
+            (hasDepth || hasClock || hasMovetime) &&
+            rootLegalMoves.length === 0
         ) {
+
+            //----------------------------------
+            // No legal moves at the root (checkmate
+            // or stalemate). search.bestMove() has a
+            // latent bug for exactly this case:
+            // js/engine/search.js searchRoot() calls
+            // result.bestMove.toString() unconditionally
+            // while building its per-iteration debug
+            // row, even in quiet mode, which throws
+            // when bestMove is null. That is a
+            // search.js issue -- out of scope for this
+            // change and reported separately. Short-
+            // circuiting here keeps every recognized
+            // "go" variant protocol-safe without
+            // touching search.js.
+            //----------------------------------
+
+            const inCheck =
+                this.engine.board.isInCheck();
+
+            this.engine.search.lastSearchScore =
+                inCheck
+                    ? this.engine.search.toWhiteRelativeScore(
+                        -SearchConstants.MATE,
+                        this.engine.board.sideToMove
+                    )
+                    : SearchConstants.DRAW;
+
+            result = {
+                move: null,
+                notation: null,
+                depth: 0,
+                nodes: 0,
+                pv: []
+            };
+
+        }
+
+        else if (hasDepth) {
 
             const depth =
                 Math.max(
@@ -768,21 +889,20 @@ export class UciSession {
                 );
 
             result =
-                withMutedConsole(() =>
-                    this.engine.search.bestMove(
-                        depth,
-                        { quiet: true }
-                    )
+                this.runSearchSafely(
+                    () =>
+                        withMutedConsole(() =>
+                            this.engine.search.bestMove(
+                                depth,
+                                { quiet: true }
+                            )
+                        ),
+                    rootLegalMoves
                 );
 
         }
 
-        else if (
-            wtimeIndex !== -1 &&
-            btimeIndex !== -1 &&
-            wtimeIndex < tokens.length - 1 &&
-            btimeIndex < tokens.length - 1
-        ) {
+        else if (hasClock) {
 
             //----------------------------------
             // Forced-move shortcut: with exactly
@@ -798,18 +918,18 @@ export class UciSession {
             // real to report, at negligible cost.
             //----------------------------------
 
-            const rootLegalMoves =
-                this.engine.legalMoveGenerator
-                    .generateMoves();
-
             if (rootLegalMoves.length === 1) {
 
                 result =
-                    withMutedConsole(() =>
-                        this.engine.search.bestMove(
-                            1,
-                            { quiet: true }
-                        )
+                    this.runSearchSafely(
+                        () =>
+                            withMutedConsole(() =>
+                                this.engine.search.bestMove(
+                                    1,
+                                    { quiet: true }
+                                )
+                            ),
+                        rootLegalMoves
                     );
 
             }
@@ -891,24 +1011,25 @@ export class UciSession {
                     Math.max(0, movetime - 5);
 
                 result =
-                    withMutedConsole(() =>
-                        this.engine.search.bestMove(
-                            64,
-                            {
-                                deadlineMs,
-                                quiet: true
-                            }
-                        )
+                    this.runSearchSafely(
+                        () =>
+                            withMutedConsole(() =>
+                                this.engine.search.bestMove(
+                                    64,
+                                    {
+                                        deadlineMs,
+                                        quiet: true
+                                    }
+                                )
+                            ),
+                        rootLegalMoves
                     );
 
             }
 
         }
 
-        else if (
-            movetimeIndex !== -1 &&
-            movetimeIndex < tokens.length - 1
-        ) {
+        else if (hasMovetime) {
 
             const movetime =
                 Math.max(
@@ -924,14 +1045,18 @@ export class UciSession {
                 Math.max(0, movetime - 5);
 
             result =
-                withMutedConsole(() =>
-                    this.engine.search.bestMove(
-                        64,
-                        {
-                            deadlineMs,
-                            quiet: true
-                        }
-                    )
+                this.runSearchSafely(
+                    () =>
+                        withMutedConsole(() =>
+                            this.engine.search.bestMove(
+                                64,
+                                {
+                                    deadlineMs,
+                                    quiet: true
+                                }
+                            )
+                        ),
+                    rootLegalMoves
                 );
 
         }
