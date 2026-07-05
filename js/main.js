@@ -440,6 +440,23 @@ window.chess = {
     },
 
     //----------------------------------
+    // Coach Eval History / PGN Export
+    // (browser-only diagnostics)
+    //----------------------------------
+
+    evalHistory() {
+
+        return gameController.evalHistory();
+
+    },
+
+    exportPgn() {
+
+        return gameController.exportPgn();
+
+    },
+
+    //----------------------------------
     // Coach Lab
     //----------------------------------
 

@@ -4,6 +4,7 @@
 
 import EngineDebug from "../dev/enginedebug.js";
 import Attack from "../engine/attack.js";
+import PGN from "./pgn.js";
 
 export default class GameController {
 
@@ -247,6 +248,7 @@ export default class GameController {
                 ) / 100
             ).toFixed(2);
         result.pv = [choice.move];
+        result.note = "opening variety";
 
         console.debug(
             "Coach opening variety pool",
@@ -366,8 +368,14 @@ export default class GameController {
 
         console.time("Play Move");
 
+        const coachMeta =
+            this.buildCoachMeta(
+                result,
+                rootSideToMove
+            );
+
         const ok =
-            this.playMove(result.move);
+            this.playMove(result.move, coachMeta);
 
         console.timeEnd("Play Move");
 
@@ -395,10 +403,67 @@ export default class GameController {
     }
 
     //----------------------------------
+    // Coach Move Metadata
+    //
+    // Captures the search telemetry that
+    // corresponds to the move Coach is
+    // about to play, for chess.evalHistory().
+    //----------------------------------
+
+    buildCoachMeta(result, rootSideToMove) {
+
+        const evalWhite =
+            Number(result.evaluation);
+
+        const evalCoach =
+            rootSideToMove > 0
+                ? evalWhite
+                : -evalWhite;
+
+        return {
+
+            depth: result.depth,
+
+            evalWhite,
+
+            evalCoach,
+
+            nodes: result.nodes,
+
+            timeMs: Number(result.elapsedMs),
+
+            nps: result.nps,
+
+            pv: (result.pv || [])
+                .map(pvMove => pvMove.toString())
+                .join(" "),
+
+            note: result.note || ""
+
+        };
+
+    }
+
+    //----------------------------------
     // Play Move
     //----------------------------------
 
-    playMove(move) {
+    playMove(move, coachMeta = null) {
+
+        //----------------------------------
+        // SAN (Pre-Move Legal Position)
+        //----------------------------------
+        // Must run before board.makeMove()
+        // so disambiguation sees the actual
+        // pre-move legal move list.
+        //----------------------------------
+
+        const legalMoves =
+            this.gameState.legalMoveGenerator
+                .generateMoves();
+
+        const baseSan =
+            PGN.sanForMove(move, legalMoves);
 
         //----------------------------------
         // Execute Move
@@ -407,10 +472,18 @@ export default class GameController {
         this.board.makeMove(move);
 
         //----------------------------------
+        // Check / Checkmate Suffix
+        // (post-move position)
+        //----------------------------------
+
+        const san =
+            baseSan + this.checkSuffix();
+
+        //----------------------------------
         // Record Move
         //----------------------------------
 
-        this.recordMove(move);
+        this.recordMove(move, san, coachMeta);
         this.ui.updateMoveHistory(this.gameMoves);
 
         //----------------------------------
@@ -447,6 +520,31 @@ export default class GameController {
         this.checkGameOver();
 
         return true;
+
+    }
+
+    //----------------------------------
+    // Check / Checkmate Suffix
+    //
+    // Must run AFTER board.makeMove(),
+    // using the post-move position, and
+    // must NOT undo the move -- the move
+    // just made is the real game move.
+    //----------------------------------
+
+    checkSuffix() {
+
+        if (!this.board.isInCheck()) {
+            return "";
+        }
+
+        const opponentMoves =
+            this.gameState.legalMoveGenerator
+                .generateMoves();
+
+        return opponentMoves.length === 0
+            ? "#"
+            : "+";
 
     }
 
@@ -551,9 +649,30 @@ export default class GameController {
 
     //----------------------------------
     // Record Move
+    //
+    // One record per ply, for both human
+    // and Coach moves. Coach moves carry
+    // search metadata (coachMeta); human
+    // moves leave those fields blank.
+    //
+    // This same array backs:
+    // - the existing move history panel (.move)
+    // - chess.evalHistory()
+    // - chess.exportPgn() (.san)
+    // so Undo (which pops this array) keeps
+    // all three in sync automatically.
     //----------------------------------
 
-    recordMove(move) {
+    recordMove(move, san, coachMeta = null) {
+
+        const ply =
+            this.gameMoves.length + 1;
+
+        const moveNumber =
+            Math.ceil(ply / 2);
+
+        const side =
+            (ply % 2 === 1) ? "White" : "Black";
 
         this.gameMoves.push({
 
@@ -567,9 +686,102 @@ export default class GameController {
 
             flags: move.flags,
 
-            fen: this.board.repetitionKey()
+            fen: this.board.repetitionKey(),
+
+            san,
+
+            moveNumber,
+
+            side,
+
+            coach: !!coachMeta,
+
+            depth: coachMeta ? coachMeta.depth : null,
+
+            evalWhite: coachMeta ? coachMeta.evalWhite : null,
+
+            evalCoach: coachMeta ? coachMeta.evalCoach : null,
+
+            nodes: coachMeta ? coachMeta.nodes : null,
+
+            timeMs: coachMeta ? coachMeta.timeMs : null,
+
+            nps: coachMeta ? coachMeta.nps : null,
+
+            pv: coachMeta ? coachMeta.pv : null,
+
+            note: coachMeta ? (coachMeta.note || "") : ""
 
         });
+
+    }
+
+    //----------------------------------
+    // Coach Eval History
+    // (console command: chess.evalHistory())
+    //----------------------------------
+
+    evalHistory() {
+
+        const rows =
+            this.gameMoves.map(entry => ({
+
+                moveNumber: entry.moveNumber,
+
+                side: entry.side,
+
+                played: entry.move,
+
+                san: entry.san,
+
+                depth: entry.depth,
+
+                evalWhite: entry.evalWhite,
+
+                evalCoach: entry.evalCoach,
+
+                nodes: entry.nodes,
+
+                timeMs: entry.timeMs,
+
+                nps: entry.nps,
+
+                pv: entry.pv,
+
+                note: entry.note
+
+            }));
+
+        console.table(rows);
+
+        return rows;
+
+    }
+
+    //----------------------------------
+    // PGN Export
+    // (console command: chess.exportPgn())
+    //----------------------------------
+
+    exportPgn() {
+
+        const result =
+            this.gameState.getResult().result;
+
+        const pgn =
+            PGN.buildPgnString({
+
+                gameMoves: this.gameMoves,
+
+                humanSide: this.humanSide,
+
+                result
+
+            });
+
+        console.log(pgn);
+
+        return pgn;
 
     }
 
