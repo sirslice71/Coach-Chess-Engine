@@ -2,7 +2,7 @@
 
 Version: 1.0 Draft
 Project: Coach Chess Engine
-Audience: AI Coding Assistants (ChatGPT, Codex, Claude, Gemini, Future Agents)
+Audience: AI Coding Assistants (ChatGPT, Codex, Claude, Claude Code, Gemini, Future Agents)
 
 ---
 

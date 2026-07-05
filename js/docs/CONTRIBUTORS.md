@@ -25,7 +25,7 @@ Responsibilities:
 Role:
 - Architecture discussion
 - Engine design review
-- Prompt writing for Codex
+- Prompt writing for Codex and Claude Code
 - Code review assistance
 - Debugging strategy
 - Evaluation/search planning
@@ -48,13 +48,35 @@ Codex changes are reviewed before being committed.
 
 ---
 
+### Claude Code
+
+Role:
+- Repository inspection
+- Code implementation assistance
+- Focused bug fixes
+- Test and verification assistance
+- Diff-based development tasks
+
+Claude Code changes are reviewed before being committed.
+
+Note (current status): Codex is currently unavailable/limited. Claude Code is
+the current active outside coding helper for the project. Codex remains
+documented above and may resume this role again in the future.
+
+---
+
 ## Current Development Workflow
 
+*(Codex / Claude Code Workflow Guidance)*
+
+Sir Slice works with outside coding helpers such as Codex and Claude Code,
+depending on availability, following the same review process either way.
+
 1. Sir Slice defines or approves the next engine task.
-2. ChatGPT helps design the task and produce a focused Codex prompt.
-3. Codex inspects the repository and makes narrow code changes.
+2. ChatGPT helps design the task and produce a focused prompt for Codex or Claude Code.
+3. Codex or Claude Code inspects the repository and makes narrow code changes.
 4. Sir Slice tests the engine locally.
-5. ChatGPT reviews Codex summaries, benchmark results, and design risks.
+5. ChatGPT reviews summaries, benchmark results, and design risks from Codex or Claude Code.
 6. Sir Slice commits and pushes approved changes.
 
 ---
