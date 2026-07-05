@@ -173,7 +173,7 @@ test("UCI process handshake and depth-1 search return protocol-safe output", asy
             .filter(Boolean);
 
     assert.ok(lines.includes("id name Coach Chess Engine"));
-    assert.ok(lines.includes("id author Sir Slice / Sir Slice"));
+    assert.ok(lines.includes("id author Sir Slice"));
     assert.ok(lines.includes("option name Hash type spin default 32 min 1 max 512"));
     assert.ok(lines.includes("option name Move Overhead type spin default 50 min 0 max 1000"));
     assert.ok(lines.includes("option name Clear Hash type button"));
