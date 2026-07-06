@@ -267,6 +267,17 @@ export default class Search {
 
         //----------------------------------
         // Iterative Deepening
+        //
+        // `result` is only ever assigned from a validated
+        // `iterationResult` below -- never directly from a
+        // just-returned search call. This matters because an
+        // aspiration-window search that fails high/low is only a
+        // bound, not the true score: if the corrective full-window
+        // re-search that follows is itself interrupted by
+        // SearchTimeout, there must be no trusted value to publish
+        // for this depth, and `result` must keep holding whatever
+        // the last fully completed, trusted depth produced (or
+        // remain null if depth 1 itself never completed).
         //----------------------------------
 
         for (
@@ -297,9 +308,16 @@ export default class Search {
 
             }
 
+            //----------------------------------
+            // Narrow (aspiration) window search. Its outcome is
+            // NOT trusted yet -- see the note above the loop.
+            //----------------------------------
+
+            let iterationResult;
+
             try {
 
-                result = this.searchIteration(
+                iterationResult = this.searchIteration(
 
                     depth,
 
@@ -331,9 +349,9 @@ export default class Search {
 
                 (
 
-                    result.bestScore <= alpha ||
+                    iterationResult.bestScore <= alpha ||
 
-                    result.bestScore >= beta
+                    iterationResult.bestScore >= beta
 
                 )
 
@@ -343,7 +361,7 @@ export default class Search {
 
                 try {
 
-                    result = this.searchIteration(
+                    iterationResult = this.searchIteration(
                         depth,
                         -SearchConstants.INFINITY,
                         SearchConstants.INFINITY
@@ -352,6 +370,17 @@ export default class Search {
                 }
 
                 catch (error) {
+
+                    //----------------------------------
+                    // The full-window re-search was interrupted
+                    // before producing a trustworthy result.
+                    // iterationResult still holds the failed
+                    // narrow-window bound from just above -- that
+                    // is only a lower/upper bound, not a real
+                    // score, and must never be published. Discard
+                    // it and stop iterating; `result` still holds
+                    // the last fully completed, trusted depth.
+                    //----------------------------------
 
                     if (error instanceof SearchTimeout) {
                         break;
@@ -362,6 +391,15 @@ export default class Search {
                 }
 
             }
+
+            //----------------------------------
+            // Reaching here means iterationResult is trustworthy:
+            // either the aspiration window held on the first try,
+            // or the full-window re-search completed without being
+            // interrupted. Commit it as the new trusted result.
+            //----------------------------------
+
+            result = iterationResult;
 
             previousScore = result.bestScore;
             completedDepth = depth;
@@ -579,6 +617,19 @@ export default class Search {
 
             -SearchConstants.INFINITY;
 
+        //----------------------------------
+        // Remember the window this call actually entered with
+        // (before the loop below raises `alpha`), so the root
+        // position can be stored with an honest EXACT/LOWER/UPPER
+        // flag afterwards -- exactly like negamax() does. Without
+        // this, a fail-high/fail-low result (bestScore outside the
+        // window that was searched) would be mislabeled EXACT in
+        // the TT, and a later buildPV()/probe() could pick up that
+        // untrustworthy bound as if it were a real, exact score.
+        //----------------------------------
+
+        const alphaOriginal = alpha;
+
         const rootMoves = [];
 
         let t =
@@ -749,7 +800,36 @@ export default class Search {
 
         //----------------------------------
         // Store Root Position
+        //
+        // Classify exactly like negamax(): only EXACT when the
+        // returned score actually fell strictly inside the window
+        // this call was given. A fail-low (bestScore <=
+        // alphaOriginal) or fail-high (bestScore >= beta) result is
+        // only a bound, not the true value, and must be stored as
+        // such -- otherwise a failed aspiration-window call could
+        // leave a bogus EXACT entry for the root position that a
+        // later buildPV() or TT probe would wrongly trust.
         //----------------------------------
+
+        let flag;
+
+        if (bestScore <= alphaOriginal) {
+
+            flag = TTFlag.UPPER;
+
+        }
+
+        else if (bestScore >= beta) {
+
+            flag = TTFlag.LOWER;
+
+        }
+
+        else {
+
+            flag = TTFlag.EXACT;
+
+        }
 
         if (!this.hasRepetitionHistory()) {
 
@@ -761,7 +841,7 @@ export default class Search {
 
                 bestScore,
 
-                TTFlag.EXACT,
+                flag,
 
                 bestMove
 
