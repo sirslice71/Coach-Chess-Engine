@@ -59,6 +59,30 @@ const QSEARCH_SEE_PRUNE_THRESHOLD = -300;
 
 const MAX_Q_CHECK_PLY = MAX_Q_PLY;
 
+//----------------------------------
+// Principal Variation Search (PVS)
+//
+// Only applied inside negamax()'s own move loop (never the
+// root loop in searchIteration(), and never quiescence()).
+// The first ordered move at a node is always searched with
+// the full alpha-beta window, exactly as before. Later moves
+// are first searched with a cheap null/scout window; if a
+// scout search unexpectedly beats alpha (while still below
+// beta), that move is re-searched with the full window before
+// its score is trusted, so the final result is identical to a
+// full-window search either way -- PVS only changes how many
+// nodes it costs to get there.
+//
+// Kept conservative on purpose: skipped while the side to
+// move is in check (forced, tactical positions where a cheap
+// scout window is least likely to pay off), and skipped below
+// PVS_MIN_DEPTH (very shallow remaining depth, right next to
+// the quiescence handoff, where the bookkeeping overhead of a
+// possible re-search isn't worth it).
+//----------------------------------
+
+const PVS_MIN_DEPTH = 3;
+
 export class SearchTimeout extends Error {}
 
 export default class Search {
@@ -139,6 +163,7 @@ export default class Search {
 
         this.aspirationWindow = 25;     // 0.25 pawns
         this.aspirationResearches = 0;
+        this.pvsResearches = 0;
 
         //----------------------------------
         // History Heuristic
@@ -906,9 +931,11 @@ export default class Search {
         // Mate / Stalemate
         //----------------------------------
 
+        const inCheck = this.board.isInCheck();
+
         if (moves.length === 0) {
 
-            if (this.board.isInCheck()) {
+            if (inCheck) {
 
                 return -SearchConstants.MATE + ply;
 
@@ -925,6 +952,8 @@ export default class Search {
         let bestScore = -SearchConstants.INFINITY;
 
         let bestMove = null;
+
+        let moveIndex = 0;
 
             for (const move of moves) {
 
@@ -947,21 +976,82 @@ export default class Search {
                 }
 
                 //----------------------------------
-                // Search Child
+                // Search Child (Principal Variation Search)
+                //
+                // The first ordered move always gets the full
+                // alpha-beta window, exactly as before PVS. Later
+                // moves are only scouted with a null window when
+                // it is safe to do so (not in check, and enough
+                // depth remains -- see PVS_MIN_DEPTH above); a
+                // scout that beats alpha but stays below beta is
+                // re-searched with the full window before being
+                // trusted, so the final score is never taken from
+                // a null-window search alone.
                 //----------------------------------
 
-                const score =
-                    -this.negamax(
+                const usePvsScout =
 
-                        depth - 1,
+                    moveIndex > 0 &&
 
-                        -beta,
+                    !inCheck &&
 
-                        -alpha,
+                    depth >= PVS_MIN_DEPTH;
 
-                        ply + 1
+                let score;
 
-                    );
+                if (usePvsScout) {
+
+                    score =
+                        -this.negamax(
+
+                            depth - 1,
+
+                            -alpha - 1,
+
+                            -alpha,
+
+                            ply + 1
+
+                        );
+
+                    if (score > alpha && score < beta) {
+
+                        this.pvsResearches++;
+
+                        score =
+                            -this.negamax(
+
+                                depth - 1,
+
+                                -beta,
+
+                                -alpha,
+
+                                ply + 1
+
+                            );
+
+                    }
+
+                }
+                else {
+
+                    score =
+                        -this.negamax(
+
+                            depth - 1,
+
+                            -beta,
+
+                            -alpha,
+
+                            ply + 1
+
+                        );
+
+                }
+
+                moveIndex++;
 
                 //----------------------------------
                 // Undo Move
@@ -1541,6 +1631,7 @@ export default class Search {
         this.leafNodes = 0;
         this.cutoffs = 0;
         this.killerCutoffs = 0;
+        this.pvsResearches = 0;
 
         this.board.profileMakeMove = 0;
         this.board.profileUndoMove = 0;
