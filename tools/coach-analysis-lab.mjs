@@ -1,13 +1,19 @@
 #!/usr/bin/env node
 
 //----------------------------------
-// Coach Analysis Lab v1
+// Coach Analysis Lab v1.1
 //
 // Diagnostic tool only. Runs Coach (and optionally a
 // stronger reference UCI engine such as Stockfish) over a
 // set of FEN positions and reports where they disagree
 // most, so overnight runs produce concrete engineering
 // targets in the morning.
+//
+// v1.1 adds PGN ingestion: feed a played game (typically a
+// Stockfish-annotated Arena PGN) with --pgn-file and the
+// tool replays it, extracts positions before the selected
+// Coach side's moves, and writes a ranked candidate
+// regression FEN list alongside the existing report.
 //
 // This tool does NOT change engine behavior. It talks to
 // engines strictly through their UCI stdin/stdout, exactly
@@ -18,13 +24,16 @@
 //   node tools/coach-analysis-lab.mjs --fen-file docs/coach-analysis-sample-fens.txt --coach "node uci.js" --movetime 10000
 //   node tools/coach-analysis-lab.mjs --fen-file docs/regression-fens.txt --coach "node uci.js" --stockfish "C:\Path\To\stockfish.exe" --movetime 10000
 //   node tools/coach-analysis-lab.mjs --fen "8/R5N1/2p2pkp/4p3/P7/1p3P1P/2r3PK/8 b - - 0 45" --coach "node uci.js" --movetime 10000
+//   node tools/coach-analysis-lab.mjs --pgn-file docs/coach-analysis-sample-loss2.pgn --coach "node uci.js" --coach-side black --extract annotated --movetime 1000
 //
 // FEN file format: one position per line.
 //   - Blank lines and lines starting with # are ignored.
 //   - Optional label:   label | fen
 //
 // Output: analysis-runs/YYYYMMDD-HHMMSS/results.json and
-// report.md (directory configurable via --out).
+// report.md (directory configurable via --out). PGN runs
+// additionally write candidate-regressions.fens and
+// candidate-regressions.md in the same directory.
 //
 // Coach-only mode (no --stockfish) still produces a useful
 // per-position report; comparison fields are simply absent.
@@ -35,6 +44,10 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { performance } from "node:perf_hooks";
+
+import { createEngineCore, moveToUci } from "../js/uci/uciengine.js";
+import PGN from "../js/game/pgn.js";
+import FEN from "../js/core/fen.js";
 
 //----------------------------------
 // Coach reports forced mates as plain "score cp" values
@@ -64,17 +77,27 @@ const EVAL_DIFF_TACTIC_CP = 150;
 const TOP_DISAGREEMENT_COUNT = 10;
 
 //----------------------------------
+// PGN mode defaults and option vocab
+//----------------------------------
+
+const DEFAULT_COACH_SIDE = "auto";
+const DEFAULT_EXTRACT_MODE = "annotated";
+const VALID_COACH_SIDES = ["white", "black", "both", "auto"];
+const VALID_EXTRACT_MODES = ["all", "annotated", "blunders"];
+
+//----------------------------------
 // CLI parsing
 //----------------------------------
 
 function usage() {
 
     return [
-        "Coach Analysis Lab v1",
+        "Coach Analysis Lab v1.1",
         "",
         "Required (one of):",
         "  --fen-file <path>     File with one FEN per line ('label | fen' and # comments allowed)",
         "  --fen \"<fen>\"         Analyze a single FEN",
+        "  --pgn-file <path>     Replay a PGN game and extract candidate positions",
         "",
         "Engines:",
         "  --coach \"<command>\"     Coach UCI command (default: node uci.js)",
@@ -84,6 +107,11 @@ function usage() {
         "Search control (one of):",
         "  --movetime <ms>       go movetime per position (default 5000)",
         "  --depth <n>           go depth per position instead of movetime",
+        "",
+        "PGN mode:",
+        "  --coach-side white|black|both|auto  Which side's moves to extract (default: auto)",
+        "  --extract all|annotated|blunders    Extraction strictness (default: annotated)",
+        "  --max-positions <n>                 Cap extracted positions for long games",
         "",
         "Other:",
         "  --label \"<text>\"      Label for --fen mode",
@@ -101,6 +129,7 @@ function parseCliArguments(argv) {
     const options = {
         fenFile: null,
         fen: null,
+        pgnFile: null,
         label: null,
         coachCommand: "node uci.js",
         referenceCommand: null,
@@ -110,7 +139,10 @@ function parseCliArguments(argv) {
         outDir: "analysis-runs",
         timeoutMs: null,
         verbose: false,
-        help: false
+        help: false,
+        coachSide: DEFAULT_COACH_SIDE,
+        extractMode: DEFAULT_EXTRACT_MODE,
+        maxPositions: null
     };
 
     for (let i = 0; i < argv.length; i++) {
@@ -137,6 +169,22 @@ function parseCliArguments(argv) {
 
             case "--fen":
                 options.fen = next();
+                break;
+
+            case "--pgn-file":
+                options.pgnFile = next();
+                break;
+
+            case "--coach-side":
+                options.coachSide = next();
+                break;
+
+            case "--extract":
+                options.extractMode = next();
+                break;
+
+            case "--max-positions":
+                options.maxPositions = Number.parseInt(next(), 10);
                 break;
 
             case "--label":
@@ -194,8 +242,39 @@ function parseCliArguments(argv) {
 
 function validateOptions(options) {
 
-    if (!options.fenFile && !options.fen) {
-        throw new Error("Provide --fen-file <path> or --fen \"<fen>\" (see --help)");
+    if (!options.fenFile && !options.fen && !options.pgnFile) {
+        throw new Error("Provide --fen-file <path>, --fen \"<fen>\", or --pgn-file <path> (see --help)");
+    }
+
+    const inputSourceCount =
+        [options.fenFile, options.fen, options.pgnFile]
+            .filter(value => value !== null).length;
+
+    if (inputSourceCount > 1) {
+        throw new Error("Use only one of --fen-file, --fen, or --pgn-file");
+    }
+
+    if (!VALID_COACH_SIDES.includes(options.coachSide)) {
+
+        throw new Error(
+            `--coach-side must be one of: ${VALID_COACH_SIDES.join(", ")}`
+        );
+
+    }
+
+    if (!VALID_EXTRACT_MODES.includes(options.extractMode)) {
+
+        throw new Error(
+            `--extract must be one of: ${VALID_EXTRACT_MODES.join(", ")}`
+        );
+
+    }
+
+    if (
+        options.maxPositions !== null &&
+        (!Number.isInteger(options.maxPositions) || options.maxPositions <= 0)
+    ) {
+        throw new Error("--max-positions must be a positive integer");
     }
 
     if (options.movetimeMs !== null && options.depth !== null) {
@@ -905,6 +984,684 @@ function readFenFile(filePath) {
 
 }
 
+//======================================
+// PGN Ingestion (v1.1)
+//
+// A lightweight, tolerant PGN reader: it does not aim for
+// full ChessBase-level correctness, but it must safely
+// handle normal Arena/Stockfish-annotated PGNs (headers,
+// {comments}, $NAGs, (variations), move numbers, results)
+// without crashing, and it must replay the mainline using
+// Coach's own board/movegen so extracted FENs are exactly
+// what Coach itself would have seen.
+//======================================
+
+const RESULT_TOKEN_PATTERN = /^(1-0|0-1|1\/2-1\/2|\*)$/;
+const MOVE_NUMBER_TOKEN_PATTERN = /^\d+\.+$/;
+
+//----------------------------------
+// Negative/annotation phrases used by both the "annotated"
+// extraction mode and the candidate-regressions ranking.
+// Case-insensitive substring match against move comments.
+//----------------------------------
+
+const NEGATIVE_COMMENT_PHRASES = [
+    "what a pity",
+    "throws away",
+    "ruining",
+    "missed",
+    "only",
+    "was possible",
+    "is worth consideration",
+    "stockfish",
+    "the only chance",
+    "blunder",
+    "mistake"
+];
+
+function parsePgnHeaders(text) {
+
+    const headers = {};
+    const headerLinePattern = /^\s*\[(\w+)\s+"((?:[^"\\]|\\.)*)"\]\s*$/gm;
+
+    let match;
+
+    while ((match = headerLinePattern.exec(text)) !== null) {
+        headers[match[1]] = match[2].replace(/\\"/g, "\"");
+    }
+
+    return headers;
+
+}
+
+//----------------------------------
+// Strip the header block, leaving only movetext. Headers
+// are always "[Tag \"value\"]" lines at the top of the file
+// in normal Arena/PGN output, so removing every line that
+// matches the header pattern is sufficient and safe even if
+// blank lines are inconsistent.
+//----------------------------------
+
+function stripHeaders(text) {
+
+    return text
+        .split(/\r?\n/)
+        .filter(line => !/^\s*\[\w+\s+".*"\]\s*$/.test(line))
+        .join("\n");
+
+}
+
+//----------------------------------
+// Single-pass movetext tokenizer. Comments and variations
+// are captured whole (by paren/brace depth) rather than
+// recursively tokenized here; variations are tokenized
+// separately, on demand, only to pull out their first move
+// (see firstMoveInVariation).
+//----------------------------------
+
+function tokenizeMovetext(movetext) {
+
+    const tokens = [];
+    const length = movetext.length;
+    let i = 0;
+
+    while (i < length) {
+
+        const ch = movetext[i];
+
+        if (/\s/.test(ch)) {
+            i++;
+            continue;
+        }
+
+        if (ch === "{") {
+
+            let depth = 1;
+            const start = i + 1;
+            i++;
+
+            while (i < length && depth > 0) {
+
+                if (movetext[i] === "{") depth++;
+                else if (movetext[i] === "}") depth--;
+
+                i++;
+
+            }
+
+            tokens.push({
+                type: "comment",
+                text: movetext.slice(start, Math.max(start, i - 1)).trim()
+            });
+
+            continue;
+
+        }
+
+        if (ch === "(") {
+
+            let depth = 1;
+            const start = i + 1;
+            i++;
+
+            while (i < length && depth > 0) {
+
+                if (movetext[i] === "(") depth++;
+                else if (movetext[i] === ")") depth--;
+
+                i++;
+
+            }
+
+            tokens.push({
+                type: "variation",
+                text: movetext.slice(start, Math.max(start, i - 1)).trim()
+            });
+
+            continue;
+
+        }
+
+        if (ch === "$") {
+
+            const start = i;
+            i++;
+
+            while (i < length && /[0-9]/.test(movetext[i])) {
+                i++;
+            }
+
+            tokens.push({
+                type: "nag",
+                code: movetext.slice(start, i)
+            });
+
+            continue;
+
+        }
+
+        const start = i;
+
+        while (
+            i < length &&
+            !/\s/.test(movetext[i]) &&
+            movetext[i] !== "{" &&
+            movetext[i] !== "(" &&
+            movetext[i] !== "$"
+        ) {
+            i++;
+        }
+
+        tokens.push({
+            type: "raw",
+            text: movetext.slice(start, i)
+        });
+
+    }
+
+    return tokens;
+
+}
+
+//----------------------------------
+// Separate the base SAN from trailing "!"/"?" annotation
+// glyphs (some PGN sources use these instead of, or in
+// addition to, numeric NAGs) and trailing "+"/"#" check or
+// mate markers (sanForMove() never includes those, so they
+// must be stripped before matching against it).
+//----------------------------------
+
+function splitSanGlyphs(rawToken) {
+
+    const glyphMatch = rawToken.match(/^(.*?)([!?]+)$/);
+
+    const withoutGlyphs = glyphMatch ? glyphMatch[1] : rawToken;
+    const glyphs = glyphMatch ? glyphMatch[2] : "";
+
+    const baseSan = withoutGlyphs.replace(/[+#]+$/, "");
+
+    return { baseSan, glyphs };
+
+}
+
+//----------------------------------
+// Pull just the first real move out of a variation's raw
+// text (skipping any leading move-number marker), for the
+// "suggested/variation move" metadata field. Does not
+// attempt to replay the variation itself.
+//----------------------------------
+
+function firstMoveInVariation(variationText) {
+
+    const tokens = tokenizeMovetext(variationText);
+
+    for (const token of tokens) {
+
+        if (token.type !== "raw") {
+            continue;
+        }
+
+        if (
+            MOVE_NUMBER_TOKEN_PATTERN.test(token.text) ||
+            RESULT_TOKEN_PATTERN.test(token.text)
+        ) {
+            continue;
+        }
+
+        const { baseSan } = splitSanGlyphs(token.text);
+
+        if (baseSan) {
+            return baseSan;
+        }
+
+    }
+
+    return null;
+
+}
+
+//----------------------------------
+// Group the flat token stream into an ordered mainline move
+// list, attaching comments/NAGs/the first following
+// variation's first move to the mainline move they follow.
+// Side/move-number bookkeeping is independent of the PGN's
+// own move-number tokens (which are only markers here) --
+// it simply alternates starting from White's move 1, which
+// matches every normal PGN mainline.
+//----------------------------------
+
+function buildMainlineMoves(tokens) {
+
+    const mainline = [];
+    let result = null;
+
+    let moveNumber = 1;
+    let side = "w";
+    let current = null;
+
+    for (const token of tokens) {
+
+        if (token.type === "comment") {
+
+            if (current) {
+
+                current.comments.push(token.text);
+
+            }
+
+            continue;
+
+        }
+
+        if (token.type === "nag") {
+
+            if (current) {
+                current.nags.push(token.code);
+            }
+
+            continue;
+
+        }
+
+        if (token.type === "variation") {
+
+            if (current && current.variationFirstMove === null) {
+                current.variationFirstMove = firstMoveInVariation(token.text);
+            }
+
+            continue;
+
+        }
+
+        // token.type === "raw"
+
+        if (RESULT_TOKEN_PATTERN.test(token.text)) {
+            result = token.text;
+            break;
+        }
+
+        if (MOVE_NUMBER_TOKEN_PATTERN.test(token.text)) {
+            continue;
+        }
+
+        const { baseSan, glyphs } = splitSanGlyphs(token.text);
+
+        if (!baseSan) {
+            continue;
+        }
+
+        current = {
+            moveNumber,
+            side,
+            san: baseSan,
+            glyphs,
+            comments: [],
+            nags: [],
+            variationFirstMove: null
+        };
+
+        mainline.push(current);
+
+        if (side === "w") {
+            side = "b";
+        }
+        else {
+            side = "w";
+            moveNumber++;
+        }
+
+    }
+
+    return { mainline, result };
+
+}
+
+function parsePgn(text) {
+
+    const headers = parsePgnHeaders(text);
+    const movetext = stripHeaders(text);
+    const tokens = tokenizeMovetext(movetext);
+    const { mainline, result } = buildMainlineMoves(tokens);
+
+    return { headers, mainline, result };
+
+}
+
+//----------------------------------
+// Replay the mainline using Coach's own board and legal
+// move generator, matching each SAN token against the SAN
+// Coach's own browser PGN helper (js/game/pgn.js
+// sanForMove()) would generate for each legal candidate move
+// in that exact position. This reuses the same SAN logic
+// Coach's browser export already relies on instead of
+// duplicating a second SAN implementation.
+//
+// Stops at the first move that cannot be matched unambiguously
+// (zero or multiple candidates), returning whatever replayed
+// cleanly plus a clear error describing the move number, side,
+// and token that failed. Never throws for a bad PGN move -- a
+// malformed or unsupported input should be reported, not crash
+// the tool.
+//----------------------------------
+
+function replayPgnMainline(mainline, startingFen) {
+
+    const engine = createEngineCore(
+        startingFen && startingFen !== "startpos" ? startingFen : null
+    );
+
+    const replayed = [];
+    let replayError = null;
+
+    for (const entry of mainline) {
+
+        const legalMoves = engine.legalMoveGenerator.generateMoves();
+
+        const fenBefore = FEN.export(engine.board);
+
+        const candidates = legalMoves.filter(candidate =>
+            PGN.sanForMove(candidate, legalMoves) === entry.san
+        );
+
+        if (candidates.length !== 1) {
+
+            replayError =
+                `move ${entry.moveNumber}${entry.side === "b" ? "..." : "."} ` +
+                `"${entry.san}": ` +
+                (candidates.length === 0
+                    ? "no legal move matched this SAN"
+                    : `ambiguous, ${candidates.length} legal moves matched this SAN`);
+
+            break;
+
+        }
+
+        const move = candidates[0];
+
+        replayed.push({
+            ...entry,
+            fenBefore,
+            uciMove: moveToUci(move)
+        });
+
+        engine.board.makeMove(move);
+
+    }
+
+    return { replayed, replayError };
+
+}
+
+//----------------------------------
+// Coach-side inference from PGN player-name headers.
+// "auto" looks for the substring "coach" (case-insensitive)
+// in the White/Black name headers. If both names contain it
+// (as with two Coach-uci builds playing each other), this is
+// genuinely ambiguous -- report that clearly and fall back
+// to analyzing both sides rather than silently guessing.
+//----------------------------------
+
+function inferCoachSide(headers, requestedSide) {
+
+    if (requestedSide !== "auto") {
+        return { side: requestedSide, message: null };
+    }
+
+    const whiteName = (headers.White || "").toLowerCase();
+    const blackName = (headers.Black || "").toLowerCase();
+
+    const whiteIsCoach = whiteName.includes("coach");
+    const blackIsCoach = blackName.includes("coach");
+
+    if (whiteIsCoach && blackIsCoach) {
+
+        return {
+            side: "both",
+            message:
+                `Both player names contain "Coach" (White="${headers.White}", ` +
+                `Black="${headers.Black}"). --coach-side auto cannot tell them ` +
+                `apart, so falling back to "both". Pass --coach-side white or ` +
+                `--coach-side black explicitly to analyze only one side.`
+        };
+
+    }
+
+    if (whiteIsCoach) {
+        return { side: "white", message: `Inferred --coach-side white from White="${headers.White}".` };
+    }
+
+    if (blackIsCoach) {
+        return { side: "black", message: `Inferred --coach-side black from Black="${headers.Black}".` };
+    }
+
+    return {
+        side: "both",
+        message:
+            `Neither player name contains "Coach" (White="${headers.White}", ` +
+            `Black="${headers.Black}"). Falling back to "both". Pass ` +
+            `--coach-side white or --coach-side black explicitly if that is wrong.`
+    };
+
+}
+
+//----------------------------------
+// Annotation-signal detection, shared by extraction
+// filtering and candidate-regressions ranking.
+//----------------------------------
+
+function annotationSignals(entry) {
+
+    const nag2or4 =
+        entry.nags.includes("$2") || entry.nags.includes("$4");
+
+    const hasAnyNag = entry.nags.length > 0;
+
+    const commentText = entry.comments.join(" ").toLowerCase();
+
+    const hasComment = commentText.trim().length > 0;
+
+    const hasNegativePhrase = NEGATIVE_COMMENT_PHRASES.some(
+        phrase => commentText.includes(phrase)
+    );
+
+    const hasDoubleQuestion = entry.glyphs.includes("??");
+
+    const hasSingleQuestion =
+        !hasDoubleQuestion && entry.glyphs.includes("?");
+
+    const hasDubiousGlyph =
+        entry.glyphs === "?!";
+
+    const hasVariationSuggestion = entry.variationFirstMove !== null;
+
+    return {
+        nag2or4,
+        hasAnyNag,
+        hasComment,
+        hasNegativePhrase,
+        hasDoubleQuestion,
+        hasSingleQuestion,
+        hasDubiousGlyph,
+        hasVariationSuggestion
+    };
+
+}
+
+//----------------------------------
+// --extract mode filters. "all" takes every move by the
+// selected side; "annotated" takes any move carrying PGN
+// metadata that suggests importance; "blunders" takes only
+// the strong negative markers.
+//----------------------------------
+
+function matchesExtractMode(entry, mode) {
+
+    const signals = annotationSignals(entry);
+
+    if (mode === "all") {
+        return true;
+    }
+
+    if (mode === "annotated") {
+
+        return (
+            signals.hasAnyNag ||
+            signals.hasComment ||
+            signals.hasVariationSuggestion
+        );
+
+    }
+
+    // mode === "blunders"
+
+    return (
+        signals.nag2or4 ||
+        signals.hasDoubleQuestion ||
+        signals.hasSingleQuestion ||
+        signals.hasNegativePhrase
+    );
+
+}
+
+//----------------------------------
+// Annotation-severity score used to rank candidate
+// regressions when no reference engine is provided (and
+// blended with comparison.severity when one is). Coarse and
+// deliberately simple, matching the rest of v1's thresholds.
+//----------------------------------
+
+function annotationSeverity(entry) {
+
+    const signals = annotationSignals(entry);
+    let severity = 0;
+
+    if (entry.nags.includes("$4")) severity += 100;
+    else if (entry.nags.includes("$2")) severity += 70;
+
+    if (signals.hasDoubleQuestion) severity += 100;
+    else if (signals.hasSingleQuestion) severity += 60;
+    else if (signals.hasDubiousGlyph) severity += 30;
+
+    if (signals.hasNegativePhrase) severity += 40;
+    if (signals.hasVariationSuggestion) severity += 20;
+    if (signals.hasComment && !signals.hasNegativePhrase) severity += 10;
+
+    return severity;
+
+}
+
+//----------------------------------
+// Selects candidate positions from a replayed mainline:
+// filters to the requested side(s), applies the --extract
+// mode, and caps the result. Ordering is preserved (game
+// order); ranking for candidate-regressions happens later,
+// after engine analysis, using severity + comparison data.
+//----------------------------------
+
+function selectPgnCandidates(replayedMainline, coachSide, extractMode, maxPositions) {
+
+    const sideMatches = entry => {
+
+        if (coachSide === "both") return true;
+        if (coachSide === "white") return entry.side === "w";
+        return entry.side === "b";
+
+    };
+
+    const selected = replayedMainline
+        .filter(sideMatches)
+        .filter(entry => matchesExtractMode(entry, extractMode));
+
+    const capped =
+        maxPositions !== null
+            ? selected.slice(0, maxPositions)
+            : selected;
+
+    return capped.map(entry => {
+
+        const sideLabel = entry.side === "w" ? "w" : "b";
+
+        const label =
+            `before-${entry.moveNumber}${sideLabel === "b" ? "..." : "."}` +
+            `${entry.san}`;
+
+        return {
+            label,
+            fen: entry.fenBefore,
+            pgn: {
+                moveNumber: entry.moveNumber,
+                side: entry.side,
+                gameMoveSan: entry.san,
+                gameMoveGlyphs: entry.glyphs,
+                gameMoveUci: entry.uciMove,
+                nags: entry.nags,
+                comments: entry.comments,
+                suggestedMove: entry.variationFirstMove,
+                severity: annotationSeverity(entry)
+            }
+        };
+
+    });
+
+}
+
+//----------------------------------
+// PGN/comment-derived theme hints. Additive only -- layered
+// on top of the existing FEN-only themeTags() output for
+// PGN-derived candidates. themeTags() itself is unchanged so
+// FEN mode behaves exactly as before.
+//----------------------------------
+
+function pgnThemeHints(pgnMeta) {
+
+    const tags = new Set();
+
+    const commentText = pgnMeta.comments.join(" ").toLowerCase();
+    const san = pgnMeta.gameMoveSan;
+
+    if (/king\s*side|mating attack|attack.*king|king.*attack/.test(commentText)) {
+        tags.add("kingside attack / king safety");
+    }
+
+    if (/attacking continuation|keeps? (the )?attack|initiative/.test(commentText)) {
+        tags.add("attacking continuation");
+    }
+
+    if (/passed pawn|promot/.test(commentText)) {
+        tags.add("passed pawn");
+    }
+
+    if (/pawn race/.test(commentText)) {
+        tags.add("pawn race");
+    }
+
+    if (/rook endgame|rook ending/.test(commentText)) {
+        tags.add("rook endgame");
+    }
+
+    if (/exchange|trade/.test(commentText)) {
+        tags.add("exchange decision");
+    }
+
+    if (san.startsWith("K") && /[a-h][1-8]$/.test(san)) {
+        tags.add("king activity");
+    }
+
+    if (pgnMeta.moveNumber <= 12) {
+        tags.add("opening/time-management candidate");
+    }
+
+    if (
+        tags.size === 0 &&
+        (pgnMeta.nags.length > 0 || pgnMeta.comments.length > 0)
+    ) {
+        tags.add("middlegame tactic");
+    }
+
+    return [...tags];
+
+}
+
 //----------------------------------
 // Cheap FEN-derived features for theme tagging.
 // Deliberately simple v1 signals; no engine calls.
@@ -1308,6 +2065,17 @@ function buildMarkdownReport(run) {
     );
     lines.push(`- Per-position timeout: ${settings.timeoutMs}ms`);
     lines.push(`- Number of FENs: ${positions.length}`);
+
+    if (run.pgnSource) {
+
+        lines.push(
+            `- PGN source: \`${run.pgnSource.pgnFile}\` ` +
+            `(coach-side: ${run.pgnSource.coachSide}, extract: ${run.pgnSource.extractMode}, ` +
+            `replayed ${run.pgnSource.repliedPlyCount} ply/plies)`
+        );
+
+    }
+
     lines.push("");
     lines.push("## Summary");
     lines.push("");
@@ -1607,6 +2375,139 @@ function buildSummary(positions) {
 }
 
 //----------------------------------
+// candidate-regressions.fens
+//
+// Format: label | fen  (one per line), matching the same
+// format readFenFile() already accepts, so the output of a
+// PGN run can be fed straight back in as --fen-file input.
+//----------------------------------
+
+function buildCandidateRegressionsFens(rankedPositions) {
+
+    const lines = [
+        "# Candidate regression FENs",
+        "# Generated by tools/coach-analysis-lab.mjs PGN mode.",
+        "# Format: label | fen",
+        ""
+    ];
+
+    for (const position of rankedPositions) {
+        lines.push(`${position.label} | ${position.fen}`);
+    }
+
+    return lines.join("\n") + "\n";
+
+}
+
+//----------------------------------
+// candidate-regressions.md
+//----------------------------------
+
+function combinedPriorityScore(position) {
+
+    const severity =
+        position.pgn ? position.pgn.severity : 0;
+
+    const comparisonSeverity =
+        position.comparison ? position.comparison.severity : 0;
+
+    return severity + comparisonSeverity;
+
+}
+
+function buildCandidateRegressionsMarkdown(run) {
+
+    const { positions } = run;
+
+    const withPgn = positions.filter(
+        position => !position.error && position.pgn
+    );
+
+    const ranked = [...withPgn].sort(
+        (a, b) => combinedPriorityScore(b) - combinedPriorityScore(a)
+    );
+
+    const lines = [];
+
+    lines.push("# Candidate Regression FENs");
+    lines.push("");
+    lines.push(
+        `Source PGN: \`${run.pgnSource.pgnFile}\` ` +
+        `(White: ${run.pgnSource.headers.White || "?"}, ` +
+        `Black: ${run.pgnSource.headers.Black || "?"})`
+    );
+    lines.push("");
+    lines.push(`Coach side analyzed: ${run.pgnSource.coachSide}`);
+    lines.push(`Extraction mode: ${run.pgnSource.extractMode}`);
+    lines.push(`Positions extracted: ${positions.length}`);
+    lines.push("");
+
+    if (ranked.length === 0) {
+        lines.push("No candidates were successfully analyzed.");
+        lines.push("");
+    }
+
+    for (const [index, position] of ranked.entries()) {
+
+        const pgn = position.pgn;
+
+        lines.push(`## ${index + 1}. ${position.label}`);
+        lines.push("");
+        lines.push(`- FEN: \`${position.fen}\``);
+        lines.push(
+            `- Game move: ${pgn.gameMoveSan}${pgn.gameMoveGlyphs || ""}` +
+            (pgn.gameMoveUci ? ` (${pgn.gameMoveUci})` : "")
+        );
+        lines.push(
+            `- Suggested/variation move from PGN: ${pgn.suggestedMove || "none found"}`
+        );
+        lines.push(
+            `- NAG/comment: ${pgn.nags.join(" ") || "none"}` +
+            (pgn.comments.length > 0 ? ` — ${pgn.comments.join(" / ")}` : "")
+        );
+        lines.push(
+            `- Coach analysis: **${position.coach.bestMove ?? "none"}** ` +
+            `score ${formatScore(position.coach.score)}, ` +
+            `depth ${position.coach.depth ?? "n/a"}, ` +
+            `pv \`${formatPv(position.coach.pv)}\``
+        );
+
+        if (position.reference) {
+
+            lines.push(
+                `- Reference analysis: **${position.reference.bestMove ?? "none"}** ` +
+                `score ${formatScore(position.reference.score)}, ` +
+                `depth ${position.reference.depth ?? "n/a"}, ` +
+                `pv \`${formatPv(position.reference.pv)}\``
+            );
+
+        }
+        else {
+            lines.push("- Reference analysis: not run (no --stockfish/--ref provided)");
+        }
+
+        lines.push(`- Theme tag(s): ${position.themes.join(", ") || "unknown"}`);
+        lines.push(`- Priority: ${position.priority} (score ${combinedPriorityScore(position)})`);
+        lines.push("");
+
+    }
+
+    lines.push("---");
+    lines.push("");
+    lines.push(
+        "Generated by tools/coach-analysis-lab.mjs (diagnostic only; no " +
+        "engine behavior was changed). Priority score combines PGN " +
+        "annotation severity (NAGs/glyphs/comments/variation hints) with " +
+        "Coach-vs-reference disagreement severity when a reference engine " +
+        "was provided."
+    );
+    lines.push("");
+
+    return lines.join("\n");
+
+}
+
+//----------------------------------
 // Main run
 //----------------------------------
 
@@ -1689,17 +2590,114 @@ async function main() {
         return;
     }
 
-    const positionsInput = options.fenFile
-        ? readFenFile(options.fenFile)
-        : [{
-            label: options.label || "cli-fen",
-            fen: options.fen.trim()
-        }];
+    let positionsInput;
+    let pgnSource = null;
 
-    if (!options.fenFile && !looksLikeFen(positionsInput[0].fen)) {
-        console.error(`Error: --fen value does not look like a FEN: "${positionsInput[0].fen}"`);
-        process.exitCode = 1;
-        return;
+    if (options.pgnFile) {
+
+        let pgnText;
+
+        try {
+            pgnText = fs.readFileSync(options.pgnFile, "utf8");
+        }
+        catch (error) {
+            console.error(`Error: could not read --pgn-file ${options.pgnFile}: ${error.message}`);
+            process.exitCode = 1;
+            return;
+        }
+
+        const { headers, mainline, result } = parsePgn(pgnText);
+
+        if (mainline.length === 0) {
+            console.error(`Error: ${options.pgnFile}: no moves found in PGN movetext`);
+            process.exitCode = 1;
+            return;
+        }
+
+        const startingFen =
+            headers.SetUp === "1" && headers.FEN ? headers.FEN : null;
+
+        const { replayed, replayError } =
+            replayPgnMainline(mainline, startingFen);
+
+        if (replayed.length === 0) {
+
+            console.error(
+                `Error: ${options.pgnFile}: replay failed on the first move ` +
+                `(${replayError})`
+            );
+            process.exitCode = 1;
+            return;
+
+        }
+
+        if (replayError) {
+
+            console.log(
+                `Warning: ${options.pgnFile}: stopped replay early -- ${replayError}. ` +
+                `Continuing with the ${replayed.length} ply/plies replayed successfully.`
+            );
+
+        }
+
+        const { side: resolvedCoachSide, message: coachSideMessage } =
+            inferCoachSide(headers, options.coachSide);
+
+        if (coachSideMessage) {
+            console.log(coachSideMessage);
+        }
+
+        positionsInput = selectPgnCandidates(
+            replayed,
+            resolvedCoachSide,
+            options.extractMode,
+            options.maxPositions
+        );
+
+        if (positionsInput.length === 0) {
+
+            console.error(
+                `Error: ${options.pgnFile}: no candidate positions matched ` +
+                `--coach-side ${resolvedCoachSide} --extract ${options.extractMode} ` +
+                `(replayed ${replayed.length} ply/plies)`
+            );
+            process.exitCode = 1;
+            return;
+
+        }
+
+        pgnSource = {
+            pgnFile: options.pgnFile,
+            headers,
+            result,
+            coachSide: resolvedCoachSide,
+            extractMode: options.extractMode,
+            repliedPlyCount: replayed.length,
+            replayError
+        };
+
+        console.log(
+            `Replayed ${replayed.length} ply/plies from ${options.pgnFile}; ` +
+            `extracted ${positionsInput.length} candidate position(s) ` +
+            `(side=${resolvedCoachSide}, mode=${options.extractMode}).`
+        );
+
+    }
+    else {
+
+        positionsInput = options.fenFile
+            ? readFenFile(options.fenFile)
+            : [{
+                label: options.label || "cli-fen",
+                fen: options.fen.trim()
+            }];
+
+        if (!options.fenFile && !looksLikeFen(positionsInput[0].fen)) {
+            console.error(`Error: --fen value does not look like a FEN: "${positionsInput[0].fen}"`);
+            process.exitCode = 1;
+            return;
+        }
+
     }
 
     const positionsToRun =
@@ -1712,7 +2710,7 @@ async function main() {
             ? `go depth ${options.depth}`
             : `go movetime ${options.movetimeMs}`;
 
-    console.log(`Coach Analysis Lab v1`);
+    console.log(`Coach Analysis Lab v1.1`);
     console.log(`Positions: ${positionsToRun.length}  |  ${goCommand}  |  reference: ${options.referenceCommand ? "yes" : "no (Coach-only)"}`);
 
     //----------------------------------
@@ -1799,6 +2797,7 @@ async function main() {
                 positions.push({
                     label: entry.label,
                     fen: entry.fen,
+                    pgn: entry.pgn || null,
                     sideToMove: entry.fen.split(/\s+/)[1] || "?",
                     error: coachResult.error,
                     coach: coachResult,
@@ -1818,12 +2817,17 @@ async function main() {
             const comparison =
                 compareResults(coachResult, referenceResult);
 
-            const themes =
+            const baseThemes =
                 themeTags(features, comparison, coachResult, referenceResult);
+
+            const themes = entry.pgn
+                ? [...new Set([...baseThemes, ...pgnThemeHints(entry.pgn)])]
+                : baseThemes;
 
             const record = {
                 label: entry.label,
                 fen: entry.fen,
+                pgn: entry.pgn || null,
                 sideToMove: features.sideToMove,
                 error: null,
                 coach: coachResult,
@@ -1864,7 +2868,7 @@ async function main() {
 
     const run = {
         tool: "coach-analysis-lab",
-        version: 1,
+        version: pgnSource ? "1.1" : 1,
         startedAt: startedAt.toISOString(),
         finishedAt: new Date().toISOString(),
         coachEngineName: coachClient.idName,
@@ -1877,8 +2881,13 @@ async function main() {
             depth: options.depth,
             timeoutMs: options.timeoutMs,
             fenFile: options.fenFile,
+            pgnFile: options.pgnFile,
+            coachSide: options.coachSide,
+            extractMode: options.extractMode,
+            maxPositions: options.maxPositions,
             limit: options.limit
         },
+        pgnSource,
         summary: buildSummary(positions),
         positions
     };
@@ -1897,6 +2906,35 @@ async function main() {
     console.log("");
     console.log(`Results: ${jsonPath}`);
     console.log(`Report:  ${reportPath}`);
+
+    if (pgnSource) {
+
+        const candidateFensPath =
+            path.join(runDirectory, "candidate-regressions.fens");
+
+        const candidateMdPath =
+            path.join(runDirectory, "candidate-regressions.md");
+
+        const rankedPositions = [...positions]
+            .filter(position => !position.error && position.pgn)
+            .sort(
+                (a, b) => combinedPriorityScore(b) - combinedPriorityScore(a)
+            );
+
+        fs.writeFileSync(
+            candidateFensPath,
+            buildCandidateRegressionsFens(rankedPositions)
+        );
+
+        fs.writeFileSync(
+            candidateMdPath,
+            buildCandidateRegressionsMarkdown(run)
+        );
+
+        console.log(`Candidates (fens): ${candidateFensPath}`);
+        console.log(`Candidates (md):   ${candidateMdPath}`);
+
+    }
 
     if (run.summary.failed > 0) {
         console.log(`Warning: ${run.summary.failed} position(s) failed; see report.`);

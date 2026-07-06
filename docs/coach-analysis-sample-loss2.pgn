@@ -1,0 +1,48 @@
+[Event "Coach_v_old_Coach_260705_5_0_v2"]
+[Site "XPS8950_3080"]
+[Date "2026.07.05"]
+[Round "1"]
+[White "Coach-uci"]
+[Black "Coach-uci [001]"]
+[Result "1-0"]
+[ECO "C43"]
+[WhiteElo "1331"]
+[BlackElo "1425"]
+[Annotator "Stockfish 18 (10s)"]
+[PlyCount "129"]
+[EventDate "2026.??.??"]
+
+{C43: Petroff Defence: 3 d4} 1. e4 e5 2. Nf3 Nf6 3. d4 {White threatens to win
+material: d4xe5} Nxe4 4. Bd3 d5 5. Nxe5 Nd7 6. Nxd7 Bxd7 7. O-O {White castles
+and improves king safety} Bd6 8. c4 c6 9. c5 Bc7 10. Nd2 {White threatens to
+win material: Nd2xe4} Qb8 (10... O-O $5 $15 {has some apparent merit}) 11. g3
+f5 12. Qc2 O-O 13. Nb3 Re8 $4 {what a pity, victory was in sight} (13... f4 $5
+14. f3 Ng5 15. g4 $19) 14. Re1 Be6 (14... a5 $5 15. a4 $19) 15. Be3 Qd8 (15...
+f4 16. Bxf4 Bxf4 17. gxf4 Qxf4 18. Bxe4 dxe4 19. Qxe4 $19) 16. Rad1 Qf6 (16...
+f4 $142 17. Bxf4 Bxf4 18. gxf4 Bg4 $17) 17. Qe2 f4 18. Bd2 Ng5 {Black plans f3}
+19. h4 f3 (19... Nh3+ $142 {might be the shorter path} 20. Kg2 f3+ 21. Qxf3
+Qxf3+ 22. Kxf3 Rf8+ 23. Bf4 Nxf4 24. gxf4 Rxf4+ 25. Kg2 Rg4+ 26. Kf1 $19) 20.
+Qf1 Nh3+ 21. Kh1 a5 (21... Bd7 {and Black can already relax} 22. a4 $19) 22. a4
+b6 (22... Bd7 {keeps an even firmer grip} 23. Bc1 $19) 23. Bc3 Qh6 (23... Nf4
+$142 {it becomes clear that Black will call all the shots} 24. cxb6 Bxb6 $19)
+24. cxb6 Bxb6 25. Kh2 Bc7 $4 {throws away the game} (25... Nf4 $142 {Black
+missed this excellent chance} 26. Qh1 Ng2 $19) 26. Rxe6 Rxe6 27. Qxh3 Qf6 28.
+Kg1 Bb6 (28... Rae8 {cannot change what is in store for White} 29. Nc5 R6e7 30.
+Qf5 $18) 29. Qg4 Ree8 30. Bd2 Rab8 31. Bf4 Bc7 (31... Ra8 {doesn't do any good}
+32. Qxf3 Qf7 33. Qg4 $18) 32. Bxh7+ Kxh7 33. Bxc7 Ra8 34. Bf4 Qe7 (34... Re2 {
+a fruitless try to alter the course of the game} 35. Qxf3 Rae8 36. Qh5+ Kg8 37.
+Nc5 $18) 35. Qxf3 Qb4 36. Bd2 Qxa4 37. Ra1 Qc4 38. Rc1 Qb5 39. Rc5 Qe2 40. Qxe2
+Rxe2 41. Bc3 {Increasing the pressure on the isolated pawn on a5} Rf8 42. f4
+Re3 (42... Rfe8 43. Nc1 Rc2 44. Bxa5 Rxb2 $18) 43. Kf2 Re6 (43... Rfe8 {hardly
+improves anything} 44. Nc1 $18) 44. Nxa5 Rff6 45. Kf3 Kg8 46. g4 Re4 47. f5
+Ree6 48. Bd2 g6 (48... Re8 {does not help much} 49. Nxc6 Ra8 50. h5 $18) 49.
+Bg5 Rf7 50. Rxc6 Rxc6 (50... Re1 {cannot undo what has already been done} 51.
+Rxg6+ Kh7 52. Rh6+ Kg8 53. Nc6 $18) 51. Nxc6 gxf5 (51... Kg7 {doesn't get the
+cat off the tree} 52. Ne7 Rf8 53. Nxg6 $18) 52. Ne7+ Rxe7 53. Bxe7 Kf7 (53...
+fxg4+ {is not the saving move} 54. Kxg4 Kf7 55. Bg5 Ke6 56. h5 Kf7 57. Kf5 Kg8
+58. h6 Kf7 59. b3 Kf8 60. Ke6 Kg8 61. Kf6 Kh7 62. Kf7 Kh8 63. Kg6 Kg8 64. h7+
+Kh8 65. Bf6#) 54. Bg5 fxg4+ (54... Kg6 {doesn't change the outcome of the game}
+55. b4 fxg4+ 56. Kxg4 Kf7 57. Kf5 Ke8 58. Ke6 Kf8 59. b5 Kg8 60. h5 Kh8 61. b6
+Kg7 62. b7 Kh8 63. Bf6+ Kg8 64. b8=Q+ Kh7 65. Qh8#) 55. Kxg4 Ke6 56. h5 Kf7 57.
+h6 Kg8 58. b4 Kf7 59. b5 Kf8 60. b6 Ke8 61. b7 Kd7 62. b8=Q Kc6 63. h7 Kd7 64.
+h8=Q Ke6 65. Qhe8# 1-0
