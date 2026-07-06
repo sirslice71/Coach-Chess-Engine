@@ -577,6 +577,250 @@ test("movestogo is clamped to a safe maximum", () => {
 
 });
 
+//----------------------------------
+// Opening throttle (complexityMultiplier / allocateMoveTime):
+// quiet early positions should spend less than the same
+// position would once fullMoveNumber is past the throttle
+// window, and tactical positions should be exempt at every
+// fullMoveNumber.
+//----------------------------------
+
+test("opening throttle reduces the budget for quiet early positions", () => {
+
+    const quietOpeningParams = {
+        sideToMove: 1,
+        wtime: 300000,
+        btime: 300000,
+        winc: 0,
+        binc: 0,
+        legalMoveCount: 28,
+        captureCount: 1,
+        inCheck: false
+    };
+
+    const strongThrottleBudget =
+        allocateMoveTime({ ...quietOpeningParams, fullMoveNumber: 4 });
+
+    const lightThrottleBudget =
+        allocateMoveTime({ ...quietOpeningParams, fullMoveNumber: 7 });
+
+    const unthrottledBudget =
+        allocateMoveTime({ ...quietOpeningParams, fullMoveNumber: 9 });
+
+    assert.ok(
+        strongThrottleBudget < lightThrottleBudget,
+        `Expected fullMoveNumber 4 (${strongThrottleBudget}) < fullMoveNumber 7 (${lightThrottleBudget})`
+    );
+
+    assert.ok(
+        lightThrottleBudget < unthrottledBudget,
+        `Expected fullMoveNumber 7 (${lightThrottleBudget}) < fullMoveNumber 9 (${unthrottledBudget})`
+    );
+
+    assert.equal(strongThrottleBudget, 6596);
+    assert.equal(lightThrottleBudget, 8795);
+    assert.equal(unthrottledBudget, 10994);
+
+});
+
+test("opening throttle does not apply once past the throttle window", () => {
+
+    const quietOpeningParams = {
+        sideToMove: 1,
+        wtime: 300000,
+        btime: 300000,
+        winc: 0,
+        binc: 0,
+        legalMoveCount: 28,
+        captureCount: 1,
+        inCheck: false
+    };
+
+    const fullMove9Budget =
+        allocateMoveTime({ ...quietOpeningParams, fullMoveNumber: 9 });
+
+    const fullMove20Budget =
+        allocateMoveTime({ ...quietOpeningParams, fullMoveNumber: 20 });
+
+    assert.equal(fullMove9Budget, fullMove20Budget);
+
+});
+
+test("opening throttle is skipped when in check, even in the first few moves", () => {
+
+    const throttledBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 0,
+            binc: 0,
+            fullMoveNumber: 4,
+            legalMoveCount: 28,
+            captureCount: 1,
+            inCheck: false
+        });
+
+    const inCheckBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 0,
+            binc: 0,
+            fullMoveNumber: 4,
+            legalMoveCount: 22,
+            captureCount: 1,
+            inCheck: true
+        });
+
+    assert.ok(
+        inCheckBudget > throttledBudget,
+        `Expected in-check budget (${inCheckBudget}) > throttled quiet budget (${throttledBudget})`
+    );
+
+});
+
+test("opening throttle is skipped when legal moves are unusually low", () => {
+
+    const throttledBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 0,
+            binc: 0,
+            fullMoveNumber: 4,
+            legalMoveCount: 28,
+            captureCount: 1,
+            inCheck: false
+        });
+
+    const fewLegalMovesBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 0,
+            binc: 0,
+            fullMoveNumber: 4,
+            legalMoveCount: 5,
+            captureCount: 0,
+            inCheck: false
+        });
+
+    assert.ok(
+        fewLegalMovesBudget > throttledBudget,
+        `Expected few-legal-moves budget (${fewLegalMovesBudget}) > throttled quiet budget (${throttledBudget})`
+    );
+
+});
+
+test("opening throttle is skipped when the capture count is high", () => {
+
+    const throttledBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 0,
+            binc: 0,
+            fullMoveNumber: 4,
+            legalMoveCount: 28,
+            captureCount: 1,
+            inCheck: false
+        });
+
+    const highCaptureBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 0,
+            binc: 0,
+            fullMoveNumber: 4,
+            legalMoveCount: 25,
+            captureCount: 6,
+            inCheck: false
+        });
+
+    assert.ok(
+        highCaptureBudget > throttledBudget,
+        `Expected high-capture budget (${highCaptureBudget}) > throttled quiet budget (${throttledBudget})`
+    );
+
+});
+
+test("opening throttle does not affect go depth or go movetime", async () => {
+
+    const depthChild = spawn(
+        process.execPath,
+        ["uci.js"],
+        {
+            cwd: process.cwd(),
+            stdio: ["pipe", "pipe", "pipe"]
+        }
+    );
+
+    let depthStdout = "";
+
+    depthChild.stdout.setEncoding("utf8");
+    depthChild.stdout.on("data", chunk => {
+        depthStdout += chunk;
+    });
+
+    depthChild.stdin.write("position startpos\n");
+    depthChild.stdin.write("go depth 3\n");
+    depthChild.stdin.write("quit\n");
+    depthChild.stdin.end();
+
+    await new Promise((resolve, reject) => {
+        depthChild.on("error", reject);
+        depthChild.on("close", resolve);
+    });
+
+    const depthInfoLine =
+        depthStdout
+            .split(/\r?\n/)
+            .find(line => line.startsWith("info depth 3 "));
+
+    assert.ok(depthInfoLine, "expected a depth-3 info line, unaffected by the opening throttle");
+
+    const movetimeChild = spawn(
+        process.execPath,
+        ["uci.js"],
+        {
+            cwd: process.cwd(),
+            stdio: ["pipe", "pipe", "pipe"]
+        }
+    );
+
+    let movetimeStdout = "";
+
+    movetimeChild.stdout.setEncoding("utf8");
+    movetimeChild.stdout.on("data", chunk => {
+        movetimeStdout += chunk;
+    });
+
+    movetimeChild.stdin.write("position startpos\n");
+    movetimeChild.stdin.write("go movetime 200\n");
+    movetimeChild.stdin.write("quit\n");
+    movetimeChild.stdin.end();
+
+    await new Promise((resolve, reject) => {
+        movetimeChild.on("error", reject);
+        movetimeChild.on("close", resolve);
+    });
+
+    const movetimeBestMoveLine =
+        movetimeStdout
+            .split(/\r?\n/)
+            .find(line => line.startsWith("bestmove "));
+
+    assert.ok(movetimeBestMoveLine, "expected a bestmove line from go movetime, unaffected by the opening throttle");
+
+});
+
 test("UCI process clock-based search returns a legal bestmove", async () => {
 
     const child = spawn(

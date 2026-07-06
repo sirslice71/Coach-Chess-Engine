@@ -106,6 +106,32 @@ export function estimateMovesToGo({
 
 const COMPLEXITY_MAX_MULTIPLIER = 1.6;
 
+//----------------------------------
+// Time Management: Opening Throttle
+//
+// Arena games with no opening book can lead Coach to spend
+// too generously on the first several moves -- time that
+// would be better saved for the middlegame. This throttle
+// only ever scales the multiplier further DOWN, and only for
+// otherwise-quiet opening positions. It is skipped whenever
+// any of the cheap tactical-urgency signals below apply, so
+// Coach still thinks normally when the opening is sharp.
+//
+// fullMoveNumber <= 6 gets the strongest throttle; <= 8 gets
+// a lighter one; beyond that, normal time management applies
+// unchanged. This only affects the clock-based ("go wtime/
+// btime") path, since that is the only caller of
+// complexityMultiplier() -- "go depth", "go movetime", and
+// Analysis Lab's fixed-movetime runs never reach this code.
+//----------------------------------
+
+const OPENING_THROTTLE_STRONG_FULLMOVE = 6;
+const OPENING_THROTTLE_LIGHT_FULLMOVE = 8;
+const OPENING_THROTTLE_STRONG_FACTOR = 0.60;
+const OPENING_THROTTLE_LIGHT_FACTOR = 0.80;
+const OPENING_THROTTLE_LOW_LEGAL_MOVE_COUNT = 8;
+const OPENING_THROTTLE_CAPTURE_COUNT = 3;
+
 export function complexityMultiplier({
     inCheck = false,
     legalMoveCount = 0,
@@ -154,6 +180,34 @@ export function complexityMultiplier({
     }
     else if (remainingTime <= 8000) {
         multiplier = Math.min(multiplier, 1.20);
+    }
+
+    //----------------------------------
+    // Opening throttle. Checked directly against the same
+    // cheap signals used above (in check, very few legal
+    // moves, several captures already on the board) rather
+    // than "multiplier > 1.0", because the existing mobility
+    // bump (legalMoveCount >= 25) fires on almost every normal
+    // opening position -- a typical opening has 20-30 legal
+    // moves, so treating that alone as "urgent" would defeat
+    // the throttle for nearly every game. Only genuine
+    // tactical signals skip it.
+    //----------------------------------
+
+    const isTacticallyUrgent =
+        inCheck ||
+        legalMoveCount <= OPENING_THROTTLE_LOW_LEGAL_MOVE_COUNT ||
+        captureCount >= OPENING_THROTTLE_CAPTURE_COUNT;
+
+    if (!isTacticallyUrgent) {
+
+        if (fullMoveNumber <= OPENING_THROTTLE_STRONG_FULLMOVE) {
+            multiplier *= OPENING_THROTTLE_STRONG_FACTOR;
+        }
+        else if (fullMoveNumber <= OPENING_THROTTLE_LIGHT_FULLMOVE) {
+            multiplier *= OPENING_THROTTLE_LIGHT_FACTOR;
+        }
+
     }
 
     return multiplier;
