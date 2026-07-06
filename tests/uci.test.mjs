@@ -619,7 +619,20 @@ test("opening throttle reduces the budget for quiet early positions", () => {
 
     assert.equal(strongThrottleBudget, 6596);
     assert.equal(lightThrottleBudget, 8795);
-    assert.equal(unthrottledBudget, 10994);
+
+    //----------------------------------
+    // fullMoveNumber 9 now also falls inside the late-opening/
+    // middlegame tactical-reinvestment window (see
+    // lateOpeningMiddlegameBonus() in js/uci/uciengine.js): with
+    // many pieces still on the board (default totalMaterial),
+    // a moderate/high legal move count (28) and a capture
+    // available (1), this position picks up two +0.05 signal
+    // bonuses on top of the existing mobility bonus, raising the
+    // multiplier from 1.10 to 1.20 and the budget from the prior
+    // 10994 to 11994.
+    //----------------------------------
+
+    assert.equal(unthrottledBudget, 11994);
 
 });
 
@@ -636,13 +649,152 @@ test("opening throttle does not apply once past the throttle window", () => {
         inCheck: false
     };
 
+    //----------------------------------
+    // Both fullmove numbers below are deliberately kept
+    // outside the late-opening/middlegame "core" window
+    // (fullMoveNumber 15-24, see lateOpeningMiddlegameBonus()
+    // in js/uci/uciengine.js) so this test stays focused on
+    // "the opening throttle itself is gone past move 8" and
+    // isn't conflated with the separate core-window boost,
+    // which intentionally makes later fullmove numbers within
+    // its own window allocate more than earlier ones.
+    //----------------------------------
+
     const fullMove9Budget =
         allocateMoveTime({ ...quietOpeningParams, fullMoveNumber: 9 });
 
-    const fullMove20Budget =
-        allocateMoveTime({ ...quietOpeningParams, fullMoveNumber: 20 });
+    const fullMove13Budget =
+        allocateMoveTime({ ...quietOpeningParams, fullMoveNumber: 13 });
 
-    assert.equal(fullMove9Budget, fullMove20Budget);
+    assert.equal(fullMove9Budget, fullMove13Budget);
+
+});
+
+//----------------------------------
+// Late-opening/middlegame tactical reinvestment
+// (lateOpeningMiddlegameBonus / complexityMultiplier): a
+// tactically rich position inside the fullMoveNumber 9-28
+// window, with many pieces still on the board, should receive
+// noticeably more time than an otherwise-identical clock spent
+// on a quiet early-opening position -- but a simplified
+// endgame that happens to fall inside the same fullmove range
+// must not receive the bonus.
+//----------------------------------
+
+test("late-opening/middlegame tactical position gets more time than a quiet opening", () => {
+
+    const quietOpeningBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 0,
+            binc: 0,
+            fullMoveNumber: 4,
+            totalMaterial: 7840,
+            legalMoveCount: 20,
+            captureCount: 0,
+            inCheck: false
+        });
+
+    const lateTacticalBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 0,
+            binc: 0,
+            fullMoveNumber: 19,
+            totalMaterial: 5610,
+            legalMoveCount: 28,
+            captureCount: 0,
+            inCheck: false
+        });
+
+    assert.ok(
+        lateTacticalBudget > quietOpeningBudget,
+        `Expected the move-19 tactical position (${lateTacticalBudget}) to receive more time than the quiet move-4 opening (${quietOpeningBudget})`
+    );
+
+    //----------------------------------
+    // The gap needs to be meaningful, not just directionally
+    // correct: an earlier version of this feature only widened
+    // this gap by ~625ms (14992ms -> 15617ms for the motivating
+    // FEN), which wasn't enough to explain why Coach only found
+    // Kh1 over h3 once given a much longer fixed movetime. The
+    // core-window boost below is meant to close that gap.
+    //----------------------------------
+
+    assert.ok(
+        lateTacticalBudget - quietOpeningBudget >= 5000,
+        `Expected a meaningful (>=5000ms) gap between the tactical and quiet budgets, got ${lateTacticalBudget - quietOpeningBudget}`
+    );
+
+});
+
+test("motivating late-opening/middlegame FEN allocates roughly 18-20s on a 5-minute clock", () => {
+
+    //----------------------------------
+    // r4rk1/ppp3pp/4p1q1/4P3/1nP3B1/8/PP3P1P/R2Q1RK1 w - - 1 19
+    // -- fullMoveNumber, totalMaterial, legalMoveCount,
+    // captureCount, and inCheck below are the real values for
+    // this exact FEN. Coach only preferred Kh1 over h3 once
+    // given a fixed movetime of ~20s (not 5s or 10s), so a
+    // 5-minute-clock allocation in that neighborhood is the
+    // target this test guards against regressing.
+    //----------------------------------
+
+    const motivatingFenBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 0,
+            binc: 0,
+            fullMoveNumber: 19,
+            totalMaterial: 5610,
+            legalMoveCount: 28,
+            captureCount: 0,
+            inCheck: false
+        });
+
+    assert.ok(
+        motivatingFenBudget >= 18000 && motivatingFenBudget <= 20000,
+        `Expected the motivating FEN's allocation (${motivatingFenBudget}) to fall in the 18-20s range on a 5-minute clock`
+    );
+
+});
+
+test("late-opening/middlegame bonus does not apply to a simplified endgame in the same fullmove range", () => {
+
+    const simplifiedEndgameParams = {
+        sideToMove: 1,
+        wtime: 300000,
+        btime: 300000,
+        winc: 0,
+        binc: 0,
+        fullMoveNumber: 20,
+        totalMaterial: 600,
+        legalMoveCount: 20,
+        captureCount: 1,
+        inCheck: false
+    };
+
+    const withBonusSignals =
+        allocateMoveTime(simplifiedEndgameParams);
+
+    const withoutMobilitySignal =
+        allocateMoveTime({
+            ...simplifiedEndgameParams,
+            legalMoveCount: 10,
+            captureCount: 0
+        });
+
+    assert.equal(
+        withBonusSignals,
+        withoutMobilitySignal,
+        "Expected no late-opening/middlegame bonus once material has dropped below the middlegame floor, regardless of mobility/capture signals"
+    );
 
 });
 

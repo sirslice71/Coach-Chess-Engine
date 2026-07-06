@@ -132,6 +132,112 @@ const OPENING_THROTTLE_LIGHT_FACTOR = 0.80;
 const OPENING_THROTTLE_LOW_LEGAL_MOVE_COUNT = 8;
 const OPENING_THROTTLE_CAPTURE_COUNT = 3;
 
+//----------------------------------
+// Time Management: Late-Opening / Middlegame
+// Tactical Reinvestment
+//
+// The opening throttle above only ever scales time DOWN, and
+// only for fullMoveNumber <= 8. Once the position reaches the
+// late-opening/middlegame window (roughly moves 9-28) and
+// still has many pieces on the board, a tactically rich
+// position deserves a bit MORE time than the plain phase bonus
+// already gives -- this is exactly the kind of position where
+// Coach only found the materially better defensive move once
+// given a longer fixed movetime (Kh1 over h3 at 20s, but not at
+// 5s/10s). This reinvests some of what the opening throttle
+// saved earlier in the game, using only signals already
+// computed at the call site (no extra move generation or
+// make/undo, consistent with the "cheap signals only" rule
+// above).
+//
+// Deliberately additive, well below COMPLEXITY_MAX_MULTIPLIER:
+// each signal contributes a modest, fixed amount, and only
+// within the fullmove window and only while total material
+// shows the position has not already been simplified toward an
+// endgame (reusing MIDDLEGAME_MATERIAL_FLOOR, the same threshold
+// gamePhase() uses for "middlegame").
+//
+// A first version of this feature only added flat +0.05
+// per-signal bumps across the whole 9-28 window, which moved the
+// motivating FEN's allocation from 14992ms to 15617ms on a
+// 5-minute clock -- correct in direction, but too small to be
+// the difference between h3 and Kh1 the way the 20s-fixed-
+// movetime comparison suggested it should be. This revision adds
+// a second, narrower "core" window (roughly moves 15-24, the
+// heart of the late-opening/middlegame) with its own flat base
+// boost, plus an extra boost when legal moves are unusually high
+// in that core window. Genuine check/capture pressure is still
+// covered by the inCheck/captureCount signals below; a separate
+// king-safety (pawn-shield) detector was considered for the
+// "king exposed" half of this request, but a reliable version
+// needs extra board traversal beyond the "cheap signals only"
+// rule this feature has followed throughout, so raw legal-move
+// count is used instead as the cheap stand-in for "the position
+// has a lot going on."
+//----------------------------------
+
+const LATE_TACTICAL_FULLMOVE_MIN = 9;
+const LATE_TACTICAL_FULLMOVE_MAX = 28;
+const LATE_TACTICAL_LEGAL_MOVE_COUNT = 20;
+const LATE_TACTICAL_SIGNAL_BONUS = 0.05;
+
+const LATE_TACTICAL_CORE_FULLMOVE_MIN = 15;
+const LATE_TACTICAL_CORE_FULLMOVE_MAX = 24;
+const LATE_TACTICAL_CORE_BASE_BONUS = 0.15;
+const LATE_TACTICAL_HIGH_LEGAL_MOVE_COUNT = 25;
+const LATE_TACTICAL_HIGH_MOBILITY_BONUS = 0.10;
+
+function lateOpeningMiddlegameBonus({
+    fullMoveNumber,
+    totalMaterial,
+    legalMoveCount,
+    captureCount,
+    inCheck
+}) {
+
+    const inWindow =
+        fullMoveNumber >= LATE_TACTICAL_FULLMOVE_MIN &&
+        fullMoveNumber <= LATE_TACTICAL_FULLMOVE_MAX;
+
+    const manyPiecesRemain =
+        totalMaterial >= MIDDLEGAME_MATERIAL_FLOOR;
+
+    if (!inWindow || !manyPiecesRemain) {
+        return 0;
+    }
+
+    let bonus = 0;
+
+    if (legalMoveCount >= LATE_TACTICAL_LEGAL_MOVE_COUNT) {
+        bonus += LATE_TACTICAL_SIGNAL_BONUS;
+    }
+
+    if (captureCount >= 1) {
+        bonus += LATE_TACTICAL_SIGNAL_BONUS;
+    }
+
+    if (inCheck) {
+        bonus += LATE_TACTICAL_SIGNAL_BONUS;
+    }
+
+    const inCoreWindow =
+        fullMoveNumber >= LATE_TACTICAL_CORE_FULLMOVE_MIN &&
+        fullMoveNumber <= LATE_TACTICAL_CORE_FULLMOVE_MAX;
+
+    if (inCoreWindow) {
+
+        bonus += LATE_TACTICAL_CORE_BASE_BONUS;
+
+        if (legalMoveCount >= LATE_TACTICAL_HIGH_LEGAL_MOVE_COUNT) {
+            bonus += LATE_TACTICAL_HIGH_MOBILITY_BONUS;
+        }
+
+    }
+
+    return bonus;
+
+}
+
 export function complexityMultiplier({
     inCheck = false,
     legalMoveCount = 0,
@@ -166,6 +272,15 @@ export function complexityMultiplier({
     if (phase === "middlegame" || phase === "lateMiddlegame") {
         multiplier += 0.10;
     }
+
+    multiplier +=
+        lateOpeningMiddlegameBonus({
+            fullMoveNumber,
+            totalMaterial,
+            legalMoveCount,
+            captureCount,
+            inCheck
+        });
 
     multiplier =
         Math.min(multiplier, COMPLEXITY_MAX_MULTIPLIER);
