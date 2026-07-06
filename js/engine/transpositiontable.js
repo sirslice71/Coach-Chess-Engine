@@ -16,6 +16,18 @@ export const TTFlag = {
 
 };
 
+//----------------------------------
+// Known limitation (not addressed in this change): stored
+// scores are not ply-normalized. A mate score encoded relative
+// to the ply where it was found can, in principle, be reused
+// at a different ply via a TT hit and be off by however many
+// plies separate the two nodes. Flagging this because it's a
+// real correctness edge case for mate scoring specifically,
+// not because this task touches it -- the replacement policy
+// below only changes which entries survive, not what they
+// store.
+//----------------------------------
+
 //==================================
 // Transposition Table
 //==================================
@@ -126,6 +138,55 @@ export default class TranspositionTable {
 
     }
 
+    //----------------------------------
+    // Replacement policy
+    //
+    // Conservative depth/age-aware replacement, replacing the
+    // previous always-replace behavior. A new entry replaces
+    // whatever occupies its slot when any of these hold:
+    //   1. The slot is empty.
+    //   2. The slot already stores this same position (hash
+    //      match) -- always keep the position's entry current.
+    //   3. The new entry is meaningfully deeper (strictly
+    //      deeper) than the entry it would displace.
+    //   4. The existing entry is from an older search (age
+    //      generation) than the current one, so it's stale
+    //      regardless of its depth.
+    // Otherwise the existing (deeper, current-generation, and
+    // for a different position) entry is kept. This does not
+    // change probe() semantics or hash generation.
+    //----------------------------------
+
+    shouldReplace(existing, hash, depth) {
+
+        if (!existing) {
+
+            return true;
+
+        }
+
+        if (existing.hash === hash) {
+
+            return true;
+
+        }
+
+        if (depth > existing.depth) {
+
+            return true;
+
+        }
+
+        if (existing.age !== this.age) {
+
+            return true;
+
+        }
+
+        return false;
+
+    }
+
     store(
 
         hash,
@@ -142,9 +203,19 @@ export default class TranspositionTable {
 
         this.stores++;
 
+        const index = this.index(hash);
+
+        const existing = this.table[index];
+
+        if (!this.shouldReplace(existing, hash, depth)) {
+
+            return;
+
+        }
+
         this.table[
 
-            this.index(hash)
+            index
 
         ] = {
 
