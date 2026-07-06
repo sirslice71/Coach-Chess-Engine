@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 //----------------------------------
-// Coach Analysis Lab v1.2
+// Coach Analysis Lab v1.3
 //
 // Diagnostic tool only. Runs Coach (and optionally a
 // stronger reference UCI engine such as Stockfish) over a
@@ -24,6 +24,13 @@
 // whole file. candidate-regressions.md groups candidates by
 // game and adds an overall top-candidates section.
 //
+// v1.3 adds --target-player "<name>": only analyze games
+// where the named player is White or Black, using only that
+// player's own moves, overriding --coach-side entirely. Name
+// matching prefers an exact (case-insensitive) match against
+// the distinct player names seen in the file, falling back to
+// a substring match only when it is unambiguous.
+//
 // This tool does NOT change engine behavior. It talks to
 // engines strictly through their UCI stdin/stdout, exactly
 // like a GUI would.
@@ -35,6 +42,7 @@
 //   node tools/coach-analysis-lab.mjs --fen "8/R5N1/2p2pkp/4p3/P7/1p3P1P/2r3PK/8 b - - 0 45" --coach "node uci.js" --movetime 10000
 //   node tools/coach-analysis-lab.mjs --pgn-file docs/coach-analysis-sample-loss2.pgn --coach "node uci.js" --coach-side black --extract annotated --movetime 1000
 //   node tools/coach-analysis-lab.mjs --pgn-file docs/coach-analysis-sample-multigame.pgn --coach "node uci.js" --coach-side auto --extract annotated --movetime 1000
+//   node tools/coach-analysis-lab.mjs --pgn-file docs/coach-analysis-sample-multigame.pgn --coach "node uci.js" --target-player "Coach-uci [001]" --extract annotated --movetime 1000
 //
 // FEN file format: one position per line.
 //   - Blank lines and lines starting with # are ignored.
@@ -102,7 +110,7 @@ const VALID_EXTRACT_MODES = ["all", "annotated", "blunders"];
 function usage() {
 
     return [
-        "Coach Analysis Lab v1.2",
+        "Coach Analysis Lab v1.3",
         "",
         "Required (one of):",
         "  --fen-file <path>     File with one FEN per line ('label | fen' and # comments allowed)",
@@ -120,6 +128,7 @@ function usage() {
         "",
         "PGN mode:",
         "  --coach-side white|black|both|auto  Which side's moves to extract; \"auto\" infers per game (default: auto)",
+        "  --target-player \"<name>\"            Only analyze games/moves for this player; overrides --coach-side",
         "  --extract all|annotated|blunders    Extraction strictness (default: annotated)",
         "  --max-positions <n>                 Cap total extracted positions across the whole file",
         "",
@@ -152,7 +161,8 @@ function parseCliArguments(argv) {
         help: false,
         coachSide: DEFAULT_COACH_SIDE,
         extractMode: DEFAULT_EXTRACT_MODE,
-        maxPositions: null
+        maxPositions: null,
+        targetPlayer: null
     };
 
     for (let i = 0; i < argv.length; i++) {
@@ -187,6 +197,10 @@ function parseCliArguments(argv) {
 
             case "--coach-side":
                 options.coachSide = next();
+                break;
+
+            case "--target-player":
+                options.targetPlayer = next();
                 break;
 
             case "--extract":
@@ -277,6 +291,18 @@ function validateOptions(options) {
         throw new Error(
             `--extract must be one of: ${VALID_EXTRACT_MODES.join(", ")}`
         );
+
+    }
+
+    if (options.targetPlayer !== null) {
+
+        if (!options.targetPlayer.trim()) {
+            throw new Error("--target-player must not be empty");
+        }
+
+        if (!options.pgnFile) {
+            throw new Error("--target-player requires --pgn-file");
+        }
 
     }
 
@@ -1554,6 +1580,143 @@ function inferCoachSide(headers, requestedSide) {
 }
 
 //----------------------------------
+// --target-player resolution (v1.3)
+//
+// Resolves a requested player name against the distinct set
+// of White/Black names seen anywhere in the PGN file (not
+// per game), so a bracketed variant like "Coach-uci [001]"
+// can be told apart from the plain "Coach-uci". Names are
+// deduplicated case-insensitively, keeping the first-seen
+// original casing for display.
+//
+// Prefers an exact (case-insensitive) match. If none exists,
+// falls back to a substring match, but only if exactly one
+// distinct player contains the requested text -- otherwise
+// this is genuinely ambiguous and the caller should stop with
+// a clear error rather than silently guessing which player
+// was meant.
+//----------------------------------
+
+function collectDistinctPlayerNames(games) {
+
+    const nameMap = new Map();
+
+    for (const game of games) {
+
+        for (const raw of [game.headers.White, game.headers.Black]) {
+
+            if (!raw) {
+                continue;
+            }
+
+            const key = raw.toLowerCase();
+
+            if (!nameMap.has(key)) {
+                nameMap.set(key, raw);
+            }
+
+        }
+
+    }
+
+    return nameMap;
+
+}
+
+function resolveTargetPlayer(games, targetPlayer) {
+
+    const nameMap = collectDistinctPlayerNames(games);
+    const targetLower = targetPlayer.toLowerCase();
+
+    const exactMatches = [...nameMap.entries()]
+        .filter(([key]) => key === targetLower)
+        .map(([, name]) => name);
+
+    if (exactMatches.length === 1) {
+
+        return {
+            resolvedName: exactMatches[0],
+            matchType: "exact",
+            message: null,
+            error: null
+        };
+
+    }
+
+    const substringMatches = [...nameMap.entries()]
+        .filter(([key]) => key.includes(targetLower))
+        .map(([, name]) => name);
+
+    if (substringMatches.length === 1) {
+
+        return {
+            resolvedName: substringMatches[0],
+            matchType: "substring",
+            message:
+                `--target-player "${targetPlayer}" matched by substring: "${substringMatches[0]}".`,
+            error: null
+        };
+
+    }
+
+    const knownNames = [...nameMap.values()];
+
+    if (substringMatches.length === 0) {
+
+        return {
+            resolvedName: null,
+            matchType: null,
+            message: null,
+            error:
+                `No player found matching --target-player "${targetPlayer}". ` +
+                `Players seen in this file: ${knownNames.join(", ") || "(none)"}.`
+        };
+
+    }
+
+    return {
+        resolvedName: null,
+        matchType: null,
+        message: null,
+        error:
+            `--target-player "${targetPlayer}" matches multiple players ambiguously: ` +
+            `${substringMatches.join(", ")}. Provide a more exact name.`
+    };
+
+}
+
+//----------------------------------
+// Which side (if any) the resolved target player occupies in
+// a specific game's headers. Returns null if the target does
+// not appear in this game at all -- the caller should skip
+// the game entirely in that case, per --target-player's
+// "ignore games where that player does not appear" behavior.
+//----------------------------------
+
+function targetSideForGame(headers, resolvedName) {
+
+    const resolvedLower = resolvedName.toLowerCase();
+
+    const whiteIsTarget = (headers.White || "").toLowerCase() === resolvedLower;
+    const blackIsTarget = (headers.Black || "").toLowerCase() === resolvedLower;
+
+    if (whiteIsTarget && blackIsTarget) {
+        return "both";
+    }
+
+    if (whiteIsTarget) {
+        return "white";
+    }
+
+    if (blackIsTarget) {
+        return "black";
+    }
+
+    return null;
+
+}
+
+//----------------------------------
 // Annotation-signal detection, shared by extraction
 // filtering and candidate-regressions ranking.
 //----------------------------------
@@ -2195,6 +2358,18 @@ function buildMarkdownReport(run) {
                 : "")
         );
 
+        if (run.pgnSource.targetPlayer) {
+
+            const target = run.pgnSource.targetPlayer;
+
+            lines.push(
+                `- Target player: "${target.resolvedName}" (${target.matchType} match for ` +
+                `"${target.requested}") -- ${target.gamesInvolvingTarget}/${target.gamesScanned} ` +
+                `games involved this player, ${target.gamesSkippedNoTarget} skipped`
+            );
+
+        }
+
     }
 
     lines.push("");
@@ -2639,13 +2814,43 @@ function buildCandidateRegressionsMarkdown(run) {
             ? ` (analyzed: ${pgnSource.totalCandidatesAnalyzed}, capped by --max-positions)`
             : "")
     );
+
+    const target = pgnSource.targetPlayer;
+
+    if (target) {
+
+        lines.push(
+            `Target player: "${target.resolvedName}" (${target.matchType} match for ` +
+            `"${target.requested}")`
+        );
+        lines.push(
+            `Games scanned: ${target.gamesScanned} -- ` +
+            `involving target: ${target.gamesInvolvingTarget}, ` +
+            `skipped (target not present): ${target.gamesSkippedNoTarget}`
+        );
+
+    }
+
     lines.push("");
     lines.push("## Candidate Counts by Game");
     lines.push("");
-    lines.push("| Game | Event | White | Black | Result | Candidates |");
-    lines.push("|------|-------|-------|-------|--------|------------|");
+
+    if (target) {
+        lines.push("| Game | Event | White | Black | Result | Target Side | Candidates |");
+        lines.push("|------|-------|-------|-------|--------|--------------|------------|");
+    }
+    else {
+        lines.push("| Game | Event | White | Black | Result | Candidates |");
+        lines.push("|------|-------|-------|-------|--------|------------|");
+    }
 
     for (const game of pgnSource.games) {
+
+        const candidatesCell = game.parseError
+            ? `error: ${game.parseError}`
+            : (target && game.targetSide === null
+                ? "skipped (target not present)"
+                : game.candidateCount);
 
         lines.push(
             `| ${game.gameIndex} ` +
@@ -2653,7 +2858,8 @@ function buildCandidateRegressionsMarkdown(run) {
             `| ${game.white || "-"} ` +
             `| ${game.black || "-"} ` +
             `| ${game.result || "-"} ` +
-            `| ${game.parseError ? `error: ${game.parseError}` : game.candidateCount} |`
+            (target ? `| ${game.targetSide || "-"} ` : "") +
+            `| ${candidatesCell} |`
         );
 
     }
@@ -2690,6 +2896,21 @@ function buildCandidateRegressionsMarkdown(run) {
             lines.push("");
             continue;
 
+        }
+
+        if (pgnSource.targetPlayer && game.targetSide === null) {
+
+            lines.push(
+                `- Status: skipped -- target player "${pgnSource.targetPlayer.resolvedName}" ` +
+                "not present in this game"
+            );
+            lines.push("");
+            continue;
+
+        }
+
+        if (pgnSource.targetPlayer) {
+            lines.push(`- Target player played as: ${game.targetSide}`);
         }
 
         lines.push(`- Coach side analyzed: ${game.coachSide}`);
@@ -2842,6 +3063,45 @@ async function main() {
             return;
         }
 
+        //----------------------------------
+        // --target-player resolves once, against every
+        // distinct White/Black name in the file, and then
+        // overrides --coach-side on a per-game basis for the
+        // rest of this run: games the target does not appear
+        // in are skipped entirely (not just filtered down to
+        // zero candidates), and games it does appear in are
+        // always analyzed from the target's own side(s).
+        //----------------------------------
+
+        let targetPlayerInfo = null;
+
+        if (options.targetPlayer) {
+
+            const resolution = resolveTargetPlayer(games, options.targetPlayer);
+
+            if (resolution.error) {
+                console.error(`Error: ${resolution.error}`);
+                process.exitCode = 1;
+                return;
+            }
+
+            if (resolution.message) {
+                console.log(resolution.message);
+            }
+
+            targetPlayerInfo = {
+                requested: options.targetPlayer,
+                resolvedName: resolution.resolvedName,
+                matchType: resolution.matchType
+            };
+
+            console.log(
+                `Target player: "${targetPlayerInfo.resolvedName}" ` +
+                `(${targetPlayerInfo.matchType} match) -- overriding --coach-side.`
+            );
+
+        }
+
         const allCandidates = [];
         const gameSummaries = [];
 
@@ -2880,10 +3140,50 @@ async function main() {
                     repliedPlyCount: 0,
                     coachSide: null,
                     coachSideMessage: null,
-                    candidateCount: 0
+                    candidateCount: 0,
+                    targetSide: null
                 });
 
                 continue;
+
+            }
+
+            //----------------------------------
+            // --target-player: skip this game entirely (no
+            // replay attempted) if the resolved player is not
+            // White or Black here. This is a distinct outcome
+            // from a parse/replay error -- it is reported
+            // separately in the report as "skipped, target
+            // player not present".
+            //----------------------------------
+
+            let targetSide = null;
+
+            if (targetPlayerInfo) {
+
+                targetSide = targetSideForGame(game.headers, targetPlayerInfo.resolvedName);
+
+                if (targetSide === null) {
+
+                    console.log(
+                        `${gameLabel}: target player "${targetPlayerInfo.resolvedName}" not present ` +
+                        `(White="${gameMeta.white}", Black="${gameMeta.black}"). Skipping.`
+                    );
+
+                    gameSummaries.push({
+                        ...gameMeta,
+                        parseError: null,
+                        replayError: null,
+                        repliedPlyCount: 0,
+                        coachSide: null,
+                        coachSideMessage: null,
+                        candidateCount: 0,
+                        targetSide: null
+                    });
+
+                    continue;
+
+                }
 
             }
 
@@ -2898,7 +3198,8 @@ async function main() {
                     repliedPlyCount: 0,
                     coachSide: null,
                     coachSideMessage: null,
-                    candidateCount: 0
+                    candidateCount: 0,
+                    targetSide
                 });
 
                 continue;
@@ -2925,7 +3226,8 @@ async function main() {
                     repliedPlyCount: 0,
                     coachSide: null,
                     coachSideMessage: null,
-                    candidateCount: 0
+                    candidateCount: 0,
+                    targetSide
                 });
 
                 continue;
@@ -2941,11 +3243,23 @@ async function main() {
 
             }
 
-            const { side: resolvedCoachSide, message: coachSideMessage } =
-                inferCoachSide(game.headers, options.coachSide);
+            let resolvedCoachSide;
+            let coachSideMessage = null;
 
-            if (coachSideMessage) {
-                console.log(`${gameLabel}: ${coachSideMessage}`);
+            if (targetPlayerInfo) {
+                resolvedCoachSide = targetSide;
+            }
+            else {
+
+                const inferred = inferCoachSide(game.headers, options.coachSide);
+
+                resolvedCoachSide = inferred.side;
+                coachSideMessage = inferred.message;
+
+                if (coachSideMessage) {
+                    console.log(`${gameLabel}: ${coachSideMessage}`);
+                }
+
             }
 
             //----------------------------------
@@ -2976,7 +3290,8 @@ async function main() {
                 repliedPlyCount: replayed.length,
                 coachSide: resolvedCoachSide,
                 coachSideMessage,
-                candidateCount: gameCandidates.length
+                candidateCount: gameCandidates.length,
+                targetSide
             });
 
         }
@@ -2992,8 +3307,10 @@ async function main() {
 
             console.error(
                 `Error: ${options.pgnFile}: no candidate positions matched ` +
-                `--coach-side ${options.coachSide} --extract ${options.extractMode} ` +
-                `across ${games.length} game(s)`
+                (targetPlayerInfo
+                    ? `--target-player "${targetPlayerInfo.resolvedName}" `
+                    : `--coach-side ${options.coachSide} `) +
+                `--extract ${options.extractMode} across ${games.length} game(s)`
             );
             process.exitCode = 1;
             return;
@@ -3009,6 +3326,29 @@ async function main() {
                 (summary.replayError !== null && summary.repliedPlyCount === 0)
             ).length;
 
+        let targetPlayerSummary = null;
+
+        if (targetPlayerInfo) {
+
+            const gamesInvolvingTarget =
+                gameSummaries.filter(summary => summary.targetSide !== null).length;
+
+            const gamesSkippedNoTarget =
+                gameSummaries.filter(summary =>
+                    summary.targetSide === null && summary.parseError === null
+                ).length;
+
+            targetPlayerSummary = {
+                requested: targetPlayerInfo.requested,
+                resolvedName: targetPlayerInfo.resolvedName,
+                matchType: targetPlayerInfo.matchType,
+                gamesScanned: games.length,
+                gamesInvolvingTarget,
+                gamesSkippedNoTarget
+            };
+
+        }
+
         pgnSource = {
             pgnFile: options.pgnFile,
             coachSide: options.coachSide,
@@ -3018,6 +3358,7 @@ async function main() {
             gamesWithErrors,
             totalCandidatesExtracted,
             totalCandidatesAnalyzed: positionsInput.length,
+            targetPlayer: targetPlayerSummary,
             games: gameSummaries
         };
 
@@ -3030,6 +3371,16 @@ async function main() {
                 : "") +
             "."
         );
+
+        if (targetPlayerSummary) {
+
+            console.log(
+                `Target player "${targetPlayerSummary.resolvedName}": ` +
+                `${targetPlayerSummary.gamesInvolvingTarget}/${targetPlayerSummary.gamesScanned} ` +
+                `games involved this player, ${targetPlayerSummary.gamesSkippedNoTarget} skipped.`
+            );
+
+        }
 
     }
     else {
@@ -3059,7 +3410,7 @@ async function main() {
             ? `go depth ${options.depth}`
             : `go movetime ${options.movetimeMs}`;
 
-    console.log(`Coach Analysis Lab v1.2`);
+    console.log(`Coach Analysis Lab v1.3`);
     console.log(`Positions: ${positionsToRun.length}  |  ${goCommand}  |  reference: ${options.referenceCommand ? "yes" : "no (Coach-only)"}`);
 
     //----------------------------------
@@ -3217,7 +3568,7 @@ async function main() {
 
     const run = {
         tool: "coach-analysis-lab",
-        version: pgnSource ? "1.2" : 1,
+        version: pgnSource ? "1.3" : 1,
         startedAt: startedAt.toISOString(),
         finishedAt: new Date().toISOString(),
         coachEngineName: coachClient.idName,
