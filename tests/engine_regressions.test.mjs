@@ -485,3 +485,142 @@ test("depth-5 Nxe5 rook regression keeps the tactical bishop move", () => {
     assert.equal(result.notation, "f8-b4");
 
 });
+
+//----------------------------------
+// Quiescence: SEE Capture Pruning /
+// In-Check Ply Cap regression tests
+//----------------------------------
+
+test("quiescence prunes a clearly losing non-promotion capture", () => {
+
+    // White rook on d1 can only play Rxd5, but the pawn on
+    // d5 is defended twice (c6 and e6 pawns). SEE(-400) is
+    // well below the pruning threshold, so quiescence should
+    // skip it entirely and return the stand-pat score
+    // unchanged rather than searching the losing trade.
+
+    const { search } =
+        createEngine(
+            "4k3/8/2p1p3/3p4/8/8/8/3RK3 w - - 0 1"
+        );
+
+    const standPat =
+        search.toSideToMoveScore(
+            search.whiteRelativeEval()
+        );
+
+    const result =
+        withMutedConsole(
+            () => search.quiescence(
+                -SearchConstants.INFINITY,
+                SearchConstants.INFINITY,
+                0,
+                0
+            )
+        );
+
+    assert.equal(
+        result,
+        standPat,
+        "Expected the losing rook capture to be pruned, leaving quiescence at stand-pat"
+    );
+
+});
+
+test("quiescence still searches a clearly winning capture", () => {
+
+    // White queen on a1 can play Qxa8, winning an undefended
+    // rook for free (SEE +500). This capture must still be
+    // searched normally -- SEE pruning only removes clearly
+    // losing captures, never winning ones.
+
+    const { search } =
+        createEngine(
+            "r5k1/8/8/8/8/8/8/Q6K w - - 0 1"
+        );
+
+    const standPat =
+        search.toSideToMoveScore(
+            search.whiteRelativeEval()
+        );
+
+    const result =
+        withMutedConsole(
+            () => search.quiescence(
+                -SearchConstants.INFINITY,
+                SearchConstants.INFINITY,
+                0,
+                0
+            )
+        );
+
+    assert.ok(
+        result > standPat,
+        `Expected the winning rook capture to still be searched, got ${result} vs stand-pat ${standPat}`
+    );
+
+});
+
+test("quiescence in-check ply cap returns a normal evaluation, not a false mate", () => {
+
+    // White king on e1 is in check from the Black queen on e2,
+    // but Kxe2 is a legal reply -- this is NOT checkmate. Forcing
+    // qPly past the in-check cap must fall back to the static
+    // evaluation, never a mate-magnitude score.
+
+    const { board, search } =
+        createEngine(
+            "4k3/8/8/8/8/8/4q3/4K3 w - - 0 1"
+        );
+
+    assert.ok(board.isInCheck());
+
+    const result =
+        withMutedConsole(
+            () => search.quiescence(
+                -SearchConstants.INFINITY,
+                SearchConstants.INFINITY,
+                0,
+                999
+            )
+        );
+
+    assert.ok(
+        Math.abs(result) < SearchConstants.MATE_THRESHOLD,
+        `Expected a normal evaluation at the in-check ply cap, got ${result}`
+    );
+
+});
+
+test("quiescence still detects real checkmate even past the in-check ply cap", () => {
+
+    // Standard back-rank mate: Black king on g8 boxed in by its
+    // own pawns, Rook on a8 delivering mate. This has zero legal
+    // moves and must still be reported as mate even when qPly is
+    // already past the cap -- the ply cap must never suppress a
+    // genuine, verified checkmate.
+
+    const { board, search } =
+        createEngine(
+            "R5k1/5ppp/8/8/8/8/8/6K1 b - - 0 1"
+        );
+
+    assert.ok(board.isInCheck());
+
+    const result =
+        withMutedConsole(
+            () => search.quiescence(
+                -SearchConstants.INFINITY,
+                SearchConstants.INFINITY,
+                3,
+                999
+            )
+        );
+
+    assert.equal(
+        result,
+        -SearchConstants.MATE + 3,
+        "Expected real checkmate to still be reported despite the in-check ply cap"
+    );
+
+});

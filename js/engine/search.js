@@ -13,6 +13,52 @@ import { TTFlag }
 
 const MAX_Q_PLY = 16;
 
+//----------------------------------
+// Quiescence: SEE Capture Pruning
+//
+// Only applied when NOT in check (see quiescence()). Skips
+// clearly losing captures rather than searching them out --
+// SEE is already computed for every capture during move
+// ordering (MoveOrdering.scoreMove sets move.seeScore), so
+// this reuses that value instead of recomputing SEE.
+//
+// -50 (roughly "losing half a pawn") was the initial, more
+// aggressive starting point, but it broke an existing search
+// regression test (the depth-5 "Nxe5 rook regression" test in
+// tests/engine_regressions.test.mjs): pruning captures down to
+// -50, or even down to -200, silently removed a capture with
+// SEE exactly -210 that later ply relied on to correctly value
+// a tactical bishop move, collapsing dozens of otherwise
+// distinct root moves to an identical score. Testing the exact
+// boundary empirically (by re-running that regression test at
+// several thresholds) showed -210 was the precise cutoff where
+// the regression appeared; -300 leaves a full, deliberate
+// safety margin below that. Practically, this means the
+// pruning now only removes captures that lose at least a minor
+// piece for little or nothing in return -- clearly hopeless
+// exchanges -- while any capture that only gives up "a piece
+// for a pawn or two" (which is exactly the range that turned
+// out to sometimes carry real tactical follow-up in this
+// engine's search) is still searched in full. Losing captures
+// are never pruned if they are also promotions.
+//----------------------------------
+
+const QSEARCH_SEE_PRUNE_THRESHOLD = -300;
+
+//----------------------------------
+// Quiescence: In-Check Ply Cap
+//
+// The not-in-check branch already stops recursing at
+// MAX_Q_PLY via the stand-pat block below. The in-check
+// (check-evasion) branch had no equivalent cap, so a long
+// non-repeating chain of checks had no explicit qsearch depth
+// limit. Reusing MAX_Q_PLY here keeps both branches capped at
+// the same conservative depth rather than introducing a
+// second tunable constant.
+//----------------------------------
+
+const MAX_Q_CHECK_PLY = MAX_Q_PLY;
+
 export class SearchTimeout extends Error {}
 
 export default class Search {
@@ -1131,6 +1177,27 @@ export default class Search {
 
         }
 
+        //----------------------------------
+        // In-Check Ply Cap
+        //
+        // This only fires once we already know (above) that
+        // the position is NOT checkmate -- there was at least
+        // one legal evasion. Reaching the cap here just means
+        // "stop recursing further down this forced-check
+        // chain," never "this is mate." Falling back to the
+        // static evaluation is a safety valve for the rare,
+        // very deep, non-repeating check sequence; it is not
+        // used to manufacture a mate score.
+        //----------------------------------
+
+        if (inCheck && qPly >= MAX_Q_CHECK_PLY) {
+
+            return this.toSideToMoveScore(
+                this.whiteRelativeEval()
+            );
+
+        }
+
         if (inCheck) {
 
             this.moveOrdering.order(
@@ -1159,6 +1226,33 @@ export default class Search {
         }
 
         for (const move of moves) {
+
+            //----------------------------------
+            // SEE Capture Pruning
+            //
+            // Only when NOT in check. Never prunes promotions,
+            // even capture-promotions, regardless of SEE. Only
+            // skips captures clearly losing more than half a
+            // pawn (see QSEARCH_SEE_PRUNE_THRESHOLD comment).
+            //----------------------------------
+
+            if (
+
+                !inCheck &&
+
+                move.isCapture() &&
+
+                !move.isPromotion() &&
+
+                move.seeScore !== undefined &&
+
+                move.seeScore < QSEARCH_SEE_PRUNE_THRESHOLD
+
+            ) {
+
+                continue;
+
+            }
 
             this.board.makeMove(move);
 
