@@ -123,14 +123,31 @@ const COMPLEXITY_MAX_MULTIPLIER = 1.6;
 // btime") path, since that is the only caller of
 // complexityMultiplier() -- "go depth", "go movetime", and
 // Analysis Lab's fixed-movetime runs never reach this code.
+//
+// Recalibration (Arena 5-minute no-increment evidence): the
+// factors below (0.60 / 0.80) and the capture-count escape
+// threshold (3) were still letting Coach spend far too much on
+// the first few quiet moves -- move 1 alone took ~6s, and a
+// perfectly normal quiet developing position (e.g. after 1.e4 e5
+// 2.Nf3 Nc6 3.Bb5 a6) usually has 3+ pseudo-available pawn/piece
+// captures on the board without being remotely tactical, which
+// was enough to trip isTacticallyUrgent and skip the throttle
+// entirely. That let roughly the first 5 moves burn ~32s combined
+// before the middlegame even started. The factors are now lower
+// (0.30 / 0.55, targeting ~2-4s for move 1 on a 5-minute clock)
+// and the capture-count escape threshold is raised to 5, so only
+// positions with genuinely many captures on the board (not just
+// "a few pawns can trade") are treated as tactically urgent this
+// early. inCheck and low-legal-move-count still escape the
+// throttle unconditionally, exactly as before.
 //----------------------------------
 
 const OPENING_THROTTLE_STRONG_FULLMOVE = 6;
 const OPENING_THROTTLE_LIGHT_FULLMOVE = 8;
-const OPENING_THROTTLE_STRONG_FACTOR = 0.60;
-const OPENING_THROTTLE_LIGHT_FACTOR = 0.80;
+const OPENING_THROTTLE_STRONG_FACTOR = 0.30;
+const OPENING_THROTTLE_LIGHT_FACTOR = 0.55;
 const OPENING_THROTTLE_LOW_LEGAL_MOVE_COUNT = 8;
-const OPENING_THROTTLE_CAPTURE_COUNT = 3;
+const OPENING_THROTTLE_CAPTURE_COUNT = 5;
 
 //----------------------------------
 // Time Management: Late-Opening / Middlegame
@@ -162,18 +179,34 @@ const OPENING_THROTTLE_CAPTURE_COUNT = 3;
 // motivating FEN's allocation from 14992ms to 15617ms on a
 // 5-minute clock -- correct in direction, but too small to be
 // the difference between h3 and Kh1 the way the 20s-fixed-
-// movetime comparison suggested it should be. This revision adds
-// a second, narrower "core" window (roughly moves 15-24, the
-// heart of the late-opening/middlegame) with its own flat base
-// boost, plus an extra boost when legal moves are unusually high
-// in that core window. Genuine check/capture pressure is still
-// covered by the inCheck/captureCount signals below; a separate
-// king-safety (pawn-shield) detector was considered for the
-// "king exposed" half of this request, but a reliable version
-// needs extra board traversal beyond the "cheap signals only"
-// rule this feature has followed throughout, so raw legal-move
-// count is used instead as the cheap stand-in for "the position
-// has a lot going on."
+// movetime comparison suggested it should be. A second revision
+// added a narrower "core" window (moves 15-24) with its own flat
+// base boost, plus an extra boost when legal moves are unusually
+// high in that core window, which got the motivating FEN to
+// ~18.7s. Genuine check/capture pressure is still covered by the
+// inCheck/captureCount signals below; a separate king-safety
+// (pawn-shield) detector was considered for the "king exposed"
+// half of an earlier request, but a reliable version needs extra
+// board traversal beyond the "cheap signals only" rule this
+// feature has followed throughout, so raw legal-move count is
+// used instead as the cheap stand-in for "the position has a lot
+// going on."
+//
+// Recalibration (Arena 5-minute no-increment evidence): with the
+// opening throttle now cutting deeper (see above), there is more
+// saved clock time to reinvest, and the Arena games showed New
+// Coach was still carrying too much of it past move 10 without
+// spending it -- by moves 12-18 it held ~18s more than Old Coach,
+// and ~30s more by move 24. The core window is widened from
+// 15-24 to 10-28 (matching "roughly moves 10-28" from the
+// motivating request) so moves 10-14 also get the full core
+// boost instead of just the smaller flat per-signal bumps below.
+// This does not change the motivating move-19 FEN's allocation
+// (19 was already inside the old 15-24 core window), and a
+// simplified endgame that happens to fall in this range still
+// gets nothing, because manyPiecesRemain is checked before any
+// of this -- widening the fullmove range does not weaken that
+// material gate.
 //----------------------------------
 
 const LATE_TACTICAL_FULLMOVE_MIN = 9;
@@ -181,8 +214,8 @@ const LATE_TACTICAL_FULLMOVE_MAX = 28;
 const LATE_TACTICAL_LEGAL_MOVE_COUNT = 20;
 const LATE_TACTICAL_SIGNAL_BONUS = 0.05;
 
-const LATE_TACTICAL_CORE_FULLMOVE_MIN = 15;
-const LATE_TACTICAL_CORE_FULLMOVE_MAX = 24;
+const LATE_TACTICAL_CORE_FULLMOVE_MIN = 10;
+const LATE_TACTICAL_CORE_FULLMOVE_MAX = 28;
 const LATE_TACTICAL_CORE_BASE_BONUS = 0.15;
 const LATE_TACTICAL_HIGH_LEGAL_MOVE_COUNT = 25;
 const LATE_TACTICAL_HIGH_MOBILITY_BONUS = 0.10;
@@ -732,6 +765,32 @@ export class UciSession {
         this.moveOverheadMs =
             UCI_MOVE_OVERHEAD_DEFAULT_MS;
 
+        //----------------------------------
+        // Tracked fullmove number for clock-based time
+        // management. board.fullMoveNumber is set correctly by
+        // Board's constructor and by FEN.import(), but
+        // board.makeMove() never increments it -- it only saves
+        // the old value into undo history. Since a real UCI GUI
+        // resends the *entire* move list on every "position"
+        // command (not just the newest move), that means
+        // board.fullMoveNumber would silently stay pinned at
+        // whatever it was after "position ... [fen]" for the rest
+        // of the game, no matter how many moves get replayed on
+        // top of it. That would make every fullMoveNumber-based
+        // rule in complexityMultiplier() (the opening throttle,
+        // the late-opening/middlegame reinvestment window) think
+        // every move of the game is still move 1 -- consistent
+        // with the Arena evidence motivating this recalibration:
+        // Coach's time surplus over Old Coach only ever grew,
+        // exactly what happens if the reinvestment window can
+        // never fire. This is tracked independently here, at the
+        // UCI layer only, rather than fixing board.js itself,
+        // which is out of scope for a clock-based time-management
+        // change.
+        //----------------------------------
+
+        this.currentFullMoveNumber = 1;
+
         this.resetEngine();
 
     }
@@ -745,6 +804,9 @@ export class UciSession {
             new TranspositionTable(
                 this.hashSizeMB
             );
+
+        this.currentFullMoveNumber =
+            this.engine.board.fullMoveNumber;
 
     }
 
@@ -874,9 +936,34 @@ export class UciSession {
 
         }
 
+        //----------------------------------
+        // Capture the starting fullmove number and side to move
+        // right after the reset (correct at this point, whether
+        // from a fresh startpos or an imported FEN), before
+        // replaying moveTokens -- board.makeMove() will not
+        // advance board.fullMoveNumber itself. See the comment in
+        // the constructor above.
+        //----------------------------------
+
+        const startingFullMoveNumber =
+            this.engine.board.fullMoveNumber;
+
+        const startingSideToMove =
+            this.engine.board.sideToMove;
+
         for (const moveText of moveTokens) {
             applyUciMove(this.engine, moveText);
         }
+
+        const pliesApplied = moveTokens.length;
+
+        const blackMovesCompleted =
+            startingSideToMove > 0
+                ? Math.floor(pliesApplied / 2)
+                : Math.ceil(pliesApplied / 2);
+
+        this.currentFullMoveNumber =
+            startingFullMoveNumber + blackMovesCompleted;
 
     }
 
@@ -1238,7 +1325,7 @@ export class UciSession {
                             this.moveOverheadMs,
 
                         fullMoveNumber:
-                            this.engine.board.fullMoveNumber,
+                            this.currentFullMoveNumber,
                         totalMaterial:
                             this.engine.board.whiteMaterial +
                             this.engine.board.blackMaterial,

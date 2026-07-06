@@ -105,6 +105,55 @@ test("UCI session loads explicit FEN positions", () => {
 
 });
 
+//----------------------------------
+// fullMoveNumber tracking for clock-based time management
+// (UciSession.currentFullMoveNumber): board.makeMove() never
+// increments board.fullMoveNumber -- it only saves the old value
+// for undo history. A real UCI GUI resends the entire move list
+// on every "position" command, so relying on board.fullMoveNumber
+// directly would leave every fullMoveNumber-gated rule in
+// complexityMultiplier() (the opening throttle, the late-opening/
+// middlegame reinvestment window) permanently believing every
+// move of the game is still move 1. This is exactly the pattern
+// in the Arena evidence motivating this recalibration: Coach's
+// time surplus over Old Coach only ever grew, never got
+// reinvested. UciSession tracks the real fullmove number
+// independently instead.
+//----------------------------------
+
+test("fullMoveNumber advances correctly after replaying moves from startpos", () => {
+
+    const session =
+        new UciSession();
+
+    // Ruy Lopez Breyer System, 20 plies (10 full moves each
+    // side) -- White to move at move 11 afterward.
+    session.handleCommand(
+        "position startpos moves e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 " +
+        "b5a4 g8f6 e1g1 f8e7 f1e1 b7b5 a4b3 d7d6 c2c3 e8g8 h2h3 " +
+        "c6b8 d2d4 b8d7"
+    );
+
+    assert.equal(session.currentFullMoveNumber, 11);
+
+});
+
+test("fullMoveNumber advances correctly after replaying moves from an imported FEN", () => {
+
+    const session =
+        new UciSession();
+
+    // Motivating FEN, move 19, White to move. Two plies (Kh1,
+    // then a quiet Black reply) should land on move 20.
+    session.handleCommand(
+        "position fen r4rk1/ppp3pp/4p1q1/4P3/1nP3B1/8/PP3P1P/R2Q1RK1 w - - 1 19 " +
+        "moves g1h1 b7b6"
+    );
+
+    assert.equal(session.currentFullMoveNumber, 20);
+
+});
+
 test("attachZobrist generates a consistent hash for the current board", () => {
 
     const board = new Board();
@@ -617,8 +666,17 @@ test("opening throttle reduces the budget for quiet early positions", () => {
         `Expected fullMoveNumber 7 (${lightThrottleBudget}) < fullMoveNumber 9 (${unthrottledBudget})`
     );
 
-    assert.equal(strongThrottleBudget, 6596);
-    assert.equal(lightThrottleBudget, 8795);
+    //----------------------------------
+    // Recalibrated (Arena 5-minute no-increment evidence): the
+    // opening throttle factors were lowered from 0.60/0.80 to
+    // 0.30/0.55 -- move 1 alone was taking ~6s, and roughly the
+    // first 5 moves were burning ~32s combined, both too much for
+    // quiet, no-book openings. See the comment above
+    // OPENING_THROTTLE_STRONG_FACTOR in js/uci/uciengine.js.
+    //----------------------------------
+
+    assert.equal(strongThrottleBudget, 3298);
+    assert.equal(lightThrottleBudget, 6046);
 
     //----------------------------------
     // fullMoveNumber 9 now also falls inside the late-opening/
@@ -629,14 +687,16 @@ test("opening throttle reduces the budget for quiet early positions", () => {
     // available (1), this position picks up two +0.05 signal
     // bonuses on top of the existing mobility bonus, raising the
     // multiplier from 1.10 to 1.20 and the budget from the prior
-    // 10994 to 11994.
+    // 10994 to 11994. fullMoveNumber 9 sits just outside the
+    // core window (10-28), so it is unaffected by the core-window
+    // widening below.
     //----------------------------------
 
     assert.equal(unthrottledBudget, 11994);
 
 });
 
-test("opening throttle does not apply once past the throttle window", () => {
+test("opening throttle no longer applies once fullMoveNumber is past the throttle window", () => {
 
     const quietOpeningParams = {
         sideToMove: 1,
@@ -650,23 +710,113 @@ test("opening throttle does not apply once past the throttle window", () => {
     };
 
     //----------------------------------
-    // Both fullmove numbers below are deliberately kept
-    // outside the late-opening/middlegame "core" window
-    // (fullMoveNumber 15-24, see lateOpeningMiddlegameBonus()
-    // in js/uci/uciengine.js) so this test stays focused on
-    // "the opening throttle itself is gone past move 8" and
-    // isn't conflated with the separate core-window boost,
-    // which intentionally makes later fullmove numbers within
-    // its own window allocate more than earlier ones.
+    // The late-opening/middlegame "core" window (fullMoveNumber
+    // 10-28, see lateOpeningMiddlegameBonus() in
+    // js/uci/uciengine.js) now covers nearly the entire 9-28
+    // reinvestment window by design, so there is no longer a pair
+    // of distinct fullmove numbers both inside the reinvestment
+    // window but outside the core window to compare for equality.
+    // Instead, this test checks the throttle boundary directly:
+    // fullMoveNumber 8 is still throttled (OPENING_THROTTLE_LIGHT_
+    // FULLMOVE), fullMoveNumber 9 is not, so the budget should
+    // jump upward at that transition.
     //----------------------------------
 
-    const fullMove9Budget =
+    const lightThrottleBudget =
+        allocateMoveTime({ ...quietOpeningParams, fullMoveNumber: 8 });
+
+    const unthrottledBudget =
         allocateMoveTime({ ...quietOpeningParams, fullMoveNumber: 9 });
 
-    const fullMove13Budget =
-        allocateMoveTime({ ...quietOpeningParams, fullMoveNumber: 13 });
+    assert.ok(
+        unthrottledBudget > lightThrottleBudget,
+        `Expected fullMoveNumber 9 (${unthrottledBudget}) > fullMoveNumber 8 (${lightThrottleBudget})`
+    );
 
-    assert.equal(fullMove9Budget, fullMove13Budget);
+});
+
+test("move 1 / startpos allocates roughly 2-4 seconds on a 5-minute clock", () => {
+
+    //----------------------------------
+    // Arena evidence: move 1 alone was taking ~6s on a 5-minute
+    // no-increment clock, which was too much for a quiet,
+    // no-book starting position. This pins the recalibrated
+    // opening throttle to the requested 2-4s range.
+    //----------------------------------
+
+    const moveOneBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 0,
+            binc: 0,
+            fullMoveNumber: 1,
+            totalMaterial: 7840,
+            legalMoveCount: 20,
+            captureCount: 0,
+            inCheck: false
+        });
+
+    assert.ok(
+        moveOneBudget >= 2000 && moveOneBudget <= 4000,
+        `Expected move 1's allocation (${moveOneBudget}) to fall in the 2-4s range on a 5-minute clock`
+    );
+
+});
+
+test("a quiet opening position with a few pseudo-available captures is still throttled", () => {
+
+    //----------------------------------
+    // A perfectly normal quiet developing position (e.g. after
+    // 1.e4 e5 2.Nf3 Nc6 3.Bb5 a6) commonly has 3+ pseudo-available
+    // pawn/piece captures without being remotely tactical. The
+    // old capture-count escape threshold (3) treated that as
+    // "tactically urgent" and skipped the throttle entirely,
+    // which was a real contributor to the ~32s spent across the
+    // first 5 Arena moves. The threshold is now 5, so this
+    // captureCount=3 position should still be throttled, while a
+    // genuinely capture-rich position (captureCount=6) still
+    // escapes it.
+    //----------------------------------
+
+    const fewCapturesBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 0,
+            binc: 0,
+            fullMoveNumber: 4,
+            totalMaterial: 8150,
+            legalMoveCount: 31,
+            captureCount: 3,
+            inCheck: false
+        });
+
+    const manyCapturesBudget =
+        allocateMoveTime({
+            sideToMove: 1,
+            wtime: 300000,
+            btime: 300000,
+            winc: 0,
+            binc: 0,
+            fullMoveNumber: 4,
+            totalMaterial: 8150,
+            legalMoveCount: 31,
+            captureCount: 6,
+            inCheck: false
+        });
+
+    assert.ok(
+        fewCapturesBudget < manyCapturesBudget,
+        `Expected the throttled few-captures budget (${fewCapturesBudget}) < the escaped many-captures budget (${manyCapturesBudget})`
+    );
+
+    assert.ok(
+        fewCapturesBudget < 5000,
+        `Expected the throttled few-captures budget (${fewCapturesBudget}) to stay well under 5s`
+    );
 
 });
 
