@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 //----------------------------------
-// Coach Analysis Lab v1.1
+// Coach Analysis Lab v1.2
 //
 // Diagnostic tool only. Runs Coach (and optionally a
 // stronger reference UCI engine such as Stockfish) over a
@@ -15,6 +15,15 @@
 // Coach side's moves, and writes a ranked candidate
 // regression FEN list alongside the existing report.
 //
+// v1.2 adds multi-game PGN support: --pgn-file now accepts a
+// file containing many games back-to-back (e.g. an Arena
+// tournament export). Each game is parsed and replayed
+// independently, candidate labels are prefixed with the game
+// number (game1-before-13...Re8), --coach-side auto infers
+// per game, and --max-positions caps the total across the
+// whole file. candidate-regressions.md groups candidates by
+// game and adds an overall top-candidates section.
+//
 // This tool does NOT change engine behavior. It talks to
 // engines strictly through their UCI stdin/stdout, exactly
 // like a GUI would.
@@ -25,6 +34,7 @@
 //   node tools/coach-analysis-lab.mjs --fen-file docs/regression-fens.txt --coach "node uci.js" --stockfish "C:\Path\To\stockfish.exe" --movetime 10000
 //   node tools/coach-analysis-lab.mjs --fen "8/R5N1/2p2pkp/4p3/P7/1p3P1P/2r3PK/8 b - - 0 45" --coach "node uci.js" --movetime 10000
 //   node tools/coach-analysis-lab.mjs --pgn-file docs/coach-analysis-sample-loss2.pgn --coach "node uci.js" --coach-side black --extract annotated --movetime 1000
+//   node tools/coach-analysis-lab.mjs --pgn-file docs/coach-analysis-sample-multigame.pgn --coach "node uci.js" --coach-side auto --extract annotated --movetime 1000
 //
 // FEN file format: one position per line.
 //   - Blank lines and lines starting with # are ignored.
@@ -92,12 +102,12 @@ const VALID_EXTRACT_MODES = ["all", "annotated", "blunders"];
 function usage() {
 
     return [
-        "Coach Analysis Lab v1.1",
+        "Coach Analysis Lab v1.2",
         "",
         "Required (one of):",
         "  --fen-file <path>     File with one FEN per line ('label | fen' and # comments allowed)",
         "  --fen \"<fen>\"         Analyze a single FEN",
-        "  --pgn-file <path>     Replay a PGN game and extract candidate positions",
+        "  --pgn-file <path>     Replay a PGN file (one or many games back-to-back) and extract candidate positions",
         "",
         "Engines:",
         "  --coach \"<command>\"     Coach UCI command (default: node uci.js)",
@@ -109,9 +119,9 @@ function usage() {
         "  --depth <n>           go depth per position instead of movetime",
         "",
         "PGN mode:",
-        "  --coach-side white|black|both|auto  Which side's moves to extract (default: auto)",
+        "  --coach-side white|black|both|auto  Which side's moves to extract; \"auto\" infers per game (default: auto)",
         "  --extract all|annotated|blunders    Extraction strictness (default: annotated)",
-        "  --max-positions <n>                 Cap extracted positions for long games",
+        "  --max-positions <n>                 Cap total extracted positions across the whole file",
         "",
         "Other:",
         "  --label \"<text>\"      Label for --fen mode",
@@ -1328,6 +1338,105 @@ function parsePgn(text) {
 }
 
 //----------------------------------
+// Multi-game PGN splitting (v1.2)
+//
+// A single PGN file (typically an Arena tournament export)
+// may contain many games back-to-back. Game boundaries are
+// detected using the PGN header block, specifically the
+// "[Event ...]" tag, which every well-formed game header
+// starts with. Splitting purely on blank lines is not safe
+// -- movetext itself can contain blank lines and irregular
+// spacing -- so every line matching "[Event ..." is treated
+// as the start of a new game, and each game's text runs up
+// to (but not including) the next such line.
+//
+// If no "[Event" line is found at all (a bare movetext file
+// with no headers), the whole file is treated as a single
+// game, which keeps single-game PGNs without headers working
+// exactly as before.
+//----------------------------------
+
+function splitPgnGames(text) {
+
+    const lines = text.split(/\r?\n/);
+    const eventLineIndices = [];
+
+    lines.forEach((line, index) => {
+
+        if (/^\s*\[Event\s+"/.test(line)) {
+            eventLineIndices.push(index);
+        }
+
+    });
+
+    if (eventLineIndices.length === 0) {
+        return [text];
+    }
+
+    const games = [];
+
+    for (let i = 0; i < eventLineIndices.length; i++) {
+
+        const start = eventLineIndices[i];
+
+        const end =
+            i + 1 < eventLineIndices.length
+                ? eventLineIndices[i + 1]
+                : lines.length;
+
+        games.push(lines.slice(start, end).join("\n"));
+
+    }
+
+    return games;
+
+}
+
+//----------------------------------
+// Parses every game in a (possibly multi-game) PGN file.
+// Each game is parsed independently, so a malformed game
+// cannot take down the rest of the file -- a parse failure
+// on one game is recorded as parseError and later games
+// still get a chance to parse and replay.
+//----------------------------------
+
+function parseMultiGamePgn(fullText) {
+
+    const gameTexts = splitPgnGames(fullText);
+
+    return gameTexts.map((gameText, index) => {
+
+        try {
+
+            const { headers, mainline, result } = parsePgn(gameText);
+
+            return {
+                gameIndex: index + 1,
+                headers,
+                mainline,
+                result,
+                parseError: null
+            };
+
+        }
+
+        catch (error) {
+
+            return {
+                gameIndex: index + 1,
+                headers: {},
+                mainline: [],
+                result: null,
+                parseError: error.message
+            };
+
+        }
+
+    });
+
+}
+
+//----------------------------------
 // Replay the mainline using Coach's own board and legal
 // move generator, matching each SAN token against the SAN
 // Coach's own browser PGN helper (js/game/pgn.js
@@ -1558,7 +1667,7 @@ function annotationSeverity(entry) {
 // after engine analysis, using severity + comparison data.
 //----------------------------------
 
-function selectPgnCandidates(replayedMainline, coachSide, extractMode, maxPositions) {
+function selectPgnCandidates(replayedMainline, coachSide, extractMode, maxPositions, labelPrefix = "") {
 
     const sideMatches = entry => {
 
@@ -1582,7 +1691,7 @@ function selectPgnCandidates(replayedMainline, coachSide, extractMode, maxPositi
         const sideLabel = entry.side === "w" ? "w" : "b";
 
         const label =
-            `before-${entry.moveNumber}${sideLabel === "b" ? "..." : "."}` +
+            `${labelPrefix}before-${entry.moveNumber}${sideLabel === "b" ? "..." : "."}` +
             `${entry.san}`;
 
         return {
@@ -1597,7 +1706,8 @@ function selectPgnCandidates(replayedMainline, coachSide, extractMode, maxPositi
                 nags: entry.nags,
                 comments: entry.comments,
                 suggestedMove: entry.variationFirstMove,
-                severity: annotationSeverity(entry)
+                severity: annotationSeverity(entry),
+                game: null
             }
         };
 
@@ -2070,8 +2180,19 @@ function buildMarkdownReport(run) {
 
         lines.push(
             `- PGN source: \`${run.pgnSource.pgnFile}\` ` +
-            `(coach-side: ${run.pgnSource.coachSide}, extract: ${run.pgnSource.extractMode}, ` +
-            `replayed ${run.pgnSource.repliedPlyCount} ply/plies)`
+            `(coach-side: ${run.pgnSource.coachSide}, extract: ${run.pgnSource.extractMode})`
+        );
+
+        lines.push(
+            `- Games parsed: ${run.pgnSource.totalGames} ` +
+            `(${run.pgnSource.gamesReplayed} replayed, ${run.pgnSource.gamesWithErrors} with errors)`
+        );
+
+        lines.push(
+            `- Candidates extracted: ${run.pgnSource.totalCandidatesExtracted}` +
+            (run.pgnSource.totalCandidatesExtracted !== run.pgnSource.totalCandidatesAnalyzed
+                ? ` (capped to ${run.pgnSource.totalCandidatesAnalyzed} analyzed by --max-positions)`
+                : "")
         );
 
     }
@@ -2415,9 +2536,83 @@ function combinedPriorityScore(position) {
 
 }
 
+//----------------------------------
+// Renders one candidate's detail block (FEN, game move,
+// suggested move, NAG/comment, Coach/reference analysis,
+// themes, priority) at the given markdown heading depth.
+// Shared by both the "top overall" and "by game" sections so
+// the two views never drift apart.
+//----------------------------------
+
+function renderCandidateEntry(position, index, headingMarker) {
+
+    const pgn = position.pgn;
+    const lines = [];
+
+    lines.push(`${headingMarker} ${index + 1}. ${position.label}`);
+    lines.push("");
+    lines.push(`- FEN: \`${position.fen}\``);
+    lines.push(
+        `- Game move: ${pgn.gameMoveSan}${pgn.gameMoveGlyphs || ""}` +
+        (pgn.gameMoveUci ? ` (${pgn.gameMoveUci})` : "")
+    );
+    lines.push(
+        `- Suggested/variation move from PGN: ${pgn.suggestedMove || "none found"}`
+    );
+    lines.push(
+        `- NAG/comment: ${pgn.nags.join(" ") || "none"}` +
+        (pgn.comments.length > 0 ? ` — ${pgn.comments.join(" / ")}` : "")
+    );
+    lines.push(
+        `- Coach analysis: **${position.coach.bestMove ?? "none"}** ` +
+        `score ${formatScore(position.coach.score)}, ` +
+        `depth ${position.coach.depth ?? "n/a"}, ` +
+        `pv \`${formatPv(position.coach.pv)}\``
+    );
+
+    if (position.reference) {
+
+        lines.push(
+            `- Reference analysis: **${position.reference.bestMove ?? "none"}** ` +
+            `score ${formatScore(position.reference.score)}, ` +
+            `depth ${position.reference.depth ?? "n/a"}, ` +
+            `pv \`${formatPv(position.reference.pv)}\``
+        );
+
+    }
+    else {
+        lines.push("- Reference analysis: not run (no --stockfish/--ref provided)");
+    }
+
+    lines.push(`- Theme tag(s): ${position.themes.join(", ") || "unknown"}`);
+    lines.push(`- Priority: ${position.priority} (score ${combinedPriorityScore(position)})`);
+    lines.push("");
+
+    return lines;
+
+}
+
+//----------------------------------
+// candidate-regressions.md
+//
+// Structure:
+//   - File-level summary (games parsed/replayed/errored,
+//     total candidates).
+//   - "Top Candidates Overall": every successfully analyzed
+//     candidate across every game, ranked by
+//     combinedPriorityScore (same ranking as v1.1's flat
+//     list).
+//   - "By Game": every game in game order, each with its own
+//     header (Event/White/Black/Result/side analyzed/plies
+//     replayed) followed by that game's own candidates,
+//     ranked the same way within the game, or a short note if
+//     the game produced no candidates or failed to parse/
+//     replay.
+//----------------------------------
+
 function buildCandidateRegressionsMarkdown(run) {
 
-    const { positions } = run;
+    const { positions, pgnSource } = run;
 
     const withPgn = positions.filter(
         position => !position.error && position.pgn
@@ -2431,15 +2626,40 @@ function buildCandidateRegressionsMarkdown(run) {
 
     lines.push("# Candidate Regression FENs");
     lines.push("");
+    lines.push(`Source PGN: \`${pgnSource.pgnFile}\``);
+    lines.push("");
+    lines.push(`Total games parsed: ${pgnSource.totalGames}`);
+    lines.push(`Games successfully replayed: ${pgnSource.gamesReplayed}`);
+    lines.push(`Games with parse errors: ${pgnSource.gamesWithErrors}`);
+    lines.push(`Coach side setting: ${pgnSource.coachSide}`);
+    lines.push(`Extraction mode: ${pgnSource.extractMode}`);
     lines.push(
-        `Source PGN: \`${run.pgnSource.pgnFile}\` ` +
-        `(White: ${run.pgnSource.headers.White || "?"}, ` +
-        `Black: ${run.pgnSource.headers.Black || "?"})`
+        `Total candidates extracted: ${pgnSource.totalCandidatesExtracted}` +
+        (pgnSource.totalCandidatesExtracted !== pgnSource.totalCandidatesAnalyzed
+            ? ` (analyzed: ${pgnSource.totalCandidatesAnalyzed}, capped by --max-positions)`
+            : "")
     );
     lines.push("");
-    lines.push(`Coach side analyzed: ${run.pgnSource.coachSide}`);
-    lines.push(`Extraction mode: ${run.pgnSource.extractMode}`);
-    lines.push(`Positions extracted: ${positions.length}`);
+    lines.push("## Candidate Counts by Game");
+    lines.push("");
+    lines.push("| Game | Event | White | Black | Result | Candidates |");
+    lines.push("|------|-------|-------|-------|--------|------------|");
+
+    for (const game of pgnSource.games) {
+
+        lines.push(
+            `| ${game.gameIndex} ` +
+            `| ${game.event || "-"} ` +
+            `| ${game.white || "-"} ` +
+            `| ${game.black || "-"} ` +
+            `| ${game.result || "-"} ` +
+            `| ${game.parseError ? `error: ${game.parseError}` : game.candidateCount} |`
+        );
+
+    }
+
+    lines.push("");
+    lines.push("## Top Candidates Overall");
     lines.push("");
 
     if (ranked.length === 0) {
@@ -2448,47 +2668,55 @@ function buildCandidateRegressionsMarkdown(run) {
     }
 
     for (const [index, position] of ranked.entries()) {
+        lines.push(...renderCandidateEntry(position, index, "###"));
+    }
 
-        const pgn = position.pgn;
+    lines.push("## By Game");
+    lines.push("");
 
-        lines.push(`## ${index + 1}. ${position.label}`);
+    for (const game of pgnSource.games) {
+
+        lines.push(
+            `### Game ${game.gameIndex}: ${game.event || "(no Event header)"}`
+        );
         lines.push("");
-        lines.push(`- FEN: \`${position.fen}\``);
-        lines.push(
-            `- Game move: ${pgn.gameMoveSan}${pgn.gameMoveGlyphs || ""}` +
-            (pgn.gameMoveUci ? ` (${pgn.gameMoveUci})` : "")
-        );
-        lines.push(
-            `- Suggested/variation move from PGN: ${pgn.suggestedMove || "none found"}`
-        );
-        lines.push(
-            `- NAG/comment: ${pgn.nags.join(" ") || "none"}` +
-            (pgn.comments.length > 0 ? ` — ${pgn.comments.join(" / ")}` : "")
-        );
-        lines.push(
-            `- Coach analysis: **${position.coach.bestMove ?? "none"}** ` +
-            `score ${formatScore(position.coach.score)}, ` +
-            `depth ${position.coach.depth ?? "n/a"}, ` +
-            `pv \`${formatPv(position.coach.pv)}\``
-        );
+        lines.push(`- White: ${game.white || "?"}`);
+        lines.push(`- Black: ${game.black || "?"}`);
+        lines.push(`- Result: ${game.result || "?"}`);
 
-        if (position.reference) {
+        if (game.parseError) {
 
-            lines.push(
-                `- Reference analysis: **${position.reference.bestMove ?? "none"}** ` +
-                `score ${formatScore(position.reference.score)}, ` +
-                `depth ${position.reference.depth ?? "n/a"}, ` +
-                `pv \`${formatPv(position.reference.pv)}\``
-            );
+            lines.push(`- Status: skipped -- ${game.parseError}`);
+            lines.push("");
+            continue;
 
         }
-        else {
-            lines.push("- Reference analysis: not run (no --stockfish/--ref provided)");
+
+        lines.push(`- Coach side analyzed: ${game.coachSide}`);
+        lines.push(`- Plies replayed: ${game.repliedPlyCount}`);
+
+        if (game.replayError) {
+            lines.push(`- Replay note: stopped early -- ${game.replayError}`);
         }
 
-        lines.push(`- Theme tag(s): ${position.themes.join(", ") || "unknown"}`);
-        lines.push(`- Priority: ${position.priority} (score ${combinedPriorityScore(position)})`);
+        lines.push(`- Candidates extracted: ${game.candidateCount}`);
         lines.push("");
+
+        const gameCandidates = ranked.filter(
+            position => position.pgn.game && position.pgn.game.gameIndex === game.gameIndex
+        );
+
+        if (gameCandidates.length === 0) {
+
+            lines.push("No candidates were successfully analyzed for this game.");
+            lines.push("");
+            continue;
+
+        }
+
+        for (const [index, position] of gameCandidates.entries()) {
+            lines.push(...renderCandidateEntry(position, index, "####"));
+        }
 
     }
 
@@ -2606,80 +2834,201 @@ async function main() {
             return;
         }
 
-        const { headers, mainline, result } = parsePgn(pgnText);
+        const games = parseMultiGamePgn(pgnText);
 
-        if (mainline.length === 0) {
-            console.error(`Error: ${options.pgnFile}: no moves found in PGN movetext`);
+        if (games.length === 0) {
+            console.error(`Error: ${options.pgnFile}: no games found in PGN file`);
             process.exitCode = 1;
             return;
         }
 
-        const startingFen =
-            headers.SetUp === "1" && headers.FEN ? headers.FEN : null;
+        const allCandidates = [];
+        const gameSummaries = [];
 
-        const { replayed, replayError } =
-            replayPgnMainline(mainline, startingFen);
+        //----------------------------------
+        // Every game is parsed, replayed, and side-inferred
+        // independently. A problem with one game (parse
+        // failure, empty movetext, or a replay error on its
+        // very first move) is recorded against that game only
+        // and does not stop later games from being analyzed.
+        //----------------------------------
 
-        if (replayed.length === 0) {
+        for (const game of games) {
 
-            console.error(
-                `Error: ${options.pgnFile}: replay failed on the first move ` +
-                `(${replayError})`
+            const gameLabel = `game ${game.gameIndex}`;
+
+            const gameMeta = {
+                gameIndex: game.gameIndex,
+                event: game.headers.Event || null,
+                site: game.headers.Site || null,
+                date: game.headers.Date || null,
+                round: game.headers.Round || null,
+                white: game.headers.White || null,
+                black: game.headers.Black || null,
+                result: game.headers.Result || game.result || null,
+                eco: game.headers.ECO || null
+            };
+
+            if (game.parseError) {
+
+                console.log(`Warning: ${gameLabel}: parse error -- ${game.parseError}. Skipping.`);
+
+                gameSummaries.push({
+                    ...gameMeta,
+                    parseError: game.parseError,
+                    replayError: null,
+                    repliedPlyCount: 0,
+                    coachSide: null,
+                    coachSideMessage: null,
+                    candidateCount: 0
+                });
+
+                continue;
+
+            }
+
+            if (game.mainline.length === 0) {
+
+                console.log(`Warning: ${gameLabel}: no moves found in PGN movetext. Skipping.`);
+
+                gameSummaries.push({
+                    ...gameMeta,
+                    parseError: "no moves found in PGN movetext",
+                    replayError: null,
+                    repliedPlyCount: 0,
+                    coachSide: null,
+                    coachSideMessage: null,
+                    candidateCount: 0
+                });
+
+                continue;
+
+            }
+
+            const startingFen =
+                game.headers.SetUp === "1" && game.headers.FEN ? game.headers.FEN : null;
+
+            const { replayed, replayError } =
+                replayPgnMainline(game.mainline, startingFen);
+
+            if (replayed.length === 0) {
+
+                console.log(
+                    `Warning: ${gameLabel}: replay failed on the first move ` +
+                    `(${replayError}). Skipping.`
+                );
+
+                gameSummaries.push({
+                    ...gameMeta,
+                    parseError: null,
+                    replayError,
+                    repliedPlyCount: 0,
+                    coachSide: null,
+                    coachSideMessage: null,
+                    candidateCount: 0
+                });
+
+                continue;
+
+            }
+
+            if (replayError) {
+
+                console.log(
+                    `Warning: ${gameLabel}: stopped replay early -- ${replayError}. ` +
+                    `Continuing with the ${replayed.length} ply/plies replayed successfully.`
+                );
+
+            }
+
+            const { side: resolvedCoachSide, message: coachSideMessage } =
+                inferCoachSide(game.headers, options.coachSide);
+
+            if (coachSideMessage) {
+                console.log(`${gameLabel}: ${coachSideMessage}`);
+            }
+
+            //----------------------------------
+            // Per-game candidate selection is never capped
+            // here -- --max-positions applies once, across the
+            // whole file, after every game has contributed its
+            // candidates in game order.
+            //----------------------------------
+
+            const gameCandidates = selectPgnCandidates(
+                replayed,
+                resolvedCoachSide,
+                options.extractMode,
+                null,
+                `game${game.gameIndex}-`
             );
-            process.exitCode = 1;
-            return;
+
+            for (const candidate of gameCandidates) {
+                candidate.pgn.game = gameMeta;
+            }
+
+            allCandidates.push(...gameCandidates);
+
+            gameSummaries.push({
+                ...gameMeta,
+                parseError: null,
+                replayError,
+                repliedPlyCount: replayed.length,
+                coachSide: resolvedCoachSide,
+                coachSideMessage,
+                candidateCount: gameCandidates.length
+            });
 
         }
 
-        if (replayError) {
+        const totalCandidatesExtracted = allCandidates.length;
 
-            console.log(
-                `Warning: ${options.pgnFile}: stopped replay early -- ${replayError}. ` +
-                `Continuing with the ${replayed.length} ply/plies replayed successfully.`
-            );
-
-        }
-
-        const { side: resolvedCoachSide, message: coachSideMessage } =
-            inferCoachSide(headers, options.coachSide);
-
-        if (coachSideMessage) {
-            console.log(coachSideMessage);
-        }
-
-        positionsInput = selectPgnCandidates(
-            replayed,
-            resolvedCoachSide,
-            options.extractMode,
-            options.maxPositions
-        );
+        positionsInput =
+            options.maxPositions !== null
+                ? allCandidates.slice(0, options.maxPositions)
+                : allCandidates;
 
         if (positionsInput.length === 0) {
 
             console.error(
                 `Error: ${options.pgnFile}: no candidate positions matched ` +
-                `--coach-side ${resolvedCoachSide} --extract ${options.extractMode} ` +
-                `(replayed ${replayed.length} ply/plies)`
+                `--coach-side ${options.coachSide} --extract ${options.extractMode} ` +
+                `across ${games.length} game(s)`
             );
             process.exitCode = 1;
             return;
 
         }
 
+        const gamesReplayed =
+            gameSummaries.filter(summary => summary.repliedPlyCount > 0).length;
+
+        const gamesWithErrors =
+            gameSummaries.filter(summary =>
+                summary.parseError !== null ||
+                (summary.replayError !== null && summary.repliedPlyCount === 0)
+            ).length;
+
         pgnSource = {
             pgnFile: options.pgnFile,
-            headers,
-            result,
-            coachSide: resolvedCoachSide,
+            coachSide: options.coachSide,
             extractMode: options.extractMode,
-            repliedPlyCount: replayed.length,
-            replayError
+            totalGames: games.length,
+            gamesReplayed,
+            gamesWithErrors,
+            totalCandidatesExtracted,
+            totalCandidatesAnalyzed: positionsInput.length,
+            games: gameSummaries
         };
 
         console.log(
-            `Replayed ${replayed.length} ply/plies from ${options.pgnFile}; ` +
-            `extracted ${positionsInput.length} candidate position(s) ` +
-            `(side=${resolvedCoachSide}, mode=${options.extractMode}).`
+            `Parsed ${games.length} game(s) from ${options.pgnFile}; ` +
+            `${gamesReplayed} replayed successfully, ${gamesWithErrors} with errors; ` +
+            `extracted ${totalCandidatesExtracted} candidate position(s)` +
+            (options.maxPositions !== null && totalCandidatesExtracted > positionsInput.length
+                ? `, capped to ${positionsInput.length} by --max-positions`
+                : "") +
+            "."
         );
 
     }
@@ -2710,7 +3059,7 @@ async function main() {
             ? `go depth ${options.depth}`
             : `go movetime ${options.movetimeMs}`;
 
-    console.log(`Coach Analysis Lab v1.1`);
+    console.log(`Coach Analysis Lab v1.2`);
     console.log(`Positions: ${positionsToRun.length}  |  ${goCommand}  |  reference: ${options.referenceCommand ? "yes" : "no (Coach-only)"}`);
 
     //----------------------------------
@@ -2868,7 +3217,7 @@ async function main() {
 
     const run = {
         tool: "coach-analysis-lab",
-        version: pgnSource ? "1.1" : 1,
+        version: pgnSource ? "1.2" : 1,
         startedAt: startedAt.toISOString(),
         finishedAt: new Date().toISOString(),
         coachEngineName: coachClient.idName,
