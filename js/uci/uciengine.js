@@ -498,6 +498,61 @@ function parseSetOption(tokens) {
 
 }
 
+//----------------------------------
+// UCI score formatting.
+//
+// search.js encodes forced mates as a root-relative
+// centipawn-shaped value: the side being mated returns
+// "-MATE + ply", and negamax's repeated negation on the way
+// back to the root turns a winning mate line into
+// "MATE - ply" automatically -- no separate "delivering
+// mate" code path is needed. Here "ply" is the number of
+// plies from the root to the terminal (no legal moves, in
+// check) node, since search.js increments ply by exactly 1
+// on every recursive call starting from ply = 0 at the root.
+//
+// Previously this score was always sent to the GUI as a raw
+// "score cp" value, even when it was mate-class (e.g. 99994
+// for a mate found 6 plies deep). Some GUIs -- Arena
+// included -- apply their own heuristics to abnormally large
+// cp scores and can render nonsense like "mate in 500" as a
+// result. The UCI protocol has a dedicated field for this
+// ("score mate N", N = full moves to mate, negative if the
+// engine is losing) that every compliant GUI already knows
+// how to display correctly, so genuine mate scores should
+// always be sent that way instead of guessed at downstream.
+//
+// Ply-to-move conversion: UCI wants moves, not plies. If the
+// side to move at the root can deliver mate, the mating move
+// itself is always the odd ply (1, 3, 5, ...), so the move
+// count is ceil(plies / 2) -- e.g. plies = 1 -> mate in 1,
+// plies = 3 -> mate in 2. The same formula applies when the
+// root side is the one getting mated (plies = 2 -> mated in
+// 1, plies = 4 -> mated in 2); only the sign differs. This
+// avoids an off-by-one because it is derived directly from
+// "how many of that side's own moves are still needed",
+// not from halving the ply count.
+//----------------------------------
+
+function formatUciScore(scoreCp) {
+
+    if (Math.abs(scoreCp) < SearchConstants.MATE_THRESHOLD) {
+        return ["cp", scoreCp];
+    }
+
+    const pliesToMate =
+        SearchConstants.MATE - Math.abs(scoreCp);
+
+    const movesToMate =
+        Math.ceil(pliesToMate / 2);
+
+    return [
+        "mate",
+        scoreCp > 0 ? movesToMate : -movesToMate
+    ];
+
+}
+
 export class UciSession {
 
     constructor() {
@@ -1121,7 +1176,7 @@ export class UciSession {
             [
                 "info",
                 "depth", result.depth,
-                "score", "cp", sideRelativeScore,
+                "score", ...formatUciScore(sideRelativeScore),
                 "nodes", result.nodes
             ];
 
@@ -1139,5 +1194,6 @@ export class UciSession {
 }
 
 export {
-    withMutedConsole
+    withMutedConsole,
+    formatUciScore
 };

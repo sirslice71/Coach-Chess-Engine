@@ -1059,3 +1059,84 @@ test("register and ponderhit do not crash", () => {
     );
 
 });
+
+//----------------------------------
+// Mate-score UCI reporting (formatUciScore in
+// js/uci/uciengine.js): forced mates must be sent as
+// "score mate N" (N = full moves, signed), never as a raw
+// mate-class centipawn value, and ordinary positions must
+// still report plain "score cp N".
+//----------------------------------
+
+test("forced mate for the side to move reports positive score mate N", () => {
+
+    const session =
+        new UciSession();
+
+    // Bare black king cornered on h8; White king g6 covers
+    // g7/h7, White rook a1 delivers Ra8# next move.
+    session.handleCommand(
+        "position fen 7k/8/6K1/8/8/8/8/R7 w - - 0 1"
+    );
+
+    const lines =
+        session.handleCommand("go depth 4");
+
+    const infoLine =
+        lines.find(line => line.startsWith("info "));
+
+    assert.ok(infoLine, "expected an info line");
+    assert.match(infoLine, /score mate 1(?=\s|$)/);
+    assert.doesNotMatch(infoLine, /score cp(?=\s|$)/);
+
+    assert.equal(lines[lines.length - 1], "bestmove a1a8");
+
+});
+
+test("forced mate against the side to move reports negative score mate N", () => {
+
+    const session =
+        new UciSession();
+
+    // Same corner-mate net, but Black to move: Black's only
+    // legal move is ...Kg8, after which Ra8# is forced --
+    // mate in 1 for White is "mated in 1" from Black's (the
+    // side-to-move-at-the-root) point of view.
+    session.handleCommand(
+        "position fen 7k/8/6K1/8/8/8/8/R7 b - - 0 1"
+    );
+
+    const lines =
+        session.handleCommand("go depth 4");
+
+    const infoLine =
+        lines.find(line => line.startsWith("info "));
+
+    assert.ok(infoLine, "expected an info line");
+    assert.match(infoLine, /score mate -1(?=\s|$)/);
+    assert.doesNotMatch(infoLine, /score cp(?=\s|$)/);
+
+    assert.equal(lines[lines.length - 1], "bestmove h8g8");
+
+});
+
+test("a normal winning position still reports score cp N, not mate", () => {
+
+    const session =
+        new UciSession();
+
+    session.handleCommand(
+        "position startpos moves e2e4 e7e5"
+    );
+
+    const lines =
+        session.handleCommand("go depth 5");
+
+    const infoLine =
+        lines.find(line => line.startsWith("info "));
+
+    assert.ok(infoLine, "expected an info line");
+    assert.match(infoLine, /score cp -?\d+(?=\s|$)/);
+    assert.doesNotMatch(infoLine, /score mate(?=\s|$)/);
+
+});
