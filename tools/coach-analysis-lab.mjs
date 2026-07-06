@@ -543,12 +543,34 @@ function pickFinalInfo(infos) {
 //----------------------------------
 // Score normalization
 //
-// Both engines report side-to-move-relative scores for the
-// same position, so they are directly comparable once
-// "score mate N" is mapped into the same numeric range
-// Coach already uses for mates (+/- ~100000). isMate is
-// tracked so mate-class scores are excluded from centipawn
-// averaging and flagged separately.
+// Both Coach and the reference engine report scores that are
+// side-to-move-relative -- the standard UCI convention: a
+// positive "score cp"/"score mate" always means "good for
+// whoever's turn it is right now" in the position that was
+// analyzed. Since both engines are always given the exact same
+// FEN (see the analyzeWithRestart() calls below), their raw
+// scores share that one frame. normalizeScore() below only
+// maps "score mate N" into the same numeric range Coach uses
+// internally for mates (+/- ~100000) so both kinds of score
+// can be handled uniformly; it does NOT change whose
+// perspective the number is relative to.
+//
+// Side-to-move-relative numbers are easy to misread once two
+// engines' outputs sit side by side -- e.g. a genuinely
+// consistent pair of scores can look like an "impossible"
+// contradiction to a human reader if they forget which side is
+// on move. To make comparison, ranking, and the report itself
+// unambiguous, every score is converted to a second, FIXED
+// frame -- White-relative centipawns -- before any diffing,
+// mate-agreement check, or severity/priority math happens (see
+// toWhiteRelativeCp()/compareResults() below). White-relative
+// is simple to sanity-check: positive always means White is
+// doing better, full stop, regardless of who is to move. Raw,
+// as-reported side-to-move-relative scores are still preserved
+// and shown in every report via formatScore() / formatScoreWithContext()
+// -- normalization only affects what's used for comparison and
+// what's added alongside the raw score for clarity, never what
+// was actually reported.
 //----------------------------------
 
 function normalizeScore(info) {
@@ -580,6 +602,86 @@ function normalizeScore(info) {
     }
 
     return null;
+
+}
+
+//----------------------------------
+// Side-to-move-relative -> White-relative.
+//
+// sideToMoveChar is the FEN's own "w"/"b" field for the
+// position being analyzed -- both engines were handed that
+// exact FEN, so this one flip is valid for both of their
+// scores. White-relative: positive = good for White, negative
+// = good for Black, independent of who was actually on move.
+//----------------------------------
+
+function toWhiteRelativeCp(sideRelativeCp, sideToMoveChar) {
+
+    return sideToMoveChar === "b" ? -sideRelativeCp : sideRelativeCp;
+
+}
+
+//----------------------------------
+// Which absolute side a White-relative cp value favors.
+// "none" only for an exact 0 (a true dead-equal score); this
+// is deliberately exact equality, not a tolerance band, since
+// it is only used to decide mate-side agreement, not to grade
+// closeness.
+//----------------------------------
+
+function favoredSide(whiteRelativeCp) {
+
+    if (whiteRelativeCp > 0) {
+        return "white";
+    }
+
+    if (whiteRelativeCp < 0) {
+        return "black";
+    }
+
+    return "none";
+
+}
+
+//----------------------------------
+// Human-readable, side-independent description of a score,
+// e.g. "Black mates in 4" or "White +3.10". Used alongside the
+// raw formatScore() output in reports so a reader never has to
+// do the side-to-move sign flip themselves to see who a score
+// actually favors.
+//----------------------------------
+
+function describeFavoredSide(score, sideToMoveChar) {
+
+    if (!score) {
+        return "n/a";
+    }
+
+    const whiteCp = toWhiteRelativeCp(score.cp, sideToMoveChar);
+
+    if (score.isMate) {
+
+        const mateMoves = Math.abs(
+            score.mateIn !== null
+                ? score.mateIn
+                : MATE_CP_BASE - Math.abs(score.cp)
+        );
+
+        return whiteCp >= 0
+            ? `White mates in ${mateMoves}`
+            : `Black mates in ${mateMoves}`;
+
+    }
+
+    if (whiteCp === 0) {
+        return "equal";
+    }
+
+    const pawns = Math.abs(whiteCp / 100).toFixed(2);
+
+    return whiteCp > 0
+        ? `White +${pawns}`
+        : `Black +${pawns}`;
 
 }
 
@@ -2111,13 +2213,36 @@ function themeTags(features, comparison, coachResult, referenceResult) {
 }
 
 //----------------------------------
-// Coach vs reference comparison. Scores are side-to-move
-// relative for the same position, so a positive evalDiffCp
-// means Coach is more optimistic about the side to move
-// than the reference engine is.
+// Coach vs reference comparison.
+//
+// evalDiffCp is still computed directly from the raw,
+// side-to-move-relative cp values (a positive evalDiffCp means
+// Coach is more optimistic about the side to move than the
+// reference engine is) -- that subtraction is valid without
+// normalization because both engines were scored on the exact
+// same position, so they share the same side-to-move frame,
+// and normalizing both operands by the same fixed White-
+// relative flip would not change their difference.
+//
+// mateDisagreement is where normalization actually matters. It
+// is computed in the White-relative frame (see
+// toWhiteRelativeCp()/favoredSide() above) specifically so that
+// an isMate mismatch alone is never enough to flag a
+// disagreement: Coach reporting "mate 6" and the reference
+// reporting "cp 850" for the SAME favored side agree completely
+// about who is winning, just not about whether a forced mate
+// has been found yet. Only a genuine disagreement about which
+// side is actually favored -- both mate-class but for opposite
+// sides, or one mate-class while the other's normalized score
+// favors the opposite side -- is flagged. Concretely, this
+// means: same best move + same favored side after
+// normalization never gets a mate-disagreement severity bump
+// (requirement 5), while a true opposite-side disagreement
+// still does, however the two raw scores happened to be
+// signed.
 //----------------------------------
 
-function compareResults(coachResult, referenceResult) {
+function compareResults(coachResult, referenceResult, sideToMoveChar) {
 
     if (!referenceResult || referenceResult.error) {
         return null;
@@ -2132,6 +2257,16 @@ function compareResults(coachResult, referenceResult) {
     const evalDiffCp =
         bothScored ? coachScore.cp - referenceScore.cp : null;
 
+    const coachWhiteCp =
+        bothScored
+            ? toWhiteRelativeCp(coachScore.cp, sideToMoveChar)
+            : null;
+
+    const referenceWhiteCp =
+        bothScored
+            ? toWhiteRelativeCp(referenceScore.cp, sideToMoveChar)
+            : null;
+
     const bestMoveAgree =
         coachResult.bestMove !== null &&
         referenceResult.bestMove !== null
@@ -2144,12 +2279,18 @@ function compareResults(coachResult, referenceResult) {
             ? coachResult.pv[0] === referenceResult.pv[0]
             : null;
 
+    const coachFavors =
+        bothScored ? favoredSide(coachWhiteCp) : null;
+
+    const referenceFavors =
+        bothScored ? favoredSide(referenceWhiteCp) : null;
+
     const mateDisagreement =
         bothScored &&
-        (coachScore.isMate !== referenceScore.isMate ||
-            (coachScore.isMate &&
-                referenceScore.isMate &&
-                Math.sign(coachScore.cp) !== Math.sign(referenceScore.cp)));
+        (coachScore.isMate || referenceScore.isMate) &&
+        coachFavors !== "none" &&
+        referenceFavors !== "none" &&
+        coachFavors !== referenceFavors;
 
     let coachAssessment = "unknown";
 
@@ -2170,7 +2311,10 @@ function compareResults(coachResult, referenceResult) {
     //----------------------------------
     // Severity drives ranking in the report. Eval
     // difference dominates; a different best move and any
-    // mate-level disagreement add fixed penalties.
+    // genuine (normalized) mate-level disagreement add fixed
+    // penalties. Same-move, same-favored-side cases never
+    // reach the mateDisagreement branch, so they never get
+    // this bump -- requirement 5.
     //----------------------------------
 
     let severity =
@@ -2192,7 +2336,9 @@ function compareResults(coachResult, referenceResult) {
         evalDiffCp,
         mateDisagreement,
         coachAssessment,
-        severity
+        severity,
+        coachWhiteCp,
+        referenceWhiteCp
     };
 
 }
@@ -2285,6 +2431,26 @@ function formatScore(score) {
     }
 
     return `${score.cp}cp`;
+
+}
+
+//----------------------------------
+// Raw score (exactly as reported, side-to-move-relative) plus
+// the normalized, side-independent description in brackets --
+// e.g. "mate -4 (Black mates in 4)" or "928cp (White +9.28)".
+// Used everywhere the report shows a score so raw and
+// normalized are always visible together; comparison/ranking
+// itself uses compareResults()'s normalized fields, not this
+// string.
+//----------------------------------
+
+function formatScoreWithContext(score, sideToMoveChar) {
+
+    if (!score) {
+        return "n/a";
+    }
+
+    return `${formatScore(score)} (${describeFavoredSide(score, sideToMoveChar)})`;
 
 }
 
@@ -2440,7 +2606,7 @@ function buildMarkdownReport(run) {
         lines.push(`- Side to move: ${position.sideToMove === "w" ? "White" : "Black"}`);
         lines.push(
             `- Coach: **${position.coach.bestMove ?? "none"}** ` +
-            `score ${formatScore(position.coach.score)}, ` +
+            `score ${formatScoreWithContext(position.coach.score, position.sideToMove)}, ` +
             `depth ${position.coach.depth ?? "n/a"}, ` +
             `nodes ${position.coach.nodes ?? "n/a"}, ` +
             `time ${position.coach.wallTimeMs}ms, ` +
@@ -2451,7 +2617,7 @@ function buildMarkdownReport(run) {
 
             lines.push(
                 `- Reference: **${position.reference.bestMove ?? "none"}** ` +
-                `score ${formatScore(position.reference.score)}, ` +
+                `score ${formatScoreWithContext(position.reference.score, position.sideToMove)}, ` +
                 `depth ${position.reference.depth ?? "n/a"}, ` +
                 `nodes ${position.reference.nodes ?? "n/a"}, ` +
                 `time ${position.reference.wallTimeMs}ms, ` +
@@ -2516,10 +2682,10 @@ function buildMarkdownReport(run) {
                 `| ${position.label} ` +
                 `| ${position.sideToMove} ` +
                 `| ${position.coach.bestMove ?? "-"} ` +
-                `| ${formatScore(position.coach.score)} ` +
+                `| ${formatScoreWithContext(position.coach.score, position.sideToMove)} ` +
                 `| ${position.coach.depth ?? "-"} ` +
                 `| ${position.reference ? position.reference.bestMove ?? "-" : "-"} ` +
-                `| ${position.reference ? formatScore(position.reference.score) : "-"} ` +
+                `| ${position.reference ? formatScoreWithContext(position.reference.score, position.sideToMove) : "-"} ` +
                 `| ${position.comparison && position.comparison.evalDiffCp !== null ? position.comparison.evalDiffCp : "-"} ` +
                 `| ${position.comparison && position.comparison.bestMoveAgree !== null ? (position.comparison.bestMoveAgree ? "yes" : "NO") : "-"} ` +
                 `| ${position.themes.join(", ")} ` +
@@ -2534,7 +2700,7 @@ function buildMarkdownReport(run) {
                 `| ${position.label} ` +
                 `| ${position.sideToMove} ` +
                 `| ${position.coach.bestMove ?? "-"} ` +
-                `| ${formatScore(position.coach.score)} ` +
+                `| ${formatScoreWithContext(position.coach.score, position.sideToMove)} ` +
                 `| ${position.coach.depth ?? "-"} ` +
                 `| ${position.coach.nodes ?? "-"} ` +
                 `| ${position.coach.wallTimeMs} ` +
@@ -2550,8 +2716,15 @@ function buildMarkdownReport(run) {
     lines.push("");
     lines.push(
         "Generated by tools/coach-analysis-lab.mjs (diagnostic only; " +
-        "no engine behavior was changed). Scores are side-to-move relative " +
-        "centipawns; mate-class scores use Coach's +/-100000 convention."
+        "no engine behavior was changed). Raw scores are side-to-move " +
+        "relative centipawns (standard UCI convention); mate-class scores " +
+        "use Coach's +/-100000 convention. Every score shown is followed " +
+        "by a normalized, side-independent description in parentheses " +
+        "(e.g. \"White mates in 4\") -- comparison, mate-agreement, and " +
+        "severity/priority all use that normalized (White-relative) frame " +
+        "internally, so same-move/same-favored-side cases are never " +
+        "reported as a mate disagreement even if the two engines' raw " +
+        "mate signs differ only because of whose move it was."
     );
     lines.push("");
 
@@ -2740,7 +2913,7 @@ function renderCandidateEntry(position, index, headingMarker) {
     );
     lines.push(
         `- Coach analysis: **${position.coach.bestMove ?? "none"}** ` +
-        `score ${formatScore(position.coach.score)}, ` +
+        `score ${formatScoreWithContext(position.coach.score, position.sideToMove)}, ` +
         `depth ${position.coach.depth ?? "n/a"}, ` +
         `pv \`${formatPv(position.coach.pv)}\``
     );
@@ -2749,7 +2922,7 @@ function renderCandidateEntry(position, index, headingMarker) {
 
         lines.push(
             `- Reference analysis: **${position.reference.bestMove ?? "none"}** ` +
-            `score ${formatScore(position.reference.score)}, ` +
+            `score ${formatScoreWithContext(position.reference.score, position.sideToMove)}, ` +
             `depth ${position.reference.depth ?? "n/a"}, ` +
             `pv \`${formatPv(position.reference.pv)}\``
         );
@@ -3515,7 +3688,7 @@ async function main() {
             const features = fenFeatures(entry.fen);
 
             const comparison =
-                compareResults(coachResult, referenceResult);
+                compareResults(coachResult, referenceResult, features.sideToMove);
 
             const baseThemes =
                 themeTags(features, comparison, coachResult, referenceResult);
