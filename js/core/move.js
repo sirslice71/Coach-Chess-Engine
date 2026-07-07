@@ -4,6 +4,26 @@
 
 import { algebraic } from "./square.js";
 
+//----------------------------------
+// Debug-only promotion suffix (Q/R/B/N), keyed by the absolute
+// piece value shared by both colors (see piece.js's Piece
+// constants). Used only by debug() below -- toString() itself
+// is left unchanged since it's relied on elsewhere (test helper
+// findMove()s, board.js's history logging, UCI move formatting)
+// for exact "from-to" string matching, including cases that
+// intentionally disambiguate promotion choices via
+// promotedPiece rather than the string itself (see
+// tests/material.test.mjs's "promotion updates material and
+// undo restores it" test).
+//----------------------------------
+
+const DEBUG_PROMOTION_LETTERS = {
+    2: "N",
+    3: "B",
+    4: "R",
+    5: "Q"
+};
+
 export const MoveFlags = {
 
     NONE: 0,
@@ -96,13 +116,28 @@ export default class Move {
 
     debug() {
 
+        //----------------------------------
+        // Debug-only: append the promotion choice (=Q/=R/=B/=N)
+        // so the four promotion moves from the same from/to
+        // squares are distinguishable in logs/debug output.
+        // toString() itself is unchanged -- see the comment on
+        // DEBUG_PROMOTION_LETTERS above.
+        //----------------------------------
+
+        const promotionSuffix =
+            this.isPromotion()
+                ? `=${DEBUG_PROMOTION_LETTERS[Math.abs(this.promotedPiece)] || "?"}`
+                : "";
+
         return {
 
             from: this.fromSquare,
 
             to: this.toSquare,
 
-            notation: this.toString()
+            notation: this.toString() + promotionSuffix,
+
+            promotedPiece: this.promotedPiece
 
         };
 
