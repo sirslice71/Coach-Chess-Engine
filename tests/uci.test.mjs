@@ -148,18 +148,23 @@ test("UCI session loads explicit FEN positions", () => {
 
 //----------------------------------
 // fullMoveNumber tracking for clock-based time management
-// (UciSession.currentFullMoveNumber): board.makeMove() never
-// increments board.fullMoveNumber -- it only saves the old value
-// for undo history. A real UCI GUI resends the entire move list
-// on every "position" command, so relying on board.fullMoveNumber
-// directly would leave every fullMoveNumber-gated rule in
+// (UciSession.currentFullMoveNumber): at the time this was
+// written, board.makeMove() never incremented board.fullMoveNumber
+// -- it only saved the old value for undo history -- which is why
+// UciSession tracks the real fullmove number independently instead
+// of relying on board.fullMoveNumber directly. That gap in
+// board.makeMove() has since been fixed (board.js now advances
+// fullMoveNumber correctly during play), but this UCI-layer
+// tracking is left in place unchanged, since reassessing/removing
+// it is a time-management-adjacent change out of scope here. The
+// original motivation: a real UCI GUI resends the entire move list
+// on every "position" command, and relying on board.fullMoveNumber
+// directly risked every fullMoveNumber-gated rule in
 // complexityMultiplier() (the opening throttle, the late-opening/
-// middlegame reinvestment window) permanently believing every
-// move of the game is still move 1. This is exactly the pattern
-// in the Arena evidence motivating this recalibration: Coach's
-// time surplus over Old Coach only ever grew, never got
-// reinvested. UciSession tracks the real fullmove number
-// independently instead.
+// middlegame reinvestment window) permanently believing every move
+// of the game is still move 1 -- exactly the pattern in the Arena
+// evidence motivating this recalibration: Coach's time surplus
+// over Old Coach only ever grew, never got reinvested.
 //----------------------------------
 
 test("fullMoveNumber advances correctly after replaying moves from startpos", () => {
