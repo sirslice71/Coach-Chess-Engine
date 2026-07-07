@@ -167,7 +167,7 @@ test("attachZobrist generates a consistent hash for the current board", () => {
     assert.equal(zobrist.verify(board), true);
     assert.deepEqual(
         board.repetitionTable,
-        [board.repetitionKey()]
+        [board.hashKey]
     );
 
 });
