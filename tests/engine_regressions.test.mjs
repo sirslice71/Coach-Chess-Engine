@@ -758,3 +758,84 @@ test("search timeout during an LMR-active search leaves the board clean", () => 
     assertBoardSnapshot(board, before);
 
 });
+
+//----------------------------------
+// Lone-King Mop-Up regression tests
+//
+// evaluateLoneKingMopUp() (js/engine/evaluation.js,
+// Eval.MOPUP_* constants) must reward confining a bare king
+// and closing the king distance in KX vs K, and must be
+// exactly zero the moment the weaker side has any material.
+//----------------------------------
+
+test("lone-king mop-up rewards edge confinement and king proximity in KQ vs K", () => {
+
+    //----------------------------------
+    // Same material, both White to move, bare White king.
+    // Cornered king + close attacking king must evaluate
+    // clearly better for Black (more negative white-relative)
+    // than a centralized king with a distant attacker.
+    //----------------------------------
+
+    const cornered =
+        createEngine("7q/8/8/8/8/2k5/8/1K6 w - - 0 1");
+
+    const central =
+        createEngine("q7/k7/8/8/4K3/8/8/8 w - - 0 1");
+
+    const corneredEval =
+        withMutedConsole(() => cornered.evaluation.evaluate());
+
+    const centralEval =
+        withMutedConsole(() => central.evaluation.evaluate());
+
+    assert.ok(
+        corneredEval.king.mopUp < 0,
+        `mop-up should favor Black against the bare White king, got ${corneredEval.king.mopUp}`
+    );
+
+    assert.ok(
+        corneredEval.king.mopUp < centralEval.king.mopUp,
+        `cornered+close (${corneredEval.king.mopUp}) should out-score central+far (${centralEval.king.mopUp}) for Black`
+    );
+
+});
+
+test("lone-king mop-up is inactive when the weaker side has any material", () => {
+
+    //----------------------------------
+    // Same shape as above but the White king now owns a pawn:
+    // no side is a bare king, so the term must be exactly 0.
+    //----------------------------------
+
+    const withPawn =
+        createEngine("7q/8/8/8/8/2k5/P7/1K6 w - - 0 1");
+
+    const evalScore =
+        withMutedConsole(() => withPawn.evaluation.evaluate());
+
+    assert.equal(
+        evalScore.king.mopUp,
+        0,
+        "mop-up must be zero when the weaker side is not a bare king"
+    );
+
+    //----------------------------------
+    // K+P vs bare K (no rook or queen on the strong side)
+    // must also stay 0: mating material is not guaranteed and
+    // pawn-race logic owns those positions.
+    //----------------------------------
+
+    const kpk =
+        createEngine("8/8/4k3/8/4P3/4K3/8/8 w - - 0 1");
+
+    const kpkEval =
+        withMutedConsole(() => kpk.evaluation.evaluate());
+
+    assert.equal(
+        kpkEval.king.mopUp,
+        0,
+        "mop-up must be zero in K+P vs K"
+    );
+
+});

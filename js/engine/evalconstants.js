@@ -138,6 +138,40 @@ export const Eval = Object.freeze({
 
     LONE_RUNNER_MIN_ADVANCEMENT: 6,
 
-    LONE_RUNNER_PHASE_MAX: 10
+    LONE_RUNNER_PHASE_MAX: 10,
+
+    //----------------------------------
+    // Lone-King Mop-Up (KX vs K conversion)
+    //
+    // Applies ONLY when one side has a completely bare king
+    // (no pawns, no pieces) and the other side has at least a
+    // rook or a queen (guaranteed mating material). In that
+    // situation the winning side's remaining task is purely a
+    // mating net: drive the bare king toward the edge/corner
+    // and bring the attacking king up. Without this term the
+    // evaluation is essentially material +/- PST there, the
+    // king-safety term is switched off at low game phase, and
+    // the bare king even collects the KingEndGameTable
+    // centralization bonus -- so nothing tells the search that
+    // confining the king and closing the king distance is
+    // progress, and pawn-push bonuses win every move choice
+    // (diagnosed on 8/8/8/p4q2/2K5/8/k7/8 b and the other
+    // K+Q vs K conversion FENs from game 1).
+    //
+    // Classic two-factor mop-up shape:
+    //   EDGE  * centerManhattanDistance2(bareKing)   (2..14)
+    //   CLOSE * (14 - kingManhattanDistance)         (0..12)
+    //
+    // centerManhattanDistance2 is doubled (integer) center
+    // distance. Maximum contribution with the values below is
+    // 14*4 + 12*8 = 152cp: decisive between quiet moves, small
+    // against material. Inactive the moment the weaker side
+    // has any pawn or piece, so it cannot distort ordinary
+    // endgames (including all K+P races) or middlegames.
+    //----------------------------------
+
+    MOPUP_EDGE: 4,
+
+    MOPUP_CLOSE: 8
 
 });

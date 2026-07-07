@@ -247,13 +247,18 @@ export default class Evaluation {
         score.king.safety =
             this.evaluateKingSafety();
 
+        score.king.mopUp =
+            this.evaluateLoneKingMopUp();
+
         score.king.total =
 
             score.king.castled +
 
             score.king.pawnShield +
 
-            score.king.safety;
+            score.king.safety +
+
+            score.king.mopUp;
 
         //----------------------------------
         // Pawns
@@ -1846,6 +1851,98 @@ export default class Evaluation {
     //----------------------------------
     // Game Phase
     //----------------------------------
+
+    //----------------------------------
+    // Lone-King Mop-Up
+    //
+    // See Eval.MOPUP_* in evalconstants.js for the full
+    // rationale. White-relative like every other term: positive
+    // favors White. Detection is piece-list based and cheap;
+    // the term is exactly zero unless one side is a bare king
+    // and the other has a rook or queen.
+    //----------------------------------
+
+    evaluateLoneKingMopUp() {
+
+        const white = this.board.whitePieces;
+        const black = this.board.blackPieces;
+
+        const whiteBare =
+            white.pawns.length === 0 &&
+            white.knights.length === 0 &&
+            white.bishops.length === 0 &&
+            white.rooks.length === 0 &&
+            white.queens.length === 0;
+
+        const blackBare =
+            black.pawns.length === 0 &&
+            black.knights.length === 0 &&
+            black.bishops.length === 0 &&
+            black.rooks.length === 0 &&
+            black.queens.length === 0;
+
+        if (whiteBare === blackBare) {
+
+            //----------------------------------
+            // Both bare (K vs K) or neither bare:
+            // the term does not apply.
+            //----------------------------------
+
+            return 0;
+
+        }
+
+        const winnerHasMatingMaterial =
+            whiteBare
+                ? black.rooks.length > 0 || black.queens.length > 0
+                : white.rooks.length > 0 || white.queens.length > 0;
+
+        if (!winnerHasMatingMaterial) {
+            return 0;
+        }
+
+        const bareKing =
+            whiteBare
+                ? this.board.whiteKing
+                : this.board.blackKing;
+
+        const strongKing =
+            whiteBare
+                ? this.board.blackKing
+                : this.board.whiteKing;
+
+        const bareFile = bareKing & 7;
+        const bareRank = bareKing >> 3;
+
+        const strongFile = strongKing & 7;
+        const strongRank = strongKing >> 3;
+
+        //----------------------------------
+        // Doubled center Manhattan distance of the bare king
+        // (2 at the four center squares, 14 in the corners),
+        // and plain Manhattan distance between the kings
+        // (2..14). Both integers, no allocation.
+        //----------------------------------
+
+        const centerDistance2 =
+            Math.abs(2 * bareFile - 7) +
+            Math.abs(2 * bareRank - 7);
+
+        const kingDistance =
+            Math.abs(bareFile - strongFile) +
+            Math.abs(bareRank - strongRank);
+
+        const mopUp =
+            Eval.MOPUP_EDGE * centerDistance2 +
+            Eval.MOPUP_CLOSE * (14 - kingDistance);
+
+        //----------------------------------
+        // Positive favors the side doing the mating.
+        //----------------------------------
+
+        return whiteBare ? -mopUp : mopUp;
+
+    }
 
     gamePhase() {
 
