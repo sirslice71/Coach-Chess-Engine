@@ -1972,6 +1972,29 @@ export default class Search {
             this.board.moveHistory.length;
 
         //----------------------------------
+        // Cycle Guard
+        //
+        // The PV is reconstructed by walking TT entries. TT
+        // entries in shuffle-prone positions can point at each
+        // other in a loop (A's move leads to B, whose move leads
+        // back toward A), so an unguarded walk emits the same
+        // handful of moves over and over until maxDepth -- e.g.
+        // the 64-ply "g5f6 h1g2 g6f4 g2h1 f4e2 h1g2 e2f4 ..."
+        // line observed on the false-mate sentinel FEN. That is
+        // purely a reconstruction artifact: the search itself
+        // scores repetitions as draws (see the threefold
+        // regression tests) and never consults buildPV for
+        // decisions. Track visited position hashes and stop the
+        // walk the first time a position repeats; the repeating
+        // move itself is kept so the reason the line ends is
+        // visible in the PV.
+        //----------------------------------
+
+        const visited = new Set();
+
+        visited.add(this.board.hashKey);
+
+        //----------------------------------
         // Follow TT
         //----------------------------------
 
@@ -2002,6 +2025,12 @@ export default class Search {
             pv.push(entry.move);
 
             this.board.makeMove(entry.move);
+
+            if (visited.has(this.board.hashKey)) {
+                break;
+            }
+
+            visited.add(this.board.hashKey);
 
         }
 

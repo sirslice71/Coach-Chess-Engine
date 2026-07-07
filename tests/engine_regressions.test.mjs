@@ -839,3 +839,140 @@ test("lone-king mop-up is inactive when the weaker side has any material", () =>
     );
 
 });
+
+//----------------------------------
+// Repetition / PV-reconstruction regression tests
+//
+// The repetition table keys on the Zobrist hash (BigInt).
+// These tests pin the semantics that keying depends on:
+// castling rights and en passant state distinguish otherwise
+// identical placements, threefold is detected, make/undo
+// restores hash and table exactly, and buildPV() cannot loop
+// forever through TT entry cycles.
+//----------------------------------
+
+test("threefold repetition is detected after a knight shuffle", () => {
+
+    const { board, legalMoveGenerator } = createEngine(
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    );
+
+    for (const notation of [
+        "g1-f3", "g8-f6", "f3-g1", "f6-g8",
+        "g1-f3", "g8-f6", "f3-g1", "f6-g8"
+    ]) {
+        board.makeMove(findMove(legalMoveGenerator, notation));
+    }
+
+    assert.equal(board.repetitionCount(), 3);
+    assert.equal(board.isThreefoldRepetition(), true);
+
+});
+
+test("changed castling rights break repetition sameness", () => {
+
+    const { board, legalMoveGenerator } = createEngine(
+        "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1"
+    );
+
+    //----------------------------------
+    // Rooks shuffle out and back: the piece placement matches
+    // the start again, but queenside castling rights are gone
+    // on both sides, so this must NOT count as a repetition.
+    //----------------------------------
+
+    for (const notation of ["a1-b1", "a8-b8", "b1-a1", "b8-a8"]) {
+        board.makeMove(findMove(legalMoveGenerator, notation));
+    }
+
+    assert.equal(board.repetitionCount(), 1);
+
+});
+
+test("make/undo restores hash and repetition table through EP, castling, and promotion", () => {
+
+    const { board, search, legalMoveGenerator } = createEngine(
+        "r3k2r/1P6/8/3pP3/8/8/8/R3K2R w KQkq d6 0 1"
+    );
+
+    const hashBefore = board.hashKey;
+    const tableBefore = board.repetitionTable.length;
+
+    const line = ["e5-d6", "e8-g8", "b7-b8", "a8-b8", "e1-c1"];
+    let made = 0;
+
+    for (const notation of line) {
+
+        const move =
+            legalMoveGenerator
+                .generateMoves()
+                .find(candidate =>
+                    candidate.toString().startsWith(notation)
+                );
+
+        assert.ok(move, `expected a legal move ${notation}`);
+        board.makeMove(move);
+        made++;
+
+    }
+
+    //----------------------------------
+    // Incremental hash must match a from-scratch regeneration
+    // after the EP capture, castle, promotion, and capture.
+    //----------------------------------
+
+    assert.equal(board.hashKey, search.zobrist.generate(board));
+
+    assert.equal(
+        board.repetitionTable.length,
+        tableBefore + made
+    );
+
+    for (let i = 0; i < made; i++) {
+        board.undoMove();
+    }
+
+    assert.equal(board.hashKey, hashBefore);
+    assert.equal(board.repetitionTable.length, tableBefore);
+
+});
+
+test("buildPV stops when TT entries form a repetition cycle", () => {
+
+    const { board, search, legalMoveGenerator } = createEngine(
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    );
+
+    //----------------------------------
+    // Hand-plant TT entries that walk knights out and back:
+    // after four plies the starting position (and hash)
+    // recurs, so an unguarded TT walk would loop for the full
+    // 64 plies. The guard must stop it within one lap plus the
+    // repeating move.
+    //----------------------------------
+
+    const cycle = ["g1-f3", "g8-f6", "f3-g1", "f6-g8"];
+    const made = [];
+
+    for (const notation of cycle) {
+
+        const move = findMove(legalMoveGenerator, notation);
+
+        search.tt.store(board.hashKey, 1, 0, 0, move);
+        board.makeMove(move);
+        made.push(move);
+
+    }
+
+    for (let i = 0; i < made.length; i++) {
+        board.undoMove();
+    }
+
+    const pv = search.buildPV();
+
+    assert.ok(
+        pv.length <= cycle.length + 1,
+        `buildPV should stop at the repetition, got length ${pv.length}`
+    );
+
+});
