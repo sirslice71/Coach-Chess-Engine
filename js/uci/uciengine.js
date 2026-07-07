@@ -785,25 +785,15 @@ export class UciSession {
         //----------------------------------
         // Tracked fullmove number for clock-based time
         // management. board.fullMoveNumber is set correctly by
-        // Board's constructor and by FEN.import(), but
-        // board.makeMove() never increments it -- it only saves
-        // the old value into undo history. Since a real UCI GUI
-        // resends the *entire* move list on every "position"
-        // command (not just the newest move), that means
-        // board.fullMoveNumber would silently stay pinned at
-        // whatever it was after "position ... [fen]" for the rest
-        // of the game, no matter how many moves get replayed on
-        // top of it. That would make every fullMoveNumber-based
-        // rule in complexityMultiplier() (the opening throttle,
-        // the late-opening/middlegame reinvestment window) think
-        // every move of the game is still move 1 -- consistent
-        // with the Arena evidence motivating this recalibration:
-        // Coach's time surplus over Old Coach only ever grew,
-        // exactly what happens if the reinvestment window can
-        // never fire. This is tracked independently here, at the
-        // UCI layer only, rather than fixing board.js itself,
-        // which is out of scope for a clock-based time-management
-        // change.
+        // Board's constructor and by FEN.import(). At the time this
+        // was written, board.makeMove() never incremented it -- it
+        // only saved the old value into undo history -- which is
+        // why this UCI-layer tracking exists independently. That
+        // gap in board.makeMove() has since been fixed (board.js
+        // now advances fullMoveNumber correctly during play), but
+        // this workaround is left in place unchanged here, since
+        // reassessing/removing it is a time-management-adjacent
+        // change out of scope for that fix.
         //----------------------------------
 
         this.currentFullMoveNumber = 1;
