@@ -20,6 +20,23 @@ const UCI_MOVE_OVERHEAD_MAX_MS = 1000;
 const UCI_MAX_MOVES_TO_GO = 100;
 
 //----------------------------------
+// Engine Identity
+//
+// Static build/version identifier, deliberately not derived
+// from `git rev-parse` or any other dynamic source -- Arena
+// launches coach-uci.exe (a thin C# wrapper around `node
+// uci.js`) in all sorts of working directories and packaged
+// layouts where a `.git` folder may not even be present, so a
+// dynamic lookup would risk making UCI startup fragile. Bump
+// this string by hand when it's useful to tell builds apart in
+// Arena's engine list; it has no effect on search, eval,
+// movegen, timing, or the TT.
+//----------------------------------
+
+const UCI_ENGINE_VERSION = "2026.07.07";
+const UCI_ENGINE_NAME = `Coach Chess Engine ${UCI_ENGINE_VERSION}`;
+
+//----------------------------------
 // Time Management: Game Phase
 //
 // Cheap phase estimate used only when
@@ -828,7 +845,7 @@ export class UciSession {
             case "uci":
 
                 return [
-                    "id name Coach Chess Engine",
+                    `id name ${UCI_ENGINE_NAME}`,
                     "id author Sir Slice",
                     `option name Hash type spin default ${UCI_HASH_DEFAULT_MB} min ${UCI_HASH_MIN_MB} max ${UCI_HASH_MAX_MB}`,
                     `option name Move Overhead type spin default ${UCI_MOVE_OVERHEAD_DEFAULT_MS} min ${UCI_MOVE_OVERHEAD_MIN_MS} max ${UCI_MOVE_OVERHEAD_MAX_MS}`,
