@@ -98,9 +98,9 @@ export default class Move {
 
         return {
 
-            from: this.from(),
+            from: this.fromSquare,
 
-            to: this.to(),
+            to: this.toSquare,
 
             notation: this.toString()
 
