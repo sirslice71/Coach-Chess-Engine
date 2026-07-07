@@ -31,6 +31,29 @@ export default class Attack {
     ];
 
     //------------------------------------------
+    // Static attacker/offset tables
+    //
+    // These used to be rebuilt as fresh array literals on
+    // EVERY pawn()/bishop()/rook() call. Attack detection is
+    // the hottest code in the engine (rayAttack alone measured
+    // 14% of search time, with the garbage collector at ~8%),
+    // so per-call allocations here were pure churn. Hoisting
+    // them is behavior-identical.
+    //------------------------------------------
+
+    static PAWN_OFFSETS_WHITE = [7, 9];
+
+    static PAWN_OFFSETS_BLACK = [-7, -9];
+
+    static DIAGONAL_WHITE = [Piece.WB, Piece.WQ];
+
+    static DIAGONAL_BLACK = [Piece.BB, Piece.BQ];
+
+    static STRAIGHT_WHITE = [Piece.WR, Piece.WQ];
+
+    static STRAIGHT_BLACK = [Piece.BR, Piece.BQ];
+
+    //------------------------------------------
 
     static isSquareAttacked(board, square, byWhite) {
 
@@ -40,13 +63,21 @@ export default class Attack {
         if (this.knight(board, square, byWhite))
             return true;
 
+        //----------------------------------
+        // Queens are already covered: bishop() scans the
+        // diagonals for [bishop, queen] and rook() scans the
+        // files/ranks for [rook, queen]. The old extra
+        // this.queen() call here re-ran BOTH slider scans a
+        // second time for every non-attacked square -- pure
+        // duplicate work that roughly doubled the cost of the
+        // hottest function in the engine. queen() itself is
+        // kept for debug use.
+        //----------------------------------
+
         if (this.bishop(board, square, byWhite))
             return true;
 
         if (this.rook(board, square, byWhite))
-            return true;
-
-        if (this.queen(board, square, byWhite))
             return true;
 
         if (this.king(board, square, byWhite))
@@ -76,7 +107,10 @@ export default class Attack {
 
     static pawn(board,square,byWhite){
 
-        const offsets = byWhite ? [7,9] : [-7,-9];
+        const offsets =
+            byWhite
+                ? this.PAWN_OFFSETS_WHITE
+                : this.PAWN_OFFSETS_BLACK;
 
         const file = square & 7;
 
@@ -169,9 +203,9 @@ export default class Attack {
 
             this.BISHOP,
 
-            [Piece.WB, Piece.WQ],
+            this.DIAGONAL_WHITE,
 
-            [Piece.BB, Piece.BQ],
+            this.DIAGONAL_BLACK,
 
             byWhite
 
@@ -189,9 +223,9 @@ export default class Attack {
 
             this.ROOK,
 
-            [Piece.WR, Piece.WQ],
+            this.STRAIGHT_WHITE,
 
-            [Piece.BR, Piece.BQ],
+            this.STRAIGHT_BLACK,
 
             byWhite
 

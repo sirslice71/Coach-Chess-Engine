@@ -8,6 +8,7 @@ import LegalMoveGenerator from "../js/engine/legalmovegen.js";
 import Zobrist from "../js/engine/zobrist.js";
 import Evaluation from "../js/engine/evaluation.js";
 import Search from "../js/engine/search.js";
+import Attack from "../js/engine/attack.js";
 import { Piece } from "../js/core/piece.js";
 import { SearchConstants } from "../js/engine/searchconstants.js";
 
@@ -974,5 +975,139 @@ test("buildPV stops when TT entries form a repetition cycle", () => {
         pv.length <= cycle.length + 1,
         `buildPV should stop at the repetition, got length ${pv.length}`
     );
+
+});
+
+//----------------------------------
+// Attack-detection regression tests
+//
+// Pinned after the isSquareAttacked de-duplication (the
+// redundant queen() re-scan removal) and static attacker
+// tables in js/engine/attack.js. Squares: 0 = a8 ... 63 = h1.
+//----------------------------------
+
+test("isSquareAttacked sees every attacker type", () => {
+
+    const { board } = createEngine(
+        "8/8/3k4/8/8/1P6/2N5/K2R2B1 w - - 0 1"
+    );
+
+    // pawn b3 attacks c4 (34) and a4 (32)
+    assert.equal(Attack.isSquareAttacked(board, 34, true), true);
+    assert.equal(Attack.isSquareAttacked(board, 32, true), true);
+
+    // knight c2 attacks b4 (33)
+    assert.equal(Attack.isSquareAttacked(board, 33, true), true);
+
+    // rook d1 attacks d6 (19) up the open file
+    assert.equal(Attack.isSquareAttacked(board, 19, true), true);
+
+    // bishop g1 attacks c5 (26) along the long diagonal
+    assert.equal(Attack.isSquareAttacked(board, 26, true), true);
+
+    // king a1 attacks b2 (49)
+    assert.equal(Attack.isSquareAttacked(board, 49, true), true);
+
+    // h8 (7) is attacked by nothing white
+    assert.equal(Attack.isSquareAttacked(board, 7, true), false);
+
+    const queens = createEngine("8/8/8/8/8/8/8/Q6K w - - 0 1");
+
+    // queen a1 attacks a8 (0) on the file and h8 (7) on the diagonal
+    assert.equal(Attack.isSquareAttacked(queens.board, 0, true), true);
+    assert.equal(Attack.isSquareAttacked(queens.board, 7, true), true);
+
+});
+
+test("pinned bishop has no legal moves", () => {
+
+    const { legalMoveGenerator } = createEngine(
+        "4k3/4r3/8/8/8/8/4B3/4K3 w - - 0 1"
+    );
+
+    const fromE2 =
+        legalMoveGenerator
+            .generateMoves()
+            .filter(move => move.toString().startsWith("e2-"));
+
+    assert.equal(
+        fromE2.length,
+        0,
+        "the e2 bishop is pinned on the e-file and may not move"
+    );
+
+});
+
+test("en passant that exposes the king along the rank is illegal", () => {
+
+    const { legalMoveGenerator } = createEngine(
+        "8/8/8/K1pP3q/8/8/8/6k1 w - c6 0 1"
+    );
+
+    //----------------------------------
+    // dxc6 en passant removes BOTH the c5 pawn and the d5
+    // pawn from the 5th rank, exposing Ka5 to the h5 queen,
+    // so it must not be generated as legal.
+    //----------------------------------
+
+    const notations =
+        legalMoveGenerator
+            .generateMoves()
+            .map(move => move.toString());
+
+    assert.ok(
+        !notations.some(n => n.startsWith("d5-c6")),
+        `en passant d5xc6 must be illegal, got: ${notations.join(", ")}`
+    );
+
+});
+
+test("castling through an attacked square and stepping into check are illegal", () => {
+
+    const { legalMoveGenerator } = createEngine(
+        "4k3/8/8/8/8/8/5r2/4K2R w K - 0 1"
+    );
+
+    const notations =
+        legalMoveGenerator
+            .generateMoves()
+            .map(move => move.toString());
+
+    assert.ok(
+        !notations.includes("e1-g1"),
+        "O-O through the attacked f1 square must be illegal"
+    );
+
+    assert.ok(
+        !notations.some(n => n.startsWith("e1-f1")),
+        "the king may not step onto the attacked f1 square"
+    );
+
+    assert.ok(
+        notations.some(n => n.startsWith("e1-d1")),
+        "the quiet escape e1-d1 should remain legal"
+    );
+
+});
+
+test("double check permits only king moves", () => {
+
+    const { board, legalMoveGenerator } = createEngine(
+        "4k3/8/8/8/7b/3n4/8/4K3 w - - 0 1"
+    );
+
+    const moves = legalMoveGenerator.generateMoves();
+
+    assert.ok(moves.length > 0, "double check is not mate here");
+
+    for (const move of moves) {
+
+        assert.equal(
+            move.fromSquare,
+            board.whiteKing,
+            `only king moves escape double check, got ${move.toString()}`
+        );
+
+    }
 
 });
