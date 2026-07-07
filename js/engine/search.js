@@ -839,6 +839,46 @@ export default class Search {
 
             }
 
+            //----------------------------------
+            // Root Fail-High: stop searching root moves.
+            //
+            // Under an aspiration window, a root move can score at
+            // or above beta (fail-hard leaves clamp to beta, so
+            // exact equality is common). Before this check, the
+            // loop kept going with alpha == beta, which made every
+            // remaining root move's child search run with an EMPTY
+            // window (alpha >= beta at entry). Such a degenerate
+            // call examines exactly one reply -- negamax's beta-
+            // cutoff test "alpha >= beta" is already true after the
+            // first move regardless of its score -- and then stores
+            // its truncated one-move fail-soft result in the TT as
+            // an UPPER bound. That bound is unsound: an upper bound
+            // on a max requires having examined every move, but the
+            // truncated loop examined one. Concretely diagnosed on
+            // r3r1k1/pp3ppp/3B2n1/4p1q1/1Q6/P4P2/1PP2P1P/R4R1K b
+            // (depth 7): the node after 1...Nf4 was entered with
+            // alpha = beta = -220, searched only the losing reply
+            // 2.Qxb7?? (genuinely mated), stored "UPPER -99997" --
+            // i.e. "White is mated no matter what" -- and the
+            // aspiration full-window re-search then probed that
+            // entry, clamped beta to the mate score, and published
+            // a false mate-in-2 while the real defense 2.Rg1! was
+            // never searched.
+            //
+            // Breaking here is the standard fail-high response: the
+            // iteration's bestScore >= beta is detected by
+            // searchRoot() immediately after this loop and answered
+            // with a full-window re-search, exactly as before. No
+            // remaining root move needs to be (or can meaningfully
+            // be) searched with an empty window.
+            //----------------------------------
+
+            if (alpha >= beta) {
+
+                break;
+
+            }
+
         }
 
         rootMoves.sort(
