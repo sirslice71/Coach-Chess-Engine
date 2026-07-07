@@ -1079,24 +1079,67 @@ export default class Search {
 
                 let score;
 
-                if (usePvsScout) {
+                //----------------------------------
+                // Search Child / Undo Move (paired)
+                //
+                // Wrapped in try/finally so that board.undoMove()
+                // always runs exactly once for the board.makeMove()
+                // above -- even if this.negamax() throws
+                // SearchTimeout partway through. Without this, a
+                // deadline firing several plies down would leave
+                // this.board with an un-undone move applied (wrong
+                // sideToMove, king squares, castling rights, hash
+                // key, and an extra moveHistory/repetitionTable
+                // entry), silently corrupting the board for the
+                // rest of this search call and for whatever reads
+                // this.board afterwards (including the
+                // rootSideToMove used to convert the final score
+                // back to UCI's side-relative convention in
+                // handleGo() -- an odd number of orphaned plies
+                // there can flip the sign of the score reported to
+                // the GUI). searchIteration()'s own root-level loop
+                // already had this protection; negamax() and
+                // quiescence() did not.
+                //----------------------------------
 
-                    score =
-                        -this.negamax(
+                try {
 
-                            depth - 1,
+                    if (usePvsScout) {
 
-                            -alpha - 1,
+                        score =
+                            -this.negamax(
 
-                            -alpha,
+                                depth - 1,
 
-                            ply + 1
+                                -alpha - 1,
 
-                        );
+                                -alpha,
 
-                    if (score > alpha && score < beta) {
+                                ply + 1
 
-                        this.pvsResearches++;
+                            );
+
+                        if (score > alpha && score < beta) {
+
+                            this.pvsResearches++;
+
+                            score =
+                                -this.negamax(
+
+                                    depth - 1,
+
+                                    -beta,
+
+                                    -alpha,
+
+                                    ply + 1
+
+                                );
+
+                        }
+
+                    }
+                    else {
 
                         score =
                             -this.negamax(
@@ -1114,42 +1157,30 @@ export default class Search {
                     }
 
                 }
-                else {
 
-                    score =
-                        -this.negamax(
+                finally {
 
-                            depth - 1,
+                    //----------------------------------
+                    // Undo Move
+                    //----------------------------------
 
-                            -beta,
+                    t =
+                        this.profileEnabled
+                            ? performance.now()
+                            : 0;
 
-                            -alpha,
+                    this.board.undoMove();
 
-                            ply + 1
+                    if (this.profileEnabled) {
 
-                        );
+                        this.undoMoveTime +=
+                            performance.now() - t;
+
+                    }
 
                 }
 
                 moveIndex++;
-
-                //----------------------------------
-                // Undo Move
-                //----------------------------------
-
-                t =
-                    this.profileEnabled
-                        ? performance.now()
-                        : 0;
-
-                this.board.undoMove();
-
-                if (this.profileEnabled) {
-
-                    this.undoMoveTime +=
-                        performance.now() - t;
-
-                }
 
 
                 //----------------------------------
@@ -1426,21 +1457,39 @@ export default class Search {
 
             this.board.makeMove(move);
 
-            const score =
+            let score;
 
-                -this.quiescence(
+            //----------------------------------
+            // try/finally so board.undoMove() always runs even if
+            // this.quiescence() throws SearchTimeout partway
+            // through -- see the matching comment in negamax()'s
+            // move loop above for why an unmatched makeMove() here
+            // corrupts this.board for the rest of the search call.
+            //----------------------------------
 
-                    -beta,
+            try {
 
-                    -alpha,
+                score =
 
-                    ply + 1,
+                    -this.quiescence(
 
-                    qPly + 1
+                        -beta,
 
-                );
+                        -alpha,
 
-            this.board.undoMove();
+                        ply + 1,
+
+                        qPly + 1
+
+                    );
+
+            }
+
+            finally {
+
+                this.board.undoMove();
+
+            }
 
             if (score >= beta) {
 
