@@ -114,9 +114,18 @@ test("position startpos moves e2e4 e7e5 applies legal moves", () => {
 
     assert.equal(engine.board.sideToMove, 1);
     assert.equal(engine.board.enPassantSquare, 20);
+
+    //----------------------------------
+    // Fullmove number is 2, not 1: board.js's makeMove() now
+    // correctly advances fullMoveNumber forward (standard FEN
+    // semantics increment it only once Black's move completes).
+    // e2e4 (White) leaves it at 1; e7e5 (Black) advances it to
+    // 2. The halfmove clock is 0 either way here since both
+    // plies are pawn moves.
+    //----------------------------------
     assert.equal(
         FEN.export(engine.board),
-        "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 1"
+        "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2"
     );
 
 });

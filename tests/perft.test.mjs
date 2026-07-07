@@ -482,25 +482,16 @@ test("en passant square is set by a double pawn push and cleared/restored correc
 test("halfmove clock and fullmove number round-trip exactly through make/undo", () => {
 
     //----------------------------------
-    // NOTE on current behavior (discovered while building this
-    // harness, not something this task changes): board.js's
-    // makeMove()/undoMove() save and restore halfMoveClock and
-    // fullMoveNumber in the move history exactly as they save
-    // and restore castling rights or the en passant square --
-    // but neither field is ever incremented or reset forward
-    // during makeMove() itself. fullMoveNumber's gap is already
-    // known and worked around one layer up, in
-    // js/uci/uciengine.js's UciSession.currentFullMoveNumber
-    // (see the comments there). halfMoveClock's gap does not
-    // currently have an equivalent workaround anywhere, which
-    // means Board.isFiftyMoveDraw() (halfMoveClock >= 100) can
-    // never actually trigger during play -- flagged here as a
-    // finding for a separate task, not fixed in this one.
-    //
-    // This test therefore checks what IS true today: undo
-    // restores both fields to their exact pre-move values, i.e.
-    // the save/restore plumbing itself is correct, independent
-    // of whether the forward value ever changes.
+    // NOTE on current behavior: board.js's makeMove() now
+    // advances halfMoveClock and fullMoveNumber forward (reset
+    // to 0 on any pawn move or capture, otherwise +1; and +1 to
+    // fullMoveNumber only after Black's move), in addition to
+    // saving/restoring them in the move history for undoMove().
+    // This test checks the save/restore plumbing specifically:
+    // undo must restore both fields to their exact pre-move
+    // values regardless of how makeMove() advanced them forward.
+    // The forward-update behavior itself (reset/increment rules)
+    // is covered by the dedicated tests immediately below.
     //----------------------------------
 
     const { board, legalMoveGenerator } =
@@ -519,6 +510,228 @@ test("halfmove clock and fullmove number round-trip exactly through make/undo", 
 
     assert.equal(board.halfMoveClock, halfMoveClockBefore);
     assert.equal(board.fullMoveNumber, fullMoveNumberBefore);
+
+});
+
+//======================================
+// Category 7 (continued): halfmove clock / fullmove number
+// forward-update rules during makeMove()
+//======================================
+//
+// board.js's makeMove() advances these two counters forward
+// using standard FEN semantics:
+//   halfMoveClock  -- resets to 0 after any pawn move or any
+//                     capture (including en passant), otherwise
+//                     increments by 1.
+//   fullMoveNumber -- increments only once Black's move
+//                     completes; White's move never increments
+//                     it.
+// These tests exercise each rule individually, plus the fifty-
+// move draw trigger that depends on halfMoveClock actually
+// advancing during play.
+//======================================
+
+test("quiet non-pawn move increments the halfmove clock", () => {
+
+    // Ng1-f3 is a quiet knight move: not a pawn move, not a
+    // capture.
+    const { board, legalMoveGenerator } =
+        createEngine("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 7 12");
+
+    assert.equal(board.halfMoveClock, 7);
+
+    const move = findMove(legalMoveGenerator, "g1-f3");
+
+    board.makeMove(move);
+
+    assert.equal(
+        board.halfMoveClock,
+        8,
+        "a quiet non-pawn move must increment the halfmove clock by 1"
+    );
+
+});
+
+test("pawn move resets the halfmove clock to 0", () => {
+
+    const { board, legalMoveGenerator } =
+        createEngine("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 7 12");
+
+    assert.equal(board.halfMoveClock, 7);
+
+    const move = findMove(legalMoveGenerator, "e2-e4");
+
+    board.makeMove(move);
+
+    assert.equal(
+        board.halfMoveClock,
+        0,
+        "any pawn move must reset the halfmove clock to 0"
+    );
+
+});
+
+test("capture resets the halfmove clock to 0", () => {
+
+    const { board, legalMoveGenerator } =
+        createEngine("r3k2r/7R/8/8/8/8/8/4K3 w kq - 9 30");
+
+    assert.equal(board.halfMoveClock, 9);
+
+    // White rook h7 captures Black's rook on h8 -- a non-pawn
+    // capture.
+    const move = findMove(legalMoveGenerator, "h7-h8");
+
+    board.makeMove(move);
+
+    assert.equal(
+        board.halfMoveClock,
+        0,
+        "any capture must reset the halfmove clock to 0"
+    );
+
+});
+
+test("en passant capture resets the halfmove clock to 0", () => {
+
+    // Black's f4 pawn can capture White's e4 pawn en passant;
+    // history.capturedPiece is EMPTY for an en passant capture
+    // (the captured pawn is not on move.toSquare), so this
+    // specifically exercises the EN_PASSANT-flag branch of the
+    // capture-detection logic rather than the capturedPiece
+    // check.
+    const { board, legalMoveGenerator } =
+        createEngine("4k3/8/8/8/4Pp2/8/8/4K3 b - e3 0 15");
+
+    // Force a nonzero clock so the reset is observable; the FEN's
+    // own halfmove field is 0 here regardless.
+    board.halfMoveClock = 5;
+
+    const move = findMove(legalMoveGenerator, "f4-e3");
+
+    board.makeMove(move);
+
+    assert.equal(
+        board.halfMoveClock,
+        0,
+        "an en passant capture must reset the halfmove clock to 0, " +
+        "even though history.capturedPiece is EMPTY for en passant"
+    );
+
+});
+
+test("White's move does not increment the fullmove number", () => {
+
+    const { board, legalMoveGenerator } =
+        createEngine("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 12");
+
+    assert.equal(board.fullMoveNumber, 12);
+
+    const move = findMove(legalMoveGenerator, "g1-f3");
+
+    board.makeMove(move);
+
+    assert.equal(
+        board.fullMoveNumber,
+        12,
+        "White's move must not increment the fullmove number"
+    );
+
+});
+
+test("Black's move increments the fullmove number", () => {
+
+    const { board, legalMoveGenerator } =
+        createEngine("rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 12");
+
+    assert.equal(board.fullMoveNumber, 12);
+
+    const move = findMove(legalMoveGenerator, "b8-c6");
+
+    board.makeMove(move);
+
+    assert.equal(
+        board.fullMoveNumber,
+        13,
+        "Black's move must increment the fullmove number by 1"
+    );
+
+});
+
+test("undo restores halfMoveClock and fullMoveNumber to their exact pre-move values after a forward-advancing move", () => {
+
+    const { board, legalMoveGenerator } =
+        createEngine("rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 12");
+
+    const halfMoveClockBefore = board.halfMoveClock;
+    const fullMoveNumberBefore = board.fullMoveNumber;
+
+    const move = findMove(legalMoveGenerator, "b8-c6");
+
+    board.makeMove(move);
+
+    // Sanity: the forward update actually changed something, so
+    // this test isn't vacuously true.
+    assert.notEqual(board.fullMoveNumber, fullMoveNumberBefore);
+
+    board.undoMove();
+
+    assert.equal(
+        board.halfMoveClock,
+        halfMoveClockBefore,
+        "undo must restore the exact pre-move halfmove clock"
+    );
+
+    assert.equal(
+        board.fullMoveNumber,
+        fullMoveNumberBefore,
+        "undo must restore the exact pre-move fullmove number"
+    );
+
+});
+
+test("fifty-move draw triggers once the halfmove clock reaches 100 via repeated quiet moves", () => {
+
+    // Two bare kings shuffling back and forth: every move is a
+    // quiet, non-pawn, non-capture king move, so the halfmove
+    // clock climbs by exactly 1 per makeMove() call.
+    const { board, legalMoveGenerator } =
+        createEngine("7k/8/8/8/8/8/8/K7 w - - 0 1");
+
+    assert.equal(board.halfMoveClock, 0);
+    assert.equal(board.isFiftyMoveDraw(), false);
+
+    const shuffle = ["a1-a2", "h8-h7", "a2-a1", "h7-h8"];
+
+    let index = 0;
+    let safetyCounter = 0;
+
+    while (board.halfMoveClock < 100) {
+
+        const notation = shuffle[index % shuffle.length];
+
+        const move = findMove(legalMoveGenerator, notation);
+
+        board.makeMove(move);
+
+        index++;
+        safetyCounter++;
+
+        assert.ok(
+            safetyCounter <= 120,
+            "halfmove clock did not reach 100 within the expected " +
+            "number of quiet king shuffles"
+        );
+
+    }
+
+    assert.equal(board.halfMoveClock, 100);
+
+    assert.equal(
+        board.isFiftyMoveDraw(),
+        true,
+        "isFiftyMoveDraw() must return true once the halfmove clock reaches 100"
+    );
 
 });
 

@@ -1008,6 +1008,49 @@ export default class Board {
         this.moveHistory.push(history);
 
         //----------------------------------
+        // Halfmove Clock / Fullmove Number (forward update)
+        //
+        // history.halfMoveClock / history.fullMoveNumber above
+        // already captured the pre-move snapshot that undoMove()
+        // restores. This block is the missing forward half: apply
+        // standard FEN semantics to the LIVE counters so the
+        // engine's own halfMoveClock/fullMoveNumber stay correct
+        // during play, not just across a single make/undo pair.
+        //
+        //   halfMoveClock resets to 0 after any pawn move
+        //   (including promotions -- move.piece is still the pawn
+        //   type on a promotion move) or any capture (including en
+        //   passant, where history.capturedPiece is EMPTY since
+        //   the captured pawn is not on move.toSquare -- hence the
+        //   explicit EN_PASSANT flag check below). Otherwise it
+        //   increments by 1.
+        //
+        //   fullMoveNumber increments only once Black's move
+        //   completes. history.side was captured just above as
+        //   this.sideToMove BEFORE the flip a few lines down, so
+        //   history.side < 0 means Black just moved.
+        //----------------------------------
+
+        const isPawnMove =
+            move.piece === Piece.WP ||
+            move.piece === Piece.BP;
+
+        const isCapture =
+            history.capturedPiece !== Piece.EMPTY ||
+            (move.flags & MoveFlags.EN_PASSANT) !== 0;
+
+        this.halfMoveClock =
+            (isPawnMove || isCapture)
+                ? 0
+                : this.halfMoveClock + 1;
+
+        if (history.side < 0) {
+
+            this.fullMoveNumber++;
+
+        }
+
+        //----------------------------------
         // Debug
         //----------------------------------
         /*
