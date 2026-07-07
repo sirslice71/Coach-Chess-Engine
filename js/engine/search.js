@@ -83,6 +83,55 @@ const MAX_Q_CHECK_PLY = MAX_Q_PLY;
 
 const PVS_MIN_DEPTH = 3;
 
+//----------------------------------
+// Late Move Reductions (conservative v1)
+//
+// With good move ordering, moves far down the ordered list at
+// a node rarely turn out best. LMR searches such moves with a
+// null window at a shallower depth first; only if that
+// reduced probe suggests the move might actually beat alpha
+// is it re-searched at full depth (still null-window), and
+// only if THAT beats alpha inside an open window does the
+// normal PVS full-window re-search run. A move's final score
+// is therefore never taken from a reduced search alone.
+//
+// v1 is deliberately conservative. A move is reduced only
+// when ALL of these hold:
+//
+//   - the node is a PVS scout candidate already, which
+//     requires: not the first ordered move, side to move NOT
+//     in check, and depth >= PVS_MIN_DEPTH
+//   - depth >= LMR_MIN_DEPTH (never near the horizon)
+//   - moveIndex >= LMR_MIN_MOVE_INDEX (the first few ordered
+//     moves -- including the TT move, which is always ordered
+//     first -- are always searched at full depth)
+//   - the move is not a capture and not a promotion
+//   - the move is not either killer move for this ply
+//   - the move does not give check (verified exactly on the
+//     board AFTER the move is made, so discovered checks are
+//     also excluded -- unlike the move-ordering heuristic,
+//     this must not miss any checking move)
+//
+// Root moves are never reduced: searchIteration() has its own
+// move loop that does not go through this path.
+//
+// Reduction is a single ply. With LMR_MIN_DEPTH = 5 the
+// reduced child depth is at least 3, so a reduction can never
+// drop a search directly into quiescence, let alone below
+// zero. The threshold is 5 (not 4) because the depth-5 Nxe5
+// tactical regression test showed reductions inside a
+// depth-5 tree costing a quiet pinning move (f8-b4): with
+// the threshold at 5, a depth-5 search contains no node deep
+// enough to reduce, and deeper searches keep at least a
+// 4-ply full-width core above every reduced child.
+//----------------------------------
+
+const LMR_MIN_DEPTH = 5;
+
+const LMR_MIN_MOVE_INDEX = 4;
+
+const LMR_REDUCTION = 1;
+
 export class SearchTimeout extends Error {}
 
 export default class Search {
@@ -164,6 +213,8 @@ export default class Search {
         this.aspirationWindow = 25;     // 0.25 pawns
         this.aspirationResearches = 0;
         this.pvsResearches = 0;
+        this.lmrReductions = 0;
+        this.lmrResearches = 0;
 
         //----------------------------------
         // History Heuristic
@@ -1106,18 +1157,98 @@ export default class Search {
 
                     if (usePvsScout) {
 
-                        score =
-                            -this.negamax(
+                        //----------------------------------
+                        // Late Move Reduction (scout only)
+                        //
+                        // See the LMR_* constants above for the
+                        // full gate list and rationale. The
+                        // gives-check test is exact: the move has
+                        // already been made on the board here, so
+                        // this.board.isInCheck() asks whether the
+                        // OPPONENT is now in check, including
+                        // discovered checks.
+                        //----------------------------------
 
-                                depth - 1,
+                        const reduceMove =
 
-                                -alpha - 1,
+                            depth >= LMR_MIN_DEPTH &&
 
-                                -alpha,
+                            moveIndex >= LMR_MIN_MOVE_INDEX &&
 
-                                ply + 1
+                            !move.isCapture() &&
 
-                            );
+                            !move.isPromotion() &&
+
+                            move.key !== killers[0] &&
+
+                            move.key !== killers[1] &&
+
+                            !this.board.isInCheck();
+
+                        if (reduceMove) {
+
+                            this.lmrReductions++;
+
+                            score =
+                                -this.negamax(
+
+                                    depth - 1 - LMR_REDUCTION,
+
+                                    -alpha - 1,
+
+                                    -alpha,
+
+                                    ply + 1
+
+                                );
+
+                            //----------------------------------
+                            // Reduced probe suggests the move may
+                            // beat alpha: verify at full depth
+                            // (still null-window) before the
+                            // normal PVS logic below decides
+                            // whether a full-window re-search is
+                            // needed. A reduced score is never
+                            // used as a move's final score.
+                            //----------------------------------
+
+                            if (score > alpha) {
+
+                                this.lmrResearches++;
+
+                                score =
+                                    -this.negamax(
+
+                                        depth - 1,
+
+                                        -alpha - 1,
+
+                                        -alpha,
+
+                                        ply + 1
+
+                                    );
+
+                            }
+
+                        }
+
+                        else {
+
+                            score =
+                                -this.negamax(
+
+                                    depth - 1,
+
+                                    -alpha - 1,
+
+                                    -alpha,
+
+                                    ply + 1
+
+                                );
+
+                        }
 
                         if (score > alpha && score < beta) {
 
@@ -1761,6 +1892,8 @@ export default class Search {
         this.cutoffs = 0;
         this.killerCutoffs = 0;
         this.pvsResearches = 0;
+        this.lmrReductions = 0;
+        this.lmrResearches = 0;
 
         this.board.profileMakeMove = 0;
         this.board.profileUndoMove = 0;

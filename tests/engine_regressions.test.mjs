@@ -624,3 +624,137 @@ test("quiescence still detects real checkmate even past the in-check ply cap", (
     );
 
 });
+
+//----------------------------------
+// Late Move Reduction regression tests
+//
+// LMR (js/engine/search.js, LMR_* constants) must stay
+// conservative: no reductions at shallow depth or at the
+// root, never a reduced score used as a move's final score,
+// and no board-state leakage from the extra search calls.
+//----------------------------------
+
+test("LMR-active search leaves board, hash, material, and piece lists untouched", () => {
+
+    const { board, search } =
+        createEngine(
+            "r1bq1rk1/pp2bppp/2n1pn2/3p2B1/3P4/2NBPN2/PP3PPP/R2Q1RK1 w - - 0 9"
+        );
+
+    const before = snapshotBoard(board);
+
+    const result =
+        withMutedConsole(
+            () => search.bestMove(6, { quiet: true })
+        );
+
+    assert.ok(result.move, "search should produce a move");
+
+    assert.ok(
+        search.lmrReductions > 0,
+        `expected LMR to fire in a depth-6 middlegame search, got ${search.lmrReductions}`
+    );
+
+    assertBoardSnapshot(board, before);
+
+});
+
+test("LMR never fires in a depth-5 search (shallow-depth and root gates)", () => {
+
+    const { search } =
+        createEngine(
+            "r1bq1rk1/pp2bppp/2n1pn2/3p2B1/3P4/2NBPN2/PP3PPP/R2Q1RK1 w - - 0 9"
+        );
+
+    withMutedConsole(
+        () => search.bestMove(5, { quiet: true })
+    );
+
+    //----------------------------------
+    // LMR_MIN_DEPTH is 5 and root moves are never reduced,
+    // so a depth-5 search contains no node deep enough to
+    // reduce. This is also what keeps the depth-5 Nxe5
+    // tactical regression test above meaningful.
+    //----------------------------------
+
+    assert.equal(
+        search.lmrReductions,
+        0,
+        "no reductions may fire anywhere in a depth-5 search"
+    );
+
+});
+
+test("LMR-active depth-6 search still finds the tactical bishop move", () => {
+
+    const { search } =
+        createEngine(
+            "2k2b1r/ppp2ppp/5n2/4Nb2/8/1PNrP3/PB1P1PPP/2R1K2R b K - 0 1"
+        );
+
+    const result =
+        withMutedConsole(
+            () => search.bestMove(6, { quiet: true })
+        );
+
+    assert.ok(
+        search.lmrReductions > 0,
+        "reductions should be active at depth 6"
+    );
+
+    assert.equal(result.notation, "f8-b4");
+
+});
+
+test("LMR-active search still finds a back-rank mate", () => {
+
+    const { search } =
+        createEngine(
+            "6k1/5ppp/8/8/8/8/8/4R1K1 w - - 0 1"
+        );
+
+    const result =
+        withMutedConsole(
+            () => search.bestMove(6, { quiet: true })
+        );
+
+    assert.equal(result.notation, "e1-e8");
+
+    assert.ok(
+        search.lastSearchScore >= SearchConstants.MATE_THRESHOLD,
+        `expected a mate score, got ${search.lastSearchScore}`
+    );
+
+});
+
+test("search timeout during an LMR-active search leaves the board clean", () => {
+
+    const { board, search } =
+        createEngine(
+            "r1bq1rk1/pp2bppp/2n1pn2/3p2B1/3P4/2NBPN2/PP3PPP/R2Q1RK1 w - - 0 9"
+        );
+
+    const before = snapshotBoard(board);
+
+    //----------------------------------
+    // A deadline short enough to interrupt the search midway
+    // through a deep iteration, but long enough for depth 1
+    // to complete so a move is still returned.
+    //----------------------------------
+
+    const result =
+        withMutedConsole(
+            () => search.bestMove(
+                64,
+                {
+                    quiet: true,
+                    deadlineMs: performance.now() + 300
+                }
+            )
+        );
+
+    assert.ok(result.move, "timeout search should still return a move");
+
+    assertBoardSnapshot(board, before);
+
+});
