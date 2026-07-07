@@ -1111,3 +1111,92 @@ test("double check permits only king moves", () => {
     }
 
 });
+
+//----------------------------------
+// Underpromotion generation regression tests
+//
+// js/engine/movegen.js must generate ALL FOUR promotion
+// choices (Q, R, B, N) for every promoting pawn move -- push
+// and capture, both colors. An earlier revision generated
+// only queen promotions (caught by the perft harness:
+// Kiwipete depth 4 was short of the published total).
+//----------------------------------
+
+function promotionPieces(moves, fromSquare, toSquare) {
+
+    return moves
+        .filter(move =>
+            move.fromSquare === fromSquare &&
+            move.toSquare === toSquare &&
+            move.isPromotion()
+        )
+        .map(move => move.promotedPiece)
+        .sort((a, b) => a - b);
+
+}
+
+test("quiet promotion generates exactly four promotion choices", () => {
+
+    const { legalMoveGenerator } = createEngine(
+        "6k1/P7/8/8/8/8/8/4K3 w - - 0 1"
+    );
+
+    // a7 = square 8, a8 = square 0
+    const pieces = promotionPieces(
+        legalMoveGenerator.generateMoves(), 8, 0
+    );
+
+    assert.deepEqual(
+        pieces,
+        [Piece.WN, Piece.WB, Piece.WR, Piece.WQ].sort((a, b) => a - b),
+        `expected N/B/R/Q promotions, got piece codes ${pieces}`
+    );
+
+});
+
+test("capture promotion generates exactly four promotion choices", () => {
+
+    const { legalMoveGenerator } = createEngine(
+        "1nr3k1/2P5/8/8/8/8/8/4K3 w - - 0 1"
+    );
+
+    const moves = legalMoveGenerator.generateMoves();
+
+    // c7 = square 10; captures on b8 = square 1 (c8 is blocked)
+    const captures = promotionPieces(moves, 10, 1);
+
+    assert.deepEqual(
+        captures,
+        [Piece.WN, Piece.WB, Piece.WR, Piece.WQ].sort((a, b) => a - b)
+    );
+
+    assert.ok(
+        captures.length === 4 &&
+        moves
+            .filter(m => m.fromSquare === 10 && m.toSquare === 1)
+            .every(m => m.isCapture() && m.isPromotion()),
+        "all four b8 promotions must be capture-promotions"
+    );
+
+    // quiet push c7-c8 is blocked by the rook: no promotions there
+    assert.equal(promotionPieces(moves, 10, 2).length, 0);
+
+});
+
+test("black promotion generates exactly four promotion choices", () => {
+
+    const { legalMoveGenerator } = createEngine(
+        "4k3/8/8/8/8/8/p7/4K3 b - - 0 1"
+    );
+
+    // a2 = square 48, a1 = square 56
+    const pieces = promotionPieces(
+        legalMoveGenerator.generateMoves(), 48, 56
+    );
+
+    assert.deepEqual(
+        pieces,
+        [Piece.BQ, Piece.BR, Piece.BB, Piece.BN].sort((a, b) => a - b)
+    );
+
+});

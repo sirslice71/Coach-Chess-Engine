@@ -70,6 +70,38 @@ test("UCI move conversion handles quiet moves, castling, and promotion", () => {
     assert.ok(promotionMove);
     assert.equal(moveToUci(promotionMove), "a7a8q");
 
+    //----------------------------------
+    // Underpromotions: every suffix must parse to a distinct
+    // legal move and format back to the same text.
+    //----------------------------------
+
+    for (const suffix of ["r", "b", "n"]) {
+
+        const underpromotion =
+            uciToMove(
+                `a7a8${suffix}`,
+                promotionEngine
+                    .legalMoveGenerator
+                    .generateMoves()
+            );
+
+        assert.ok(
+            underpromotion,
+            `a7a8${suffix} should be a legal move`
+        );
+
+        assert.equal(
+            moveToUci(underpromotion),
+            `a7a8${suffix}`
+        );
+
+        assert.notEqual(
+            underpromotion.promotedPiece,
+            promotionMove.promotedPiece
+        );
+
+    }
+
 });
 
 test("position startpos moves e2e4 e7e5 applies legal moves", () => {

@@ -8,6 +8,22 @@ import Move, { MoveFlags } from "../core/move.js";
 import Attack from "./attack.js";
 
 
+//----------------------------------
+// Promotion Choices
+//
+// Every legal promotion offers FOUR pieces: queen, rook,
+// bishop, and knight. Generation previously emitted only the
+// queen, which is a legal-move-generation correctness bug
+// (found by the perft harness: Kiwipete depth 4 was short of
+// the published 4,085,603 because underpromotions were
+// missing). Order queens first so move ordering's promotion
+// bonus keeps the usual best candidate early.
+//----------------------------------
+
+const WHITE_PROMOTIONS = [Piece.WQ, Piece.WR, Piece.WB, Piece.WN];
+
+const BLACK_PROMOTIONS = [Piece.BQ, Piece.BR, Piece.BB, Piece.BN];
+
 export default class MoveGenerator {
 
     //==================================================
@@ -149,25 +165,32 @@ export default class MoveGenerator {
 
         if ((oneForward >> 3) === promotionRank) {
 
-            moves.push(
+            const promotions =
+                white ? WHITE_PROMOTIONS : BLACK_PROMOTIONS;
 
-                new Move(
+            for (const promotedPiece of promotions) {
 
-                    square,
+                moves.push(
 
-                    oneForward,
+                    new Move(
 
-                    piece,
+                        square,
 
-                    Piece.EMPTY,
+                        oneForward,
 
-                    white ? Piece.WQ : Piece.BQ,
+                        piece,
 
-                    MoveFlags.PROMOTION
+                        Piece.EMPTY,
 
-                )
+                        promotedPiece,
 
-            );
+                        MoveFlags.PROMOTION
+
+                    )
+
+                );
+
+            }
 
         }
         else {
@@ -320,25 +343,29 @@ export default class MoveGenerator {
 
                 if ((target >> 3) === promotionRank) {
 
-                    moves.push(
+                    for (const promotedPiece of WHITE_PROMOTIONS) {
 
-                        new Move(
+                        moves.push(
 
-                            square,
+                            new Move(
 
-                            target,
+                                square,
 
-                            piece,
+                                target,
 
-                            targetPiece,
+                                piece,
 
-                            Piece.WQ,
+                                targetPiece,
 
-                            MoveFlags.CAPTURE | MoveFlags.PROMOTION
+                                promotedPiece,
 
-                        )
+                                MoveFlags.CAPTURE | MoveFlags.PROMOTION
 
-                    );
+                            )
+
+                        );
+
+                    }
 
                 }
                 else {
@@ -371,25 +398,29 @@ export default class MoveGenerator {
 
                 if ((target >> 3) === promotionRank) {
 
-                    moves.push(
+                    for (const promotedPiece of BLACK_PROMOTIONS) {
 
-                        new Move(
+                        moves.push(
 
-                            square,
+                            new Move(
 
-                            target,
+                                square,
 
-                            piece,
+                                target,
 
-                            targetPiece,
+                                piece,
 
-                            Piece.BQ,
+                                targetPiece,
 
-                            MoveFlags.CAPTURE | MoveFlags.PROMOTION
+                                promotedPiece,
 
-                        )
+                                MoveFlags.CAPTURE | MoveFlags.PROMOTION
 
-                    );
+                            )
+
+                        );
+
+                    }
 
                 }
                 else {

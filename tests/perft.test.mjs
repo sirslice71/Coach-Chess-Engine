@@ -30,43 +30,24 @@
 // "perft-only" or "search-only" legality path to reconcile.
 //
 //----------------------------------
-// A note on promotions (read before touching the numbers below)
+// A note on promotions
 //----------------------------------
 //
-// While building this harness we found that Coach's pawn-move
-// generator (js/engine/movegen.js, generatePawnMoves()) only
-// ever produces a QUEEN promotion -- for both push-promotions
-// and capture-promotions. It never generates underpromotion
-// (rook/bishop/knight) moves. This is a pre-existing engine
-// characteristic, not something introduced or changed by this
-// task, and this task does not change move generation.
-//
-// Practical effect: the widely-published "standard" perft
-// totals (e.g. https://www.chessprogramming.org/Perft_Results)
-// assume all 4 promotion choices are generated at every
-// promoting move. Once a promotion becomes reachable inside the
-// search tree, Coach's real count will be LOWER than the
-// standard total (missing the 3 underpromotion branches per
-// promoting move) -- this was confirmed empirically while
-// developing this file: Kiwipete's depth-4 perft comes out as
-// 4074224 here, not the standard 4085603, because a Black pawn
-// on h3 can reach h1 within 4 plies.
-//
-// To keep every number below both TRUE for Coach and VERIFIABLE
-// against a public source, this file:
-//
-//   - uses the standard positions (start position, Kiwipete,
-//     and chessprogramming.org's "Position 3") only at depths
-//     confirmed -- by direct computation against this exact
-//     checkout, see the comment above each block -- to be free
-//     of any reachable promotion, so the published totals apply
-//     unmodified; and
-//   - covers promotion itself with a small, self-contained
-//     position whose exact legal-move counts are derived by
-//     hand (shown in the comment) and cross-checked against the
-//     engine's own per-root-move divide() breakdown, not against
-//     an external "standard" total that assumes underpromotions
-//     Coach does not generate.
+// An earlier revision of Coach's pawn-move generator
+// (js/engine/movegen.js, generatePawnMoves()) produced only
+// QUEEN promotions -- push and capture alike -- so the
+// original version of this file had to avoid promotion-
+// reachable depths for the standard positions and used
+// queen-only hand-derived totals for the promotion category.
+// That bug is fixed: all four promotion choices (Q, R, B, N)
+// are generated for both push- and capture-promotions, for
+// both colors. Every total below is now the standard
+// published value where a published value exists
+// (https://www.chessprogramming.org/Perft_Results), including
+// Kiwipete depth 4, which only matches once underpromotions
+// exist. The promotion-category totals are hand-derived in
+// full (all four pieces) and cross-checked against the
+// engine's divide() breakdown, recorded in the comment.
 //
 // No perft total in this file was invented.
 //======================================
@@ -173,13 +154,13 @@ test("perft: start position depth 5 (4,865,609 nodes)", () => {
 // pinned pieces, en passant, and mid-game tactical complexity.
 // Source: https://www.chessprogramming.org/Perft_Results.
 //
-// Depths 1-3 are confirmed promotion-free for this position
-// (direct computation against this checkout matches the
-// published totals exactly). Depth 4 is DELIBERATELY OMITTED:
-// a Black pawn on h3 can reach h1 within 4 plies, so Coach's
-// queen-only promotion behavior makes its real depth-4 count
-// (4,074,224) diverge from the published total (4,085,603) --
-// this is expected, not a bug, per the file header above.
+// Depth 4 is the underpromotion sentinel for this file: a
+// Black pawn on h3 reaches h1 within 4 plies, so the count
+// only matches the published 4,085,603 when rook/bishop/
+// knight promotions are generated alongside the queen (the
+// old queen-only generator produced 4,074,224). Runtime is a
+// few seconds -- comparable to the start-position depth-5
+// test already in this suite.
 //======================================
 
 const KIWIPETE =
@@ -195,6 +176,10 @@ test("perft: Kiwipete depth 2 (2,039 nodes)", () => {
 
 test("perft: Kiwipete depth 3 (97,862 nodes)", () => {
     assertPerft(KIWIPETE, 3, 97862, "Kiwipete");
+});
+
+test("perft: Kiwipete depth 4 (4,085,603 nodes, underpromotion sentinel)", () => {
+    assertPerft(KIWIPETE, 4, 4085603, "Kiwipete");
 });
 
 //======================================
@@ -248,47 +233,51 @@ test("perft: Position 3 (en passant) depth 5 (674,624 nodes)", () => {
 
 //======================================
 // Category 4: Promotion
-// (push + capture, queen-only by design -- see file header)
+// (push + capture, all four promotion pieces)
 //======================================
 //
 // 1n6/P7/8/8/8/8/8/k6K w - - 0 1
 //   White: Kh1, Pa7.  Black: Ka1, Nb8.
 //
 // Hand-derivation, depth 1 (White to move):
-//   Pawn a7: a7-a8=Q (push, a8 empty) and a7xb8=Q (capture,
-//            promoting) -- 2 moves. Coach never generates the
-//            R/B/N alternatives (file header), so exactly 2,
-//            not 8.
-//   King h1: g1, g2, h2 are all empty and unattacked -- 3 moves.
-//   Total: 5.
+//   Pawn a7: pushes a7-a8=Q/R/B/N (a8 empty) and captures
+//            a7xb8=Q/R/B/N -- 8 moves.
+//   King h1: g1, g2, h2 are all empty and unattacked -- 3.
+//   Total: 11.
 //
-// Depth 2 (adds Black's replies), derived by hand and then
+// Depth 2 (adds Black's replies), derived by hand and
 // cross-checked against the engine's own divide() breakdown
-// for this exact position (recorded here so the reasoning is
-// auditable):
-//   a7-a8=Q puts Black's king in check along the a-file (a7 is
-//     now empty). Black's only legal replies are Kb1, Kb2, and
-//     the blocking Nb8-a6 (which lands on the a-file between
-//     the queen and the king) -- 3 replies.
-//   a7xb8=Q captures the knight and does NOT check Black (the
-//     new queen's lines from b8 don't reach a1), but Black's
-//     king is now boxed in: Kb1/Kb2 both sit on the b-file the
-//     queen now controls, so only Ka2 is legal -- 1 reply.
-//   Each of h1-g1, h1-g2, h1-h2 leaves both Black pieces free:
-//     3 legal king moves (a2, b1, b2) + 3 legal knight moves
-//     (a6, c6, d7) = 6 replies each.
-//   Total: 3 + 1 + 6 + 6 + 6 = 22.
+// (recorded here so the reasoning is auditable):
+//   a7-a8=Q and a7-a8=R both check Ka1 down the open a-file:
+//     legal replies are Kb1, Kb2, and the block Nb8-a6 --
+//     3 replies each (6).
+//   a7-a8=B gives no check (a8's diagonal runs b7..h1, and b8
+//     is not on it, so the knight is not pinned): king a2/b1/b2
+//     + knight a6/c6/d7 -- 6 replies. a7-a8=N likewise gives
+//     no check (Na8 attacks only b6/c7) -- 6 replies (12).
+//   a7xb8=Q boxes the king in (b-file and the b8 diagonals):
+//     only Ka2 -- 1 reply. a7xb8=R controls the b-file the
+//     same way: only Ka2 -- 1 reply (2).
+//   a7xb8=B (diagonals b8-a7 and b8-h2 miss a2/b1/b2): 3
+//     king replies. a7xb8=N (attacks a6/c6/d7): 3 (6).
+//   h1-g1 / h1-g2 / h1-h2: 3 king + 3 knight replies each (18).
+//   Total: 6 + 12 + 2 + 6 + 18 = 44.
+//
+// divide(2) cross-check against this exact checkout:
+//   a8=Q 3, a8=R 3, a8=B 6, a8=N 6,
+//   xb8=Q 1, xb8=R 1, xb8=B 3, xb8=N 3,
+//   Kg1 6, Kg2 6, Kh2 6.
 //======================================
 
 const PROMOTION_POSITION =
     "1n6/P7/8/8/8/8/8/k6K w - - 0 1";
 
-test("perft: promotion (push + capture, queen-only) depth 1 (5 nodes)", () => {
-    assertPerft(PROMOTION_POSITION, 1, 5, "promotion push+capture");
+test("perft: promotion (push + capture, all four pieces) depth 1 (11 nodes)", () => {
+    assertPerft(PROMOTION_POSITION, 1, 11, "promotion push+capture");
 });
 
-test("perft: promotion (push + capture, queen-only) depth 2 (22 nodes)", () => {
-    assertPerft(PROMOTION_POSITION, 2, 22, "promotion push+capture");
+test("perft: promotion (push + capture, all four pieces) depth 2 (44 nodes)", () => {
+    assertPerft(PROMOTION_POSITION, 2, 44, "promotion push+capture");
 });
 
 //======================================
