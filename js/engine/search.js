@@ -2202,6 +2202,10 @@ export default class Search {
                     after.eval.pawns.passed -
                     before.eval.pawns.passed,
 
+                promotionDanger:
+                    after.eval.pawns.promotionDanger -
+                    before.eval.pawns.promotionDanger,
+
                 isolated:
                     after.eval.pawns.isolated -
                     before.eval.pawns.isolated,
@@ -2250,69 +2254,71 @@ export default class Search {
 
                 "Search Eval (White)": (searchScore / 100).toFixed(2),
 
-                "Search - Static Δ": (deltaSearch / 100).toFixed(2),
+                "Search - Static Delta": (deltaSearch / 100).toFixed(2),
 
-                "Total Δ": delta.total,
+                "Total Delta": delta.total,
 
-                "Center Δ": delta.center,
+                "Center Delta": delta.center,
 
-                "Develop Δ": delta.development,
+                "Develop Delta": delta.development,
 
-                "Bishop Freedom Δ": delta.bishopFreedom,
+                "Bishop Freedom Delta": delta.bishopFreedom,
 
-                "Early Rook Discipline Δ": delta.coordination,
+                "Early Rook Discipline Delta": delta.coordination,
 
-                "Queen Discipline Δ": delta.queenDiscipline,
+                "Queen Discipline Delta": delta.queenDiscipline,
 
-                "Castling Urgency Δ": delta.castlingUrgency,
+                "Castling Urgency Delta": delta.castlingUrgency,
 
-                "Opening Δ": delta.opening,
+                "Opening Delta": delta.opening,
 
-                "Pawn PST Δ": delta.pawnPST,
+                "Pawn PST Delta": delta.pawnPST,
 
-                "Knight PST Δ": delta.knightPST,
+                "Knight PST Delta": delta.knightPST,
 
-                "Bishop PST Δ": delta.bishopPST,
+                "Bishop PST Delta": delta.bishopPST,
 
-                "Rook PST Δ": delta.rookPST,
+                "Rook PST Delta": delta.rookPST,
 
-                "Queen PST Δ": delta.queenPST,
+                "Queen PST Delta": delta.queenPST,
 
-                "King PST Δ": delta.kingPST,
+                "King PST Delta": delta.kingPST,
 
-                "Rook Files Δ": delta.rookFiles,
+                "Rook Files Delta": delta.rookFiles,
 
-                "King/Rook Coord Δ": delta.rookCoordination,
+                "King/Rook Coord Delta": delta.rookCoordination,
 
-                "Position Δ": delta.position,
+                "Position Delta": delta.position,
 
-                "Pawn Shield Δ": delta.pawnShield,
+                "Pawn Shield Delta": delta.pawnShield,
 
-                "King Safety Δ": delta.kingSafety,
+                "King Safety Delta": delta.kingSafety,
 
-                "King Total Δ": delta.king,
+                "King Total Delta": delta.king,
 
-                "Knight Mobility Δ": delta.knightMobility,
+                "Knight Mobility Delta": delta.knightMobility,
 
-                "Bishop Mobility Δ": delta.bishopMobility,
+                "Bishop Mobility Delta": delta.bishopMobility,
 
-                "Mobility Total Δ": delta.mobility,
+                "Mobility Total Delta": delta.mobility,
 
-                "PieceSq Δ": delta.pieceSquares,
+                "PieceSq Delta": delta.pieceSquares,
 
-                "Connected Pawns Δ": delta.connected,
+                "Connected Pawns Delta": delta.connected,
 
-                "Passed Pawns Δ": delta.passed,
+                "Passed Pawns Delta": delta.passed,
 
-                "Isolated Pawns Δ": delta.isolated,
+                "Promotion Danger Delta": delta.promotionDanger,
 
-                "Doubled Pawns Δ": delta.doubled,
+                "Isolated Pawns Delta": delta.isolated,
 
-                "Pawn Total Δ": delta.pawns,
+                "Doubled Pawns Delta": delta.doubled,
 
-                "Hanging Pieces Δ": delta.hanging,
+                "Pawn Total Delta": delta.pawns,
 
-                "Tactics Total Δ": delta.tactics
+                "Hanging Pieces Delta": delta.hanging,
+
+                "Tactics Total Delta": delta.tactics
 
             });
 
@@ -2473,6 +2479,10 @@ export default class Search {
                 after.eval.pawns.passed -
                 before.eval.pawns.passed,
 
+            promotionDanger:
+                after.eval.pawns.promotionDanger -
+                before.eval.pawns.promotionDanger,
+
             connected:
                 after.eval.pawns.connected -
                 before.eval.pawns.connected,
@@ -2615,7 +2625,7 @@ export default class Search {
         console.log("Not computed in detailed lab(move) mode");
         console.log("");
 
-        console.log("Static Δ From Current Position");
+        console.log("Static Delta From Current Position");
         console.log("------------------------------");
         console.log(`${(delta.total / 100).toFixed(2)}`);
 
@@ -2732,6 +2742,8 @@ export default class Search {
                 { label: "Connected", value: delta.connected },
 
                 { label: "Passed", value: delta.passed },
+
+                { label: "Promotion Danger", value: delta.promotionDanger },
 
                 { label: "Isolated", value: delta.isolated },
 

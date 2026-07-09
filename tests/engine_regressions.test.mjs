@@ -1369,3 +1369,65 @@ test("black promotion generates exactly four promotion choices", () => {
     );
 
 });
+
+test("Coach Lab exposes pawns.promotionDanger without mutating board state", () => {
+
+    const fen =
+        "r1r5/pp2kN1N/2b3p1/4P3/n7/1B2B3/PP4PP/2R3K1 b - - 0 29";
+
+    const {
+        board,
+        search
+    } = createEngine(fen);
+
+    const before =
+        snapshotBoard(board);
+
+    const quick =
+        withMutedConsole(() =>
+            search.compareRootMoves(1)
+        );
+
+    const detailed =
+        withMutedConsole(() =>
+            search.lab("a4-b2", 1)
+        );
+
+    assertBoardSnapshot(board, before);
+
+    const quickRow =
+        quick.find(row => row.Move === "a4-b2");
+
+    assert.ok(quickRow, "quick lab should include a4-b2");
+
+    assert.ok(
+        Object.prototype.hasOwnProperty.call(
+            quickRow,
+            "Promotion Danger Delta"
+        ),
+        "quick lab should report the promotion danger delta"
+    );
+
+    assert.ok(
+        Object.prototype.hasOwnProperty.call(
+            detailed.before.eval.pawns,
+            "promotionDanger"
+        ),
+        "detailed lab should expose before.eval.pawns.promotionDanger"
+    );
+
+    assert.ok(
+        Object.prototype.hasOwnProperty.call(
+            detailed.after.eval.pawns,
+            "promotionDanger"
+        ),
+        "detailed lab should expose after.eval.pawns.promotionDanger"
+    );
+
+    assert.equal(
+        typeof detailed.delta.promotionDanger,
+        "number",
+        "detailed lab should compute a numeric promotion danger delta"
+    );
+
+});
