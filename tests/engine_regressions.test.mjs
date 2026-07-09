@@ -637,6 +637,21 @@ test("PGN collapse regression: game 8 vs Shallowblue move 73 finds g4-f3 at dept
 
 });
 
+test("PGN collapse regression: game 4 vs Stash move 37 finds a7-b7 at depth 9", () => {
+
+    const result =
+        searchBestMove(
+            "8/Qp1q2k1/2pN3p/2Pb2p1/3P3n/P7/1P4PP/4R1K1 w - - 1 37",
+            9
+        );
+
+    assert.equal(
+        result.notation,
+        "a7-b7"
+    );
+
+});
+
 test("PGN collapse regression: game 10 vs Stash move 24 finds e6-e5 at depth 8", () => {
 
     const result =
