@@ -125,6 +125,8 @@ export default class Evaluation {
 
                 passed: 0,
 
+                promotionDanger: 0,
+
                 isolated: 0,
 
                 doubled: 0,
@@ -1257,6 +1259,8 @@ export default class Evaluation {
 
             passed: 0,
 
+            promotionDanger: 0,
+
             isolated: 0,
 
             doubled: 0,
@@ -1376,6 +1380,13 @@ export default class Evaluation {
                     whitePassedSquares
                 );
 
+                score.promotionDanger +=
+                    this.evaluatePromotionDanger(
+                        square,
+                        true,
+                        phase
+                    );
+
             }
 
             //----------------------------------
@@ -1471,6 +1482,13 @@ export default class Evaluation {
                     blackPassedSquares
                 );
 
+                score.promotionDanger -=
+                    this.evaluatePromotionDanger(
+                        square,
+                        false,
+                        phase
+                    );
+
             }
 
             //----------------------------------
@@ -1512,6 +1530,8 @@ export default class Evaluation {
         score.total =
 
             score.passed +
+
+            score.promotionDanger +
 
             score.connected +
 
@@ -1785,6 +1805,267 @@ export default class Evaluation {
         }
 
         return Math.max(0, bonus);
+
+    }
+
+    //----------------------------------
+    // Promotion Danger (v1)
+    //
+    // Separate from the raw passed-pawn bonus above:
+    // this term tries to answer a different question.
+    //
+    // Passed bonus:
+    // "How valuable is this pawn in general?"
+    //
+    // Promotion danger:
+    // "How close is this pawn to creating an immediate
+    //  promotion problem for the defender?"
+    //
+    // Activated only for advanced passers (5th/6th/7th
+    // own-perspective ranks). The idea is to notice when
+    // the route to promotion is short, the next squares are
+    // supported, and the defending side does not securely
+    // control the critical squares.
+    //
+    // This stays cheap:
+    // - only runs for already-detected passed pawns
+    // - scans at most a few squares to promotion
+    // - reuses Attack.isSquareAttacked() for only the
+    //   critical front / promotion squares
+    //----------------------------------
+
+    evaluatePromotionDanger(square, white, phase) {
+
+        const rankIndex = square >> 3;
+
+        const advancement = white
+            ? 8 - rankIndex
+            : rankIndex + 1;
+
+        if (advancement < 5) {
+            return 0;
+        }
+
+        const mgBonus =
+            Eval.PROMOTION_DANGER_BY_RANK_MG[
+                advancement
+            ] || 0;
+
+        const egBonus =
+            Eval.PROMOTION_DANGER_BY_RANK_EG[
+                advancement
+            ] || 0;
+
+        let bonus = Math.round(
+            (
+                mgBonus * phase +
+                egBonus * (24 - phase)
+            ) / 24
+        );
+
+        const step = white ? -8 : 8;
+
+        const frontSquare = square + step;
+
+        const promotionSquare = white
+            ? (square & 7)
+            : 56 + (square & 7);
+
+        //----------------------------------
+        // Clear path squares
+        //
+        // Reward every empty square between the pawn and the
+        // first blocker/promotion. The route matters because
+        // a short, open runway is exactly what turns a passed
+        // pawn into an urgent tactical problem.
+        //----------------------------------
+
+        for (
+            let target = frontSquare;
+            target >= 0 && target <= 63;
+            target += step
+        ) {
+
+            if (this.board.pieceAt(target) !== Piece.EMPTY) {
+                break;
+            }
+
+            bonus += Eval.PROMOTION_PATH_CLEAR;
+
+            if (target === promotionSquare) {
+                break;
+            }
+
+        }
+
+        //----------------------------------
+        // Next-step square control
+        //----------------------------------
+
+        if (frontSquare >= 0 && frontSquare <= 63) {
+
+            const ownFrontControl =
+                Attack.isSquareAttacked(
+                    this.board,
+                    frontSquare,
+                    white
+                );
+
+            const enemyFrontControl =
+                Attack.isSquareAttacked(
+                    this.board,
+                    frontSquare,
+                    !white
+                );
+
+            if (ownFrontControl) {
+                bonus += Eval.PROMOTION_FRONT_CONTROL;
+            }
+
+            if (enemyFrontControl && !ownFrontControl) {
+                bonus += Eval.PROMOTION_FRONT_CONTESTED;
+            }
+
+        }
+
+        //----------------------------------
+        // Promotion-square control
+        //----------------------------------
+
+        const ownPromotionControl =
+            Attack.isSquareAttacked(
+                this.board,
+                promotionSquare,
+                white
+            );
+
+        const enemyPromotionControl =
+            Attack.isSquareAttacked(
+                this.board,
+                promotionSquare,
+                !white
+            );
+
+        if (ownPromotionControl) {
+            bonus += Eval.PROMOTION_SQUARE_CONTROL;
+        }
+
+        if (enemyPromotionControl && !ownPromotionControl) {
+            bonus += Eval.PROMOTION_SQUARE_CONTESTED;
+        }
+
+        //----------------------------------
+        // Defending king proximity
+        //
+        // If the enemy king is already on top of the key
+        // stopping squares, discount the urgency somewhat.
+        //----------------------------------
+
+        const enemyKingSquare = white
+            ? this.board.blackKing
+            : this.board.whiteKing;
+
+        const distanceToFront =
+            (frontSquare >= 0 && frontSquare <= 63)
+                ? this.squareDistance(
+                    enemyKingSquare,
+                    frontSquare
+                )
+                : 8;
+
+        const distanceToPromotion =
+            this.squareDistance(
+                enemyKingSquare,
+                promotionSquare
+            );
+
+        if (
+            distanceToFront <= 1 ||
+            distanceToPromotion <= 1
+        ) {
+            bonus += Eval.PROMOTION_ENEMY_KING_NEAR;
+        }
+
+        //----------------------------------
+        // Offside enemy knight
+        //
+        // Knights are notoriously poor at stopping a far-
+        // advanced passed pawn once they drift too far from
+        // the promotion corridor. Reward the passer if an
+        // enemy knight is far from BOTH the next-step square
+        // and the promotion square, and also attacks neither.
+        //
+        // The threshold is intentionally conservative: the
+        // knight has to be genuinely remote, not merely one
+        // move away from helping.
+        //----------------------------------
+
+        for (
+            const knightSquare of (
+                white
+                    ? this.board.blackPieces.knights
+                    : this.board.whitePieces.knights
+            )
+        ) {
+
+            const distanceSum =
+                this.squareDistance(
+                    knightSquare,
+                    frontSquare
+                ) +
+                this.squareDistance(
+                    knightSquare,
+                    promotionSquare
+                );
+
+            if (distanceSum <= 8) {
+                continue;
+            }
+
+            const knightAttacksFront =
+                this.knightAttacksSquare(
+                    knightSquare,
+                    frontSquare
+                );
+
+            const knightAttacksPromotion =
+                this.knightAttacksSquare(
+                    knightSquare,
+                    promotionSquare
+                );
+
+            if (
+                !knightAttacksFront &&
+                !knightAttacksPromotion
+            ) {
+                bonus +=
+                    Eval.PROMOTION_ENEMY_KNIGHT_OFFSIDE;
+            }
+
+        }
+
+        return Math.max(0, bonus);
+
+    }
+
+    knightAttacksSquare(fromSquare, targetSquare) {
+
+        const fromRank = fromSquare >> 3;
+        const fromFile = fromSquare & 7;
+
+        const targetRank = targetSquare >> 3;
+        const targetFile = targetSquare & 7;
+
+        const rankDelta =
+            Math.abs(fromRank - targetRank);
+
+        const fileDelta =
+            Math.abs(fromFile - targetFile);
+
+        return (
+            (rankDelta === 2 && fileDelta === 1) ||
+            (rankDelta === 1 && fileDelta === 2)
+        );
 
     }
 
