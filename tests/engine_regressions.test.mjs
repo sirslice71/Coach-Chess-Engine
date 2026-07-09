@@ -148,6 +148,24 @@ function searchBestMove(fen, depth) {
 
 }
 
+function searchBestMovesByDepth(fen, depths) {
+
+    return depths.map(depth => {
+
+        const result =
+            searchBestMove(fen, depth);
+
+        return {
+            depth,
+            notation: result.notation,
+            evaluation: result.evaluation,
+            nodes: result.nodes
+        };
+
+    });
+
+}
+
 function searchMoveScore(fen, notation, depth) {
 
     const {
@@ -185,6 +203,94 @@ function searchMoveScore(fen, notation, depth) {
     );
 
 }
+
+const PGN_COLLAPSE_REGRESSIONS = [
+    {
+        label: "game 4 vs Stash move 37",
+        fen: "8/Qp1q2k1/2pN3p/2Pb2p1/3P3n/P7/1P4PP/4R1K1 w - - 1 37",
+        target: "a7-b7",
+        current: [
+            {
+                depth: 5,
+                notation: "e1-e3",
+                evaluation: "5.26"
+            },
+            {
+                depth: 6,
+                notation: "e1-e3",
+                evaluation: "5.05"
+            }
+        ]
+    },
+    {
+        label: "game 8 vs Shallowblue move 73",
+        fen: "8/k7/7p/P2q2p1/3b1pB1/2p4P/P1P1QP2/6K1 w - - 1 73",
+        target: "e2-e8",
+        current: [
+            {
+                depth: 5,
+                notation: "e2-d3",
+                evaluation: "0.89"
+            },
+            {
+                depth: 6,
+                notation: "e2-d3",
+                evaluation: "0.89"
+            }
+        ]
+    },
+    {
+        label: "game 10 vs Stash move 24",
+        fen: "2r1r1k1/1p1b1ppp/4p3/PP1p4/NRn2B2/6P1/P5KP/3R4 b - - 1 24",
+        target: "e6-e5",
+        current: [
+            {
+                depth: 5,
+                notation: "c4-a3",
+                evaluation: "-3.47"
+            },
+            {
+                depth: 6,
+                notation: "c4-a3",
+                evaluation: "-3.47"
+            }
+        ]
+    },
+    {
+        label: "game 2 vs Shallowblue move 29",
+        fen: "r1r5/pp2kN1N/2b3p1/4P3/n7/1B2B3/PP4PP/2R3K1 b - - 0 29",
+        target: "c8-h8",
+        current: [
+            {
+                depth: 5,
+                notation: "a4-b2",
+                evaluation: "3.73"
+            },
+            {
+                depth: 6,
+                notation: "a4-b2",
+                evaluation: "5.17"
+            }
+        ]
+    },
+    {
+        label: "game 11 vs Casper move 9",
+        fen: "rnbqkb1r/5pp1/p2ppn1p/1p6/3NP1P1/2N1BP2/PPP4P/R2QKB1R w KQkq - 0 9",
+        target: "d1-d2",
+        current: [
+            {
+                depth: 5,
+                notation: "f1-d3",
+                evaluation: "0.82"
+            },
+            {
+                depth: 6,
+                notation: "g4-g5",
+                evaluation: "0.59"
+            }
+        ]
+    }
+];
 
 test("static evaluation stays White-relative regardless of side to move", () => {
 
@@ -486,6 +592,69 @@ test("depth-5 Nxe5 rook regression keeps the tactical bishop move", () => {
     assert.equal(result.notation, "f8-b4");
 
 });
+
+test("PGN collapse sentinel positions load and keep target moves legal", () => {
+
+    for (const position of PGN_COLLAPSE_REGRESSIONS) {
+
+        const {
+            board,
+            legalMoveGenerator
+        } = createEngine(position.fen);
+
+        assert.equal(
+            FEN.export(board),
+            position.fen,
+            `${position.label} should round-trip through FEN import/export`
+        );
+
+        const legalMoves =
+            legalMoveGenerator.generateMoves();
+
+        assert.ok(
+            legalMoves.some(move =>
+                move.toString() === position.target
+            ),
+            `${position.label} should keep target move ${position.target} legal`
+        );
+
+    }
+
+});
+
+for (const position of PGN_COLLAPSE_REGRESSIONS) {
+
+    test.skip(
+        `diagnostic PGN collapse target: ${position.label} should eventually prefer ${position.target}`,
+        () => {
+
+            const results =
+                searchBestMovesByDepth(
+                    position.fen,
+                    [5, 6]
+                );
+
+            assert.deepEqual(
+                results,
+                position.current.map(entry => ({
+                    ...entry,
+                    nodes: results.find(
+                        result =>
+                            result.depth === entry.depth
+                    )?.nodes
+                })),
+                "Update the diagnostic snapshot if current Coach behavior changes before this target starts passing."
+            );
+
+            assert.equal(
+                results.at(-1)?.notation,
+                position.target
+            );
+
+        }
+    );
+
+}
 
 //----------------------------------
 // Quiescence: SEE Capture Pruning /
