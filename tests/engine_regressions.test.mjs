@@ -225,17 +225,17 @@ const PGN_COLLAPSE_REGRESSIONS = [
     {
         label: "game 8 vs Shallowblue move 73",
         fen: "8/k7/7p/P2q2p1/3b1pB1/2p4P/P1P1QP2/6K1 w - - 1 73",
-        target: "e2-e8",
+        target: "g4-f3",
         current: [
             {
                 depth: 5,
-                notation: "e2-d3",
-                evaluation: "0.89"
+                notation: "e2-e7",
+                evaluation: "0.84"
             },
             {
                 depth: 6,
-                notation: "e2-d3",
-                evaluation: "0.89"
+                notation: "e2-e7",
+                evaluation: "0.84"
             }
         ]
     },
@@ -619,6 +619,21 @@ test("PGN collapse sentinel positions load and keep target moves legal", () => {
         );
 
     }
+
+});
+
+test("PGN collapse regression: game 8 vs Shallowblue move 73 finds g4-f3 at depth 8", () => {
+
+    const result =
+        searchBestMove(
+            "8/k7/7p/P2q2p1/3b1pB1/2p4P/P1P1QP2/6K1 w - - 1 73",
+            8
+        );
+
+    assert.equal(
+        result.notation,
+        "g4-f3"
+    );
 
 });
 
