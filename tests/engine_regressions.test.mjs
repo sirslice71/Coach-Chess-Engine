@@ -289,6 +289,54 @@ const PGN_COLLAPSE_REGRESSIONS = [
                 evaluation: "0.59"
             }
         ]
+    },
+    {
+        label: "20260709 round 1 vs Shallowblue move 37",
+        event: "20260709 Arena tournament",
+        opponent: "Shallowblue_x86-64",
+        coachColor: "Black",
+        fen: "1bk2rr1/3n2p1/p2P1pP1/2B1pB1p/2P4P/3K1P2/1R6/R7 b - - 1 37",
+        target: "e5-e4",
+        coachPlayed: "c8-d8",
+        theme: "advanced passer / defensive emergency / promotion-race defense",
+        whySkipped: "Coach still prefers defensive king/rook handling over the critical counterpush, so this is diagnostic only for now.",
+        activatesWhen: "Activate once Coach reliably prefers the defensive emergency break e5-e4 at practical search depths.",
+        current: [
+            {
+                depth: 5,
+                notation: "a6-a5",
+                evaluation: "1.90"
+            },
+            {
+                depth: 6,
+                notation: "c8-d8",
+                evaluation: "2.54"
+            }
+        ]
+    },
+    {
+        label: "20260709 round 2 vs Shallowblue move 54",
+        event: "20260709 Arena tournament",
+        opponent: "Shallowblue_x86-64",
+        coachColor: "White",
+        fen: "5r1k/6pp/5q2/1Rb1p3/4p3/1QP3Pb/P3RP2/6K1 w - - 3 54",
+        target: "g1-h2",
+        coachPlayed: "c3-c4",
+        theme: "queen-rook endgame defense / mate-net avoidance",
+        whySkipped: "Coach still drifts in the defensive queen-rook ending and does not yet pick the prophylactic king move consistently.",
+        activatesWhen: "Activate once Coach reliably finds the defensive king retreat g1-h2 instead of the collapsing queen-side push.",
+        current: [
+            {
+                depth: 5,
+                notation: "b5-b8",
+                evaluation: "-1.66"
+            },
+            {
+                depth: 6,
+                notation: "c3-c4",
+                evaluation: "-2.31"
+            }
+        ]
     }
 ];
 
