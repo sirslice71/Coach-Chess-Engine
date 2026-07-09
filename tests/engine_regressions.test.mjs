@@ -298,9 +298,11 @@ const PGN_COLLAPSE_REGRESSIONS = [
         fen: "1bk2rr1/3n2p1/p2P1pP1/2B1pB1p/2P4P/3K1P2/1R6/R7 b - - 1 37",
         target: "e5-e4",
         coachPlayed: "c8-d8",
-        theme: "advanced passer / defensive emergency / promotion-race defense",
-        whySkipped: "Coach still prefers defensive king/rook handling over the critical counterpush, so this is diagnostic only for now.",
-        activatesWhen: "Activate once Coach reliably prefers the defensive emergency break e5-e4 at practical search depths.",
+        originalReference: "Earlier diagnosis treated e5-e4 as the clean Stockfish target while Coach played c8-d8.",
+        currentReference: "Longer Stockfish analysis still prefers e5-e4, but also treats f8-e8, c8-d8, f8-f7, and g8-h8 as serious mating or near-mating continuations.",
+        theme: "advanced passer / multiple winning continuations / defensive calculation / mate-net conversion",
+        whySkipped: "This is no longer a clean one-move failure sentinel. Coach's c8-d8 should not be framed as a clear collapse/blunder, so the position remains diagnostic only.",
+        activatesWhen: "Do not activate as a strict single-move regression unless future analysis again isolates one clearly superior move. Keep it as a skipped advanced-passer calculation diagnostic for now.",
         current: [
             {
                 depth: 5,
