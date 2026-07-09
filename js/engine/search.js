@@ -2206,6 +2206,10 @@ export default class Search {
                     after.eval.pawns.promotionDanger -
                     before.eval.pawns.promotionDanger,
 
+                stopperQuality:
+                    after.eval.pawns.stopperQuality -
+                    before.eval.pawns.stopperQuality,
+
                 isolated:
                     after.eval.pawns.isolated -
                     before.eval.pawns.isolated,
@@ -2309,6 +2313,8 @@ export default class Search {
                 "Passed Pawns Delta": delta.passed,
 
                 "Promotion Danger Delta": delta.promotionDanger,
+
+                "Stopper Quality Delta": delta.stopperQuality,
 
                 "Isolated Pawns Delta": delta.isolated,
 
@@ -2482,6 +2488,10 @@ export default class Search {
             promotionDanger:
                 after.eval.pawns.promotionDanger -
                 before.eval.pawns.promotionDanger,
+
+            stopperQuality:
+                after.eval.pawns.stopperQuality -
+                before.eval.pawns.stopperQuality,
 
             connected:
                 after.eval.pawns.connected -
@@ -2744,6 +2754,8 @@ export default class Search {
                 { label: "Passed", value: delta.passed },
 
                 { label: "Promotion Danger", value: delta.promotionDanger },
+
+                { label: "Stopper Quality", value: delta.stopperQuality },
 
                 { label: "Isolated", value: delta.isolated },
 

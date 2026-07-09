@@ -127,6 +127,8 @@ export default class Evaluation {
 
                 promotionDanger: 0,
 
+                stopperQuality: 0,
+
                 isolated: 0,
 
                 doubled: 0,
@@ -1261,6 +1263,8 @@ export default class Evaluation {
 
             promotionDanger: 0,
 
+            stopperQuality: 0,
+
             isolated: 0,
 
             doubled: 0,
@@ -1387,6 +1391,12 @@ export default class Evaluation {
                         phase
                     );
 
+                score.stopperQuality +=
+                    this.evaluateStopperQuality(
+                        square,
+                        true
+                    );
+
             }
 
             //----------------------------------
@@ -1489,6 +1499,12 @@ export default class Evaluation {
                         phase
                     );
 
+                score.stopperQuality +=
+                    this.evaluateStopperQuality(
+                        square,
+                        false
+                    );
+
             }
 
             //----------------------------------
@@ -1532,6 +1548,8 @@ export default class Evaluation {
             score.passed +
 
             score.promotionDanger +
+
+            score.stopperQuality +
 
             score.connected +
 
@@ -2045,6 +2063,473 @@ export default class Evaluation {
         }
 
         return Math.max(0, bonus);
+
+    }
+
+    evaluateStopperQuality(square, white) {
+
+        const rankIndex = square >> 3;
+
+        const advancement = white
+            ? 8 - rankIndex
+            : rankIndex + 1;
+
+        if (advancement < 5) {
+            return 0;
+        }
+
+        const step = white ? -8 : 8;
+
+        const frontSquare = square + step;
+
+        if (frontSquare < 0 || frontSquare > 63) {
+            return 0;
+        }
+
+        const promotionSquare = white
+            ? (square & 7)
+            : 56 + (square & 7);
+
+        const secondSquare =
+            frontSquare === promotionSquare
+                ? -1
+                : frontSquare + step;
+
+        const defenderWhite = !white;
+
+        const defenderPieces = defenderWhite
+            ? this.board.whitePieces
+            : this.board.blackPieces;
+
+        if (defenderPieces.rooks.length === 0) {
+            return 0;
+        }
+
+        const resources =
+            this.collectStopperResources(
+                square,
+                frontSquare,
+                secondSquare,
+                promotionSquare,
+                defenderWhite
+            );
+
+        let score = 0;
+
+        if (resources.blockade) {
+            score -= Eval.STOPPER_BLOCKADE;
+        }
+
+        score -=
+            Math.min(resources.frontControl, 2) *
+            Eval.STOPPER_FRONT_CONTROL;
+
+        if (secondSquare >= 0 && secondSquare <= 63) {
+            score -=
+                Math.min(resources.secondControl, 2) *
+                Eval.STOPPER_SECOND_CONTROL;
+        }
+
+        score -=
+            Math.min(resources.pawnAttack, 2) *
+            Eval.STOPPER_ATTACKS_PAWN;
+
+        if (resources.heavySetup) {
+            score -= Eval.STOPPER_HEAVY_SETUP;
+        }
+
+        const hasRealStopper =
+            resources.blockade ||
+            resources.frontControl > 0 ||
+            resources.secondControl > 0 ||
+            resources.pawnAttack > 0;
+
+        if (
+            frontSquare !== promotionSquare &&
+            resources.hasRook &&
+            !hasRealStopper &&
+            resources.promotionOnlyControl > 0
+        ) {
+            score +=
+                Math.min(resources.promotionOnlyControl, 2) *
+                Eval.STOPPER_FAKE_PROMOTION_CONTROL;
+        }
+
+        return white ? score : -score;
+
+    }
+
+    collectStopperResources(
+        pawnSquare,
+        frontSquare,
+        secondSquare,
+        promotionSquare,
+        defenderWhite
+    ) {
+
+        const pieces = defenderWhite
+            ? this.board.whitePieces
+            : this.board.blackPieces;
+
+        const resources = {
+            pawnAttack: 0,
+            frontControl: 0,
+            secondControl: 0,
+            promotionControl: 0,
+            promotionOnlyControl: 0,
+            heavySetup: false,
+            hasRook: pieces.rooks.length > 0,
+            blockade: this.isNonKingBlockade(
+                frontSquare,
+                defenderWhite
+            )
+        };
+
+        for (const square of pieces.pawns) {
+
+            const attacksPawn =
+                this.pawnAttacksSquare(
+                    square,
+                    defenderWhite,
+                    pawnSquare
+                );
+
+            const controlsFront =
+                this.pawnAttacksSquare(
+                    square,
+                    defenderWhite,
+                    frontSquare
+                );
+
+            const controlsSecond =
+                secondSquare >= 0 &&
+                secondSquare <= 63 &&
+                this.pawnAttacksSquare(
+                    square,
+                    defenderWhite,
+                    secondSquare
+                );
+
+            const controlsPromotion =
+                this.pawnAttacksSquare(
+                    square,
+                    defenderWhite,
+                    promotionSquare
+                );
+
+            this.accumulateStopperResource(
+                resources,
+                attacksPawn,
+                controlsFront,
+                controlsSecond,
+                controlsPromotion,
+                false
+            );
+
+        }
+
+        for (const square of pieces.knights) {
+
+            const attacksPawn =
+                this.knightAttacksSquare(
+                    square,
+                    pawnSquare
+                );
+
+            const controlsFront =
+                this.knightAttacksSquare(
+                    square,
+                    frontSquare
+                );
+
+            const controlsSecond =
+                secondSquare >= 0 &&
+                secondSquare <= 63 &&
+                this.knightAttacksSquare(
+                    square,
+                    secondSquare
+                );
+
+            const controlsPromotion =
+                this.knightAttacksSquare(
+                    square,
+                    promotionSquare
+                );
+
+            this.accumulateStopperResource(
+                resources,
+                attacksPawn,
+                controlsFront,
+                controlsSecond,
+                controlsPromotion,
+                false
+            );
+
+        }
+
+        for (const square of pieces.bishops) {
+
+            const attacksPawn =
+                this.bishopAttacksSquare(
+                    square,
+                    pawnSquare
+                );
+
+            const controlsFront =
+                this.bishopAttacksSquare(
+                    square,
+                    frontSquare
+                );
+
+            const controlsSecond =
+                secondSquare >= 0 &&
+                secondSquare <= 63 &&
+                this.bishopAttacksSquare(
+                    square,
+                    secondSquare
+                );
+
+            const controlsPromotion =
+                this.bishopAttacksSquare(
+                    square,
+                    promotionSquare
+                );
+
+            this.accumulateStopperResource(
+                resources,
+                attacksPawn,
+                controlsFront,
+                controlsSecond,
+                controlsPromotion,
+                false
+            );
+
+        }
+
+        for (const square of pieces.rooks) {
+
+            const attacksPawn =
+                this.rookAttacksSquare(
+                    square,
+                    pawnSquare
+                );
+
+            const controlsFront =
+                this.rookAttacksSquare(
+                    square,
+                    frontSquare
+                );
+
+            const controlsSecond =
+                secondSquare >= 0 &&
+                secondSquare <= 63 &&
+                this.rookAttacksSquare(
+                    square,
+                    secondSquare
+                );
+
+            const controlsPromotion =
+                this.rookAttacksSquare(
+                    square,
+                    promotionSquare
+                );
+
+            this.accumulateStopperResource(
+                resources,
+                attacksPawn,
+                controlsFront,
+                controlsSecond,
+                controlsPromotion,
+                true
+            );
+
+        }
+
+        for (const square of pieces.queens) {
+
+            const attacksPawn =
+                this.queenAttacksSquare(
+                    square,
+                    pawnSquare
+                );
+
+            const controlsFront =
+                this.queenAttacksSquare(
+                    square,
+                    frontSquare
+                );
+
+            const controlsSecond =
+                secondSquare >= 0 &&
+                secondSquare <= 63 &&
+                this.queenAttacksSquare(
+                    square,
+                    secondSquare
+                );
+
+            const controlsPromotion =
+                this.queenAttacksSquare(
+                    square,
+                    promotionSquare
+                );
+
+            this.accumulateStopperResource(
+                resources,
+                attacksPawn,
+                controlsFront,
+                controlsSecond,
+                controlsPromotion,
+                true
+            );
+
+        }
+
+        return resources;
+
+    }
+
+    accumulateStopperResource(
+        resources,
+        attacksPawn,
+        controlsFront,
+        controlsSecond,
+        controlsPromotion,
+        heavy
+    ) {
+
+        if (attacksPawn) {
+            resources.pawnAttack++;
+        }
+
+        if (controlsFront) {
+            resources.frontControl++;
+        }
+
+        if (controlsSecond) {
+            resources.secondControl++;
+        }
+
+        if (controlsPromotion) {
+            resources.promotionControl++;
+        }
+
+        const real =
+            attacksPawn ||
+            controlsFront ||
+            controlsSecond;
+
+        if (!real && controlsPromotion) {
+            resources.promotionOnlyControl++;
+        }
+
+        if (heavy && controlsPromotion && (controlsFront || controlsSecond)) {
+            resources.heavySetup = true;
+        }
+
+    }
+
+    isNonKingBlockade(square, white) {
+
+        const piece =
+            this.board.pieceAt(square);
+
+        if (piece === Piece.EMPTY) {
+            return false;
+        }
+
+        if (white) {
+            return piece > 0 && piece !== Piece.WK;
+        }
+
+        return piece < 0 && piece !== Piece.BK;
+
+    }
+
+    pawnAttacksSquare(fromSquare, white, targetSquare) {
+
+        if (targetSquare < 0 || targetSquare > 63) {
+            return false;
+        }
+
+        const delta = targetSquare - fromSquare;
+
+        return white
+            ? delta === -7 || delta === -9
+            : delta === 7 || delta === 9;
+
+    }
+
+    bishopAttacksSquare(fromSquare, targetSquare) {
+
+        return this.sliderAttacksSquare(
+            fromSquare,
+            targetSquare,
+            [[-1, -1], [-1, 1], [1, -1], [1, 1]]
+        );
+
+    }
+
+    rookAttacksSquare(fromSquare, targetSquare) {
+
+        return this.sliderAttacksSquare(
+            fromSquare,
+            targetSquare,
+            [[-1, 0], [1, 0], [0, -1], [0, 1]]
+        );
+
+    }
+
+    queenAttacksSquare(fromSquare, targetSquare) {
+
+        return (
+            this.bishopAttacksSquare(
+                fromSquare,
+                targetSquare
+            ) ||
+            this.rookAttacksSquare(
+                fromSquare,
+                targetSquare
+            )
+        );
+
+    }
+
+    sliderAttacksSquare(fromSquare, targetSquare, directions) {
+
+        const fromRank = fromSquare >> 3;
+        const fromFile = fromSquare & 7;
+
+        for (const [rankStep, fileStep] of directions) {
+
+            let targetRank = fromRank + rankStep;
+            let targetFile = fromFile + fileStep;
+
+            while (
+                targetRank >= 0 &&
+                targetRank <= 7 &&
+                targetFile >= 0 &&
+                targetFile <= 7
+            ) {
+
+                const square =
+                    targetRank * 8 + targetFile;
+
+                if (square === targetSquare) {
+                    return true;
+                }
+
+                if (this.board.pieceAt(square) !== Piece.EMPTY) {
+                    break;
+                }
+
+                targetRank += rankStep;
+                targetFile += fileStep;
+
+            }
+
+        }
+
+        return false;
 
     }
 

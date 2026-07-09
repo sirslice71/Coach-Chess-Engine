@@ -1370,7 +1370,7 @@ test("black promotion generates exactly four promotion choices", () => {
 
 });
 
-test("Coach Lab exposes pawns.promotionDanger without mutating board state", () => {
+test("Coach Lab exposes pawn promotion terms without mutating board state", () => {
 
     const fen =
         "r1r5/pp2kN1N/2b3p1/4P3/n7/1B2B3/PP4PP/2R3K1 b - - 0 29";
@@ -1410,10 +1410,26 @@ test("Coach Lab exposes pawns.promotionDanger without mutating board state", () 
 
     assert.ok(
         Object.prototype.hasOwnProperty.call(
+            quickRow,
+            "Stopper Quality Delta"
+        ),
+        "quick lab should report the stopper quality delta"
+    );
+
+    assert.ok(
+        Object.prototype.hasOwnProperty.call(
             detailed.before.eval.pawns,
             "promotionDanger"
         ),
         "detailed lab should expose before.eval.pawns.promotionDanger"
+    );
+
+    assert.ok(
+        Object.prototype.hasOwnProperty.call(
+            detailed.before.eval.pawns,
+            "stopperQuality"
+        ),
+        "detailed lab should expose before.eval.pawns.stopperQuality"
     );
 
     assert.ok(
@@ -1424,10 +1440,24 @@ test("Coach Lab exposes pawns.promotionDanger without mutating board state", () 
         "detailed lab should expose after.eval.pawns.promotionDanger"
     );
 
+    assert.ok(
+        Object.prototype.hasOwnProperty.call(
+            detailed.after.eval.pawns,
+            "stopperQuality"
+        ),
+        "detailed lab should expose after.eval.pawns.stopperQuality"
+    );
+
     assert.equal(
         typeof detailed.delta.promotionDanger,
         "number",
         "detailed lab should compute a numeric promotion danger delta"
+    );
+
+    assert.equal(
+        typeof detailed.delta.stopperQuality,
+        "number",
+        "detailed lab should compute a numeric stopper quality delta"
     );
 
 });
