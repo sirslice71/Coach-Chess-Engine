@@ -22,6 +22,7 @@ const SCORE_KILLER1   = 4000;
 const SCORE_KILLER2   = 3900;
 
 const SCORE_CENTER    = 1000;
+const SCORE_EXTENDED_CENTER = 500;
 const SCORE_KNIGHT    = 500;
 const SCORE_BISHOP    = 250;
 
@@ -258,6 +259,29 @@ export default class MoveOrdering {
         }
 
         //----------------------------------
+        // Quiet Pawn Centralization
+        //
+        // A cheap ordering nudge for quiet pawn advances that
+        // land in the center or extended center. This helps
+        // stabilizing central pawn moves compete with otherwise
+        // similar quiet piece shuffles without adding static
+        // evaluation work to move ordering.
+        //----------------------------------
+
+        if (
+            !move.isCapture() &&
+            !move.isPromotion() &&
+            Math.abs(move.piece) === 1
+        ) {
+
+            score +=
+                this.quietPawnCenterBonus(
+                    move.toSquare
+                );
+
+        }
+
+        //----------------------------------
         // Checking Move Bonus
         //----------------------------------
 
@@ -282,6 +306,35 @@ export default class MoveOrdering {
     pieceValue(piece) {
 
         return MVV[Math.abs(piece)] || 0;
+
+    }
+
+    quietPawnCenterBonus(toSquare) {
+
+        const rank = toSquare >> 3;
+        const file = toSquare & 7;
+
+        const inCentralFiles =
+            file >= 2 && file <= 5;
+
+        const inCentralRanks =
+            rank >= 2 && rank <= 5;
+
+        if (!inCentralFiles || !inCentralRanks) {
+
+            return 0;
+
+        }
+
+        const inCoreCenter =
+            file >= 3 && file <= 4 &&
+            rank >= 3 && rank <= 4;
+
+        return inCoreCenter
+
+            ? SCORE_CENTER
+
+            : SCORE_EXTENDED_CENTER;
 
     }
 
