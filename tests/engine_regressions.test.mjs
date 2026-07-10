@@ -717,6 +717,40 @@ test("PGN collapse regression: game 10 vs Stash move 24 finds e6-e5 at depth 8",
 
 });
 
+test("post-extension Game 6 quiet promotion-race defense finds the strongest rook family", () => {
+
+    //----------------------------------
+    // This position is objectively lost for Black. The point
+    // of the regression is narrower: Stockfish's longer mate
+    // line comes from the quiet defensive rook family e8-e7 /
+    // e6-e7, while the flashy king move g7-g8 shortens the
+    // mate. We only guard recognition of that stronger
+    // defensive resource family here, not a claim that Black
+    // is saving the game or that only one move is legal.
+    //----------------------------------
+
+    const result =
+        searchBestMove(
+            "3Qr3/1R4k1/4q1p1/P3P3/3pP3/2bp4/6PP/5RK1 b - - 8 61",
+            8
+        );
+
+    assert.ok(
+        [
+            "e8-e7",
+            "e6-e7"
+        ].includes(result.notation),
+        `Expected quiet defensive rook family e8-e7/e6-e7, got ${result.notation}`
+    );
+
+    assert.notEqual(
+        result.notation,
+        "g7-g8",
+        "Depth-8 regression should no longer fall back to the shorter-mate king move"
+    );
+
+});
+
 for (const position of PGN_COLLAPSE_REGRESSIONS) {
 
     test.skip(
