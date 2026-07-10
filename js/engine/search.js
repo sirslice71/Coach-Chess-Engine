@@ -2188,6 +2188,22 @@ export default class Search {
                     after.eval.opening.queenDiscipline -
                     before.eval.opening.queenDiscipline,
 
+                castlingLiveReadiness:
+                    after.eval.opening.castlingLiveReadiness -
+                    before.eval.opening.castlingLiveReadiness,
+
+                castlingCompleteHistory:
+                    after.eval.opening.castlingCompleteHistory -
+                    before.eval.opening.castlingCompleteHistory,
+
+                castlingAbortedHistory:
+                    after.eval.opening.castlingAbortedHistory -
+                    before.eval.opening.castlingAbortedHistory,
+
+                castlingHistoricalTotal:
+                    after.eval.opening.castlingHistoricalTotal -
+                    before.eval.opening.castlingHistoricalTotal,
+
                 castlingUrgency:
                     after.eval.opening.castlingUrgency -
                     before.eval.opening.castlingUrgency,
@@ -2337,6 +2353,18 @@ export default class Search {
                 "Early Rook Discipline Delta": delta.coordination,
 
                 "Queen Discipline Delta": delta.queenDiscipline,
+
+                "Castling Live Readiness Delta":
+                    delta.castlingLiveReadiness,
+
+                "Castling Complete History Delta":
+                    delta.castlingCompleteHistory,
+
+                "Castling Aborted History Delta":
+                    delta.castlingAbortedHistory,
+
+                "Castling Historical Total Delta":
+                    delta.castlingHistoricalTotal,
 
                 "Castling Urgency Delta": delta.castlingUrgency,
 
@@ -2498,6 +2526,22 @@ export default class Search {
             queenDiscipline:
                 after.eval.opening.queenDiscipline -
                 before.eval.opening.queenDiscipline,
+
+            castlingLiveReadiness:
+                after.eval.opening.castlingLiveReadiness -
+                before.eval.opening.castlingLiveReadiness,
+
+            castlingCompleteHistory:
+                after.eval.opening.castlingCompleteHistory -
+                before.eval.opening.castlingCompleteHistory,
+
+            castlingAbortedHistory:
+                after.eval.opening.castlingAbortedHistory -
+                before.eval.opening.castlingAbortedHistory,
+
+            castlingHistoricalTotal:
+                after.eval.opening.castlingHistoricalTotal -
+                before.eval.opening.castlingHistoricalTotal,
 
             castlingUrgency:
                 after.eval.opening.castlingUrgency -
@@ -2740,6 +2784,26 @@ export default class Search {
                 { label: "Bishop Freedom", value: delta.bishopFreedom },
 
                 { label: "Queen Discipline", value: delta.queenDiscipline },
+
+                {
+                    label: "Castling Live Readiness",
+                    value: delta.castlingLiveReadiness
+                },
+
+                {
+                    label: "Castling Complete History",
+                    value: delta.castlingCompleteHistory
+                },
+
+                {
+                    label: "Castling Aborted History",
+                    value: delta.castlingAbortedHistory
+                },
+
+                {
+                    label: "Castling Historical Total",
+                    value: delta.castlingHistoricalTotal
+                },
 
                 { label: "Castling Urgency", value: delta.castlingUrgency },
 

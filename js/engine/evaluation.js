@@ -81,6 +81,14 @@ export default class Evaluation {
 
                 queenDiscipline: 0,
 
+                castlingLiveReadiness: 0,
+
+                castlingCompleteHistory: 0,
+
+                castlingAbortedHistory: 0,
+
+                castlingHistoricalTotal: 0,
+
                 castlingUrgency: 0,
 
                 tempo: 0,
@@ -195,8 +203,23 @@ export default class Evaluation {
         score.opening.queenDiscipline =
             this.evaluateQueenDiscipline();
 
-        score.opening.castlingUrgency =
+        const castlingUrgency =
             this.evaluateCastlingUrgency();
+
+        score.opening.castlingLiveReadiness =
+            castlingUrgency.liveReadiness;
+
+        score.opening.castlingCompleteHistory =
+            castlingUrgency.castlingCompleteHistory;
+
+        score.opening.castlingAbortedHistory =
+            castlingUrgency.castlingAbortedHistory;
+
+        score.opening.castlingHistoricalTotal =
+            castlingUrgency.castlingHistoricalTotal;
+
+        score.opening.castlingUrgency =
+            castlingUrgency.total;
 
         score.opening.total =
 
@@ -2970,11 +2993,45 @@ export default class Evaluation {
 
     evaluateCastlingUrgency() {
 
+        const components =
+            this.evaluateCastlingUrgencyComponents();
+
+        return {
+
+            liveReadiness:
+                components.liveReadiness,
+
+            castlingCompleteHistory:
+                components.castlingCompleteHistory,
+
+            castlingAbortedHistory:
+                components.castlingAbortedHistory,
+
+            castlingHistoricalTotal:
+                components.castlingHistoricalTotal,
+
+            total:
+                components.total
+
+        };
+
+    }
+
+    evaluateCastlingUrgencyComponents() {
+
         if (!this.shouldEvaluateCastlingUrgency()) {
-            return 0;
+            return {
+                liveReadiness: 0,
+                castlingCompleteHistory: 0,
+                castlingAbortedHistory: 0,
+                castlingHistoricalTotal: 0,
+                total: 0
+            };
         }
 
-        let score = 0;
+        let liveReadiness = 0;
+        let castlingCompleteHistory = 0;
+        let castlingAbortedHistory = 0;
 
         const whiteDevelopmentStarted =
             this.board.pieceAt(57) !== Piece.WN ||
@@ -2983,11 +3040,13 @@ export default class Evaluation {
             this.board.pieceAt(61) !== Piece.WB;
 
         if (this.isCastled(true)) {
-            score += Eval.CASTLING_COMPLETE;
+            castlingCompleteHistory +=
+                Eval.CASTLING_COMPLETE;
         }
         else if (this.board.whiteKing !== 60) {
 
-            score += Eval.CASTLING_ABORTED;
+            castlingAbortedHistory +=
+                Eval.CASTLING_ABORTED;
 
         }
         else if (whiteDevelopmentStarted) {
@@ -2996,10 +3055,12 @@ export default class Evaluation {
                 this.castlingLaneStatus(true);
 
             if (readiness === 2) {
-                score += Eval.CASTLING_READY;
+                liveReadiness +=
+                    Eval.CASTLING_READY;
             }
             else if (readiness === 1) {
-                score += Eval.CASTLING_PARTIAL;
+                liveReadiness +=
+                    Eval.CASTLING_PARTIAL;
             }
 
         }
@@ -3011,11 +3072,13 @@ export default class Evaluation {
             this.board.pieceAt(5) !== Piece.BB;
 
         if (this.isCastled(false)) {
-            score -= Eval.CASTLING_COMPLETE;
+            castlingCompleteHistory -=
+                Eval.CASTLING_COMPLETE;
         }
         else if (this.board.blackKing !== 4) {
 
-            score -= Eval.CASTLING_ABORTED;
+            castlingAbortedHistory -=
+                Eval.CASTLING_ABORTED;
 
         }
         else if (blackDevelopmentStarted) {
@@ -3024,15 +3087,29 @@ export default class Evaluation {
                 this.castlingLaneStatus(false);
 
             if (readiness === 2) {
-                score -= Eval.CASTLING_READY;
+                liveReadiness -=
+                    Eval.CASTLING_READY;
             }
             else if (readiness === 1) {
-                score -= Eval.CASTLING_PARTIAL;
+                liveReadiness -=
+                    Eval.CASTLING_PARTIAL;
             }
 
         }
 
-        return score;
+        const castlingHistoricalTotal =
+            castlingCompleteHistory +
+            castlingAbortedHistory;
+
+        return {
+            liveReadiness,
+            castlingCompleteHistory,
+            castlingAbortedHistory,
+            castlingHistoricalTotal,
+            total:
+                liveReadiness +
+                castlingHistoricalTotal
+        };
 
     }
 
