@@ -132,6 +132,29 @@ const LMR_MIN_MOVE_INDEX = 4;
 
 const LMR_REDUCTION = 1;
 
+//----------------------------------
+// Check Extension (near-horizon only, budget-capped v2)
+//
+// A move that gives check is forcing; searching the reply one
+// ply deeper can reveal a mate/tactic that would otherwise fall
+// past the horizon. The unconditional v1 extended checking
+// lines throughout the whole tree and exploded in breadth in
+// queen-rich positions. v2 only extends when the current node
+// is already near the negamax->quiescence horizon
+// (depth <= CHECK_EXTENSION_MAX_DEPTH), so extensions happen
+// only in the shallow subtrees at the bottom of the tree where
+// the missing continuation actually lives. Each root-to-leaf
+// line may still spend at most MAX_CHECK_EXTENSIONS extension,
+// threaded through negamax()'s recursive calls (extensionsLeft),
+// which also stops a run of consecutive near-horizon checks from
+// extending indefinitely. Never applied at the root move loop
+// (searchIteration) and never inside quiescence().
+//----------------------------------
+
+const MAX_CHECK_EXTENSIONS = 1;
+
+const CHECK_EXTENSION_MAX_DEPTH = 3;
+
 export class SearchTimeout extends Error {}
 
 export default class Search {
@@ -959,7 +982,7 @@ export default class Search {
     // Never return moves or statistics.
     //----------------------------------
 
-    negamax(depth, alpha, beta, ply = 0, isRoot = false) {
+    negamax(depth, alpha, beta, ply = 0, isRoot = false, extensionsLeft = MAX_CHECK_EXTENSIONS) {
 
         this.checkSearchDeadline();
 
@@ -1160,6 +1183,29 @@ export default class Search {
                 // a null-window search alone.
                 //----------------------------------
 
+                //----------------------------------
+                // Check extension (near-horizon only): does the
+                // move just made give check (board-verified,
+                // incl. discovered)? If so, this line still has
+                // budget, AND the node is near the horizon
+                // (depth <= CHECK_EXTENSION_MAX_DEPTH), search the
+                // child one ply deeper. Budget decremented only
+                // when the extension is actually spent.
+                //----------------------------------
+
+                const givesCheck = this.board.isInCheck();
+
+                const extend =
+                    (givesCheck &&
+                        extensionsLeft > 0 &&
+                        depth <= CHECK_EXTENSION_MAX_DEPTH)
+                        ? 1
+                        : 0;
+
+                const childDepth = depth - 1 + extend;
+
+                const childExtensions = extensionsLeft - extend;
+
                 const usePvsScout =
 
                     moveIndex > 0 &&
@@ -1223,7 +1269,7 @@ export default class Search {
 
                             move.key !== killers[1] &&
 
-                            !this.board.isInCheck();
+                            !givesCheck;
 
                         if (reduceMove) {
 
@@ -1238,7 +1284,11 @@ export default class Search {
 
                                     -alpha,
 
-                                    ply + 1
+                                    ply + 1,
+
+                                    false,
+
+                                    childExtensions
 
                                 );
 
@@ -1259,13 +1309,17 @@ export default class Search {
                                 score =
                                     -this.negamax(
 
-                                        depth - 1,
+                                        childDepth,
 
                                         -alpha - 1,
 
                                         -alpha,
 
-                                        ply + 1
+                                        ply + 1,
+
+                                        false,
+
+                                        childExtensions
 
                                     );
 
@@ -1278,13 +1332,17 @@ export default class Search {
                             score =
                                 -this.negamax(
 
-                                    depth - 1,
+                                    childDepth,
 
                                     -alpha - 1,
 
                                     -alpha,
 
-                                    ply + 1
+                                    ply + 1,
+
+                                    false,
+
+                                    childExtensions
 
                                 );
 
@@ -1297,13 +1355,17 @@ export default class Search {
                             score =
                                 -this.negamax(
 
-                                    depth - 1,
+                                    childDepth,
 
                                     -beta,
 
                                     -alpha,
 
-                                    ply + 1
+                                    ply + 1,
+
+                                    false,
+
+                                    childExtensions
 
                                 );
 
@@ -1315,13 +1377,17 @@ export default class Search {
                         score =
                             -this.negamax(
 
-                                depth - 1,
+                                childDepth,
 
                                 -beta,
 
                                 -alpha,
 
-                                ply + 1
+                                ply + 1,
+
+                                false,
+
+                                childExtensions
 
                             );
 
