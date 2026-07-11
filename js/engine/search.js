@@ -6,6 +6,7 @@ import { SearchConstants } from "./searchconstants.js";
 import MoveOrdering from "./moveordering.js";
 import EngineDebug from "../dev/enginedebug.js";
 import { Piece } from "../core/piece.js";
+import { algebraic } from "../core/square.js";
 import Zobrist from "./zobrist.js";
 import TranspositionTable from "./transpositiontable.js";
 import {
@@ -16,6 +17,99 @@ import {
     from "./transpositiontable.js";
 
 const MAX_Q_PLY = 16;
+
+function promotionSuffix(piece) {
+
+    switch (Math.abs(piece)) {
+
+        case Math.abs(Piece.WQ):
+            return "q";
+
+        case Math.abs(Piece.WR):
+            return "r";
+
+        case Math.abs(Piece.WB):
+            return "b";
+
+        case Math.abs(Piece.WN):
+            return "n";
+
+        default:
+            return "";
+
+    }
+
+}
+
+function moveToLabUci(move) {
+
+    let notation =
+        algebraic(move.fromSquare) +
+        algebraic(move.toSquare);
+
+    if (move.isPromotion()) {
+        notation += promotionSuffix(move.promotedPiece);
+    }
+
+    return notation;
+
+}
+
+function parseLabMoveString(moveString) {
+
+    if (typeof moveString !== "string") {
+
+        return {
+            error:
+                "Invalid move format. Use e2-e4 or e2e4; " +
+                "promotion moves must include q, r, b, or n."
+        };
+
+    }
+
+    const trimmed =
+        moveString.trim();
+
+    const normalized =
+        trimmed.toLowerCase();
+
+    const exactMatch =
+        normalized.match(
+            /^([a-h][1-8])-?([a-h][1-8])(?:=?([qrbn]))?$/
+        );
+
+    if (exactMatch) {
+
+        return {
+            from: exactMatch[1],
+            to: exactMatch[2],
+            promotion: exactMatch[3] || null
+        };
+
+    }
+
+    const malformedPromotionMatch =
+        normalized.match(
+            /^([a-h][1-8])-?([a-h][1-8])(?:=?(.+))$/
+        );
+
+    if (malformedPromotionMatch) {
+
+        return {
+            error:
+                `Invalid promotion suffix "${malformedPromotionMatch[3]}". ` +
+                "Use q, r, b, or n."
+        };
+
+    }
+
+    return {
+        error:
+            `Invalid move format: ${moveString}. ` +
+            "Use e2-e4 or e2e4; promotion moves must include q, r, b, or n."
+    };
+
+}
 
 //----------------------------------
 // Quiescence: SEE Capture Pruning
@@ -2466,6 +2560,81 @@ export default class Search {
 
     }
 
+    resolveLabMove(
+        moveString,
+        legalMoves = null
+    ) {
+
+        const parsedMove =
+            parseLabMoveString(moveString);
+
+        if (parsedMove.error) {
+
+            return {
+                move: null,
+                error: parsedMove.error
+            };
+
+        }
+
+        const moves =
+            legalMoves ||
+            this.legalMoveGenerator.generateMoves();
+
+        const fromTo =
+            parsedMove.from +
+            parsedMove.to;
+
+        const candidates =
+            moves.filter(move =>
+                algebraic(move.fromSquare) +
+                algebraic(move.toSquare) === fromTo
+            );
+
+        if (parsedMove.promotion !== null) {
+
+            const exactMove =
+                candidates.find(move =>
+                    moveToLabUci(move) ===
+                    fromTo + parsedMove.promotion
+                );
+
+            return {
+                move: exactMove || null,
+                error: exactMove
+                    ? null
+                    : `Illegal move: ${moveString}`
+            };
+
+        }
+
+        if (candidates.length === 1) {
+
+            return {
+                move: candidates[0],
+                error: null
+            };
+
+        }
+
+        if (candidates.some(move => move.isPromotion())) {
+
+            return {
+                move: null,
+                error:
+                    `Ambiguous promotion move: ${moveString}. ` +
+                    "Include q, r, b, or n."
+            };
+
+        }
+
+        return {
+            move: null,
+            error: `Illegal move: ${moveString}`
+        };
+
+    }
+
     lab(moveString = null, depth = 1) {
 
         //----------------------------------
@@ -2483,21 +2652,14 @@ export default class Search {
         // Find requested move
         //----------------------------------
 
-        const moves = this.legalMoveGenerator.generateMoves();
-
-        const move = moves.find(
-
-            m => m.toString() === moveString
-
-        );
+        const {
+            move,
+            error
+        } = this.resolveLabMove(moveString);
 
         if (!move) {
 
-            console.error(
-
-                `Illegal move: ${moveString}`
-
-            );
+            console.error(error);
 
             return null;
 

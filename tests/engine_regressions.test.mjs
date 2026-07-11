@@ -96,6 +96,34 @@ function withMutedConsole(fn) {
 
 }
 
+function captureConsoleError(fn) {
+
+    const originalError =
+        console.error;
+
+    const errors = [];
+
+    console.error = (...args) => {
+        errors.push(args.join(" "));
+    };
+
+    try {
+
+        return {
+            result: fn(),
+            errors
+        };
+
+    }
+
+    finally {
+
+        console.error = originalError;
+
+    }
+
+}
+
 function findMove(legalMoveGenerator, notation) {
 
     const move =
@@ -2123,6 +2151,117 @@ test("Coach Lab exposes pawn promotion terms without mutating board state", () =
         typeof detailed.delta.stopperQuality,
         "number",
         "detailed lab should compute a numeric stopper quality delta"
+    );
+
+});
+
+test("Coach Lab resolves exact promotion moves without ambiguity", () => {
+
+    const fen =
+        "6k1/P7/8/8/8/8/8/4K3 w - - 0 1";
+
+    const { search } =
+        createEngine(fen);
+
+    for (const notation of [
+        "a7a8q",
+        "a7a8r",
+        "a7a8b",
+        "a7a8n"
+    ]) {
+
+        const resolved =
+            search.resolveLabMove(notation);
+
+        assert.equal(resolved.error, null);
+        assert.ok(resolved.move, `expected ${notation} to resolve`);
+        assert.equal(moveToUci(resolved.move), notation);
+
+    }
+
+    const dashedQueen =
+        search.resolveLabMove("a7-a8=Q");
+
+    assert.equal(dashedQueen.error, null);
+    assert.ok(dashedQueen.move);
+    assert.equal(moveToUci(dashedQueen.move), "a7a8q");
+
+    const start =
+        createEngine(
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+        );
+
+    const legacyMove =
+        start.search.resolveLabMove("e2-e4");
+
+    assert.equal(legacyMove.error, null);
+    assert.ok(legacyMove.move);
+    assert.equal(moveToUci(legacyMove.move), "e2e4");
+
+    const uciMove =
+        start.search.resolveLabMove("g1f3");
+
+    assert.equal(uciMove.error, null);
+    assert.ok(uciMove.move);
+    assert.equal(moveToUci(uciMove.move), "g1f3");
+
+});
+
+test("Coach Lab rejects ambiguous or malformed promotion requests clearly", () => {
+
+    const fen =
+        "6k1/P7/8/8/8/8/8/4K3 w - - 0 1";
+
+    const { search } =
+        createEngine(fen);
+
+    const ambiguousDashed =
+        search.resolveLabMove("a7-a8");
+
+    assert.equal(ambiguousDashed.move, null);
+    assert.match(
+        ambiguousDashed.error,
+        /Ambiguous promotion move/
+    );
+
+    const ambiguousUci =
+        search.resolveLabMove("a7a8");
+
+    assert.equal(ambiguousUci.move, null);
+    assert.match(
+        ambiguousUci.error,
+        /Ambiguous promotion move/
+    );
+
+    const invalidSuffix =
+        search.resolveLabMove("a7a8x");
+
+    assert.equal(invalidSuffix.move, null);
+    assert.match(
+        invalidSuffix.error,
+        /Invalid promotion suffix "x"/
+    );
+
+    const fresh =
+        createEngine(fen);
+
+    const before =
+        snapshotBoard(fresh.board);
+
+    const labResult =
+        captureConsoleError(() =>
+            fresh.search.lab("a7a8", 1)
+        );
+
+    assert.equal(labResult.result, null);
+    assert.match(
+        labResult.errors[0],
+        /Ambiguous promotion move: a7a8/
+    );
+
+    assertBoardSnapshot(
+        fresh.board,
+        before
     );
 
 });
