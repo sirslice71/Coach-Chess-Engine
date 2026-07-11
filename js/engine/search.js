@@ -8,7 +8,11 @@ import EngineDebug from "../dev/enginedebug.js";
 import { Piece } from "../core/piece.js";
 import Zobrist from "./zobrist.js";
 import TranspositionTable from "./transpositiontable.js";
-import { TTFlag }
+import {
+    TTFlag,
+    scoreFromTT,
+    scoreToTT
+}
     from "./transpositiontable.js";
 
 const MAX_Q_PLY = 16;
@@ -953,7 +957,10 @@ export default class Search {
 
                 depth,
 
-                bestScore,
+                scoreToTT(
+                    bestScore,
+                    0
+                ),
 
                 flag,
 
@@ -1032,11 +1039,17 @@ export default class Search {
 
             ) {
 
+            const ttScore =
+                scoreFromTT(
+                    ttEntry.score,
+                    ply
+                );
+
             switch (ttEntry.flag) {
 
                 case TTFlag.EXACT:
 
-                    return ttEntry.score;
+                    return ttScore;
 
                 case TTFlag.LOWER:
 
@@ -1046,7 +1059,7 @@ export default class Search {
 
                             alpha,
 
-                            ttEntry.score
+                            ttScore
 
                         );
 
@@ -1060,7 +1073,7 @@ export default class Search {
 
                             beta,
 
-                            ttEntry.score
+                            ttScore
 
                         );
 
@@ -1070,7 +1083,7 @@ export default class Search {
 
             if (alpha >= beta) {
 
-                return ttEntry.score;
+                return ttScore;
 
             }
 
@@ -1528,7 +1541,10 @@ export default class Search {
 
                 depth,
 
-                bestScore,
+                scoreToTT(
+                    bestScore,
+                    ply
+                ),
 
                 flag,
 

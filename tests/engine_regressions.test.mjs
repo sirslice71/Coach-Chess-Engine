@@ -9,6 +9,11 @@ import Zobrist from "../js/engine/zobrist.js";
 import Evaluation from "../js/engine/evaluation.js";
 import Search from "../js/engine/search.js";
 import Attack from "../js/engine/attack.js";
+import TranspositionTable, {
+    TTFlag,
+    scoreFromTT,
+    scoreToTT
+} from "../js/engine/transpositiontable.js";
 import { Piece } from "../js/core/piece.js";
 import { SearchConstants } from "../js/engine/searchconstants.js";
 
@@ -1135,6 +1140,306 @@ test("lone-king mop-up is inactive when the weaker side has any material", () =>
         kpkEval.king.mopUp,
         0,
         "mop-up must be zero in K+P vs K"
+    );
+
+});
+
+//----------------------------------
+// Transposition-table mate-score normalization regression
+//
+// Mate scores in search.js are root-relative ("MATE - plyToMate"
+// or "-MATE + plyToMate"), so a TT entry written at one ply must
+// be normalized before reuse at another ply. These tests pin both
+// the pure score transform and the real negamax probe path.
+//----------------------------------
+
+test("TT mate-score normalization round-trips winning and losing mates across plies", () => {
+
+    const winningAtPly3 =
+        SearchConstants.MATE - 8;
+
+    const winningStored =
+        scoreToTT(
+            winningAtPly3,
+            3
+        );
+
+    assert.equal(
+        winningStored,
+        SearchConstants.MATE - 5
+    );
+
+    assert.equal(
+        scoreFromTT(winningStored, 3),
+        winningAtPly3
+    );
+
+    assert.equal(
+        scoreFromTT(winningStored, 1),
+        SearchConstants.MATE - 6
+    );
+
+    assert.equal(
+        scoreFromTT(winningStored, 5),
+        SearchConstants.MATE - 10
+    );
+
+    const losingAtPly3 =
+        -SearchConstants.MATE + 8;
+
+    const losingStored =
+        scoreToTT(
+            losingAtPly3,
+            3
+        );
+
+    assert.equal(
+        losingStored,
+        -SearchConstants.MATE + 5
+    );
+
+    assert.equal(
+        scoreFromTT(losingStored, 3),
+        losingAtPly3
+    );
+
+    assert.equal(
+        scoreFromTT(losingStored, 1),
+        -SearchConstants.MATE + 6
+    );
+
+    assert.equal(
+        scoreFromTT(losingStored, 5),
+        -SearchConstants.MATE + 10
+    );
+
+});
+
+test("TT mate-score normalization leaves ordinary evaluations unchanged", () => {
+
+    for (const score of [
+        -SearchConstants.MATE_THRESHOLD + 1,
+        -1200,
+        0,
+        1200,
+        SearchConstants.MATE_THRESHOLD - 1
+    ]) {
+
+        assert.equal(
+            scoreToTT(score, 7),
+            score
+        );
+
+        assert.equal(
+            scoreFromTT(score, 7),
+            score
+        );
+
+    }
+
+});
+
+test("TT replacement keeps normalized mate scores valid", () => {
+
+    const tt =
+        new TranspositionTable(1);
+
+    const hash = 1n;
+
+    tt.store(
+        hash,
+        4,
+        scoreToTT(
+            SearchConstants.MATE - 8,
+            3
+        ),
+        TTFlag.EXACT,
+        null
+    );
+
+    tt.store(
+        hash,
+        6,
+        scoreToTT(
+            SearchConstants.MATE - 10,
+            5
+        ),
+        TTFlag.EXACT,
+        null
+    );
+
+    const entry =
+        tt.probe(hash);
+
+    assert.ok(entry, "expected TT entry after replacement");
+
+    assert.equal(entry.depth, 6);
+
+    assert.equal(
+        scoreFromTT(entry.score, 5),
+        SearchConstants.MATE - 10
+    );
+
+});
+
+test("TT exact mate hits are normalized back to the current ply", () => {
+
+    const fen =
+        "7k/8/6K1/8/8/8/8/R7 w - - 0 1";
+
+    const seeded =
+        createEngine(fen);
+
+    const seededScore =
+        withMutedConsole(
+            () => seeded.search.negamax(
+                1,
+                -SearchConstants.INFINITY,
+                SearchConstants.INFINITY,
+                1
+            )
+        );
+
+    const fresh =
+        createEngine(fen);
+
+    const freshPly3 =
+        withMutedConsole(
+            () => fresh.search.negamax(
+                1,
+                -SearchConstants.INFINITY,
+                SearchConstants.INFINITY,
+                3
+            )
+        );
+
+    const reused =
+        createEngine(fen);
+
+    reused.search.tt = seeded.search.tt;
+
+    const reusedPly3 =
+        withMutedConsole(
+            () => reused.search.negamax(
+                1,
+                -SearchConstants.INFINITY,
+                SearchConstants.INFINITY,
+                3
+            )
+        );
+
+    assert.equal(
+        reusedPly3,
+        freshPly3,
+        "TT exact hit should return the node-relative mate score for the current ply"
+    );
+
+    assert.notEqual(
+        reusedPly3,
+        seededScore,
+        "the same position searched at a deeper ply must not keep the older root-relative mate distance"
+    );
+
+});
+
+test("TT mate bounds use normalized scores for alpha/beta decisions", () => {
+
+    const winningFen =
+        "7k/8/6K1/8/8/8/8/R7 w - - 0 1";
+
+    const winningSeed =
+        createEngine(winningFen);
+
+    withMutedConsole(
+        () => winningSeed.search.negamax(
+            1,
+            -SearchConstants.INFINITY,
+            SearchConstants.INFINITY,
+            1
+        )
+    );
+
+    const winningEntry =
+        winningSeed.search.tt.probe(
+            winningSeed.board.hashKey
+        );
+
+    assert.ok(winningEntry, "expected seeded winning TT entry");
+
+    const winningLower =
+        createEngine(winningFen);
+
+    winningLower.search.tt.store(
+        winningLower.board.hashKey,
+        1,
+        winningEntry.score,
+        TTFlag.LOWER,
+        winningEntry.move
+    );
+
+    const winningResult =
+        withMutedConsole(
+            () => winningLower.search.negamax(
+                1,
+                SearchConstants.MATE - 4,
+                SearchConstants.MATE - 3,
+                3
+            )
+        );
+
+    assert.equal(
+        winningResult,
+        SearchConstants.MATE - 4,
+        "winning LOWER-bound hit should not trigger a false cutoff from an over-large stale mate score"
+    );
+
+    const losingFen =
+        "7k/8/6K1/8/8/8/8/R7 b - - 0 1";
+
+    const losingSeed =
+        createEngine(losingFen);
+
+    withMutedConsole(
+        () => losingSeed.search.negamax(
+            2,
+            -SearchConstants.INFINITY,
+            SearchConstants.INFINITY,
+            1
+        )
+    );
+
+    const losingEntry =
+        losingSeed.search.tt.probe(
+            losingSeed.board.hashKey
+        );
+
+    assert.ok(losingEntry, "expected seeded losing TT entry");
+
+    const losingUpper =
+        createEngine(losingFen);
+
+    losingUpper.search.tt.store(
+        losingUpper.board.hashKey,
+        2,
+        losingEntry.score,
+        TTFlag.UPPER,
+        losingEntry.move
+    );
+
+    const losingResult =
+        withMutedConsole(
+            () => losingUpper.search.negamax(
+                2,
+                -SearchConstants.MATE + 4,
+                -SearchConstants.MATE + 5,
+                3
+            )
+        );
+
+    assert.equal(
+        losingResult,
+        -SearchConstants.MATE + 5,
+        "losing UPPER-bound hit should not trigger a false cutoff from an over-large stale mate score"
     );
 
 });

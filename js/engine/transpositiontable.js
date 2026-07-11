@@ -2,6 +2,8 @@
 // transpositiontable.js
 //======================================
 
+import { SearchConstants } from "./searchconstants.js";
+
 //----------------------------------
 // TT Flags
 //----------------------------------
@@ -16,17 +18,58 @@ export const TTFlag = {
 
 };
 
+export function isMateScore(score) {
+
+    return (
+        Number.isFinite(score) &&
+        Math.abs(score) >= SearchConstants.MATE_THRESHOLD &&
+        Math.abs(score) <= SearchConstants.MATE
+    );
+
+}
+
 //----------------------------------
-// Known limitation (not addressed in this change): stored
-// scores are not ply-normalized. A mate score encoded relative
-// to the ply where it was found can, in principle, be reused
-// at a different ply via a TT hit and be off by however many
-// plies separate the two nodes. Flagging this because it's a
-// real correctness edge case for mate scoring specifically,
-// not because this task touches it -- the replacement policy
-// below only changes which entries survive, not what they
-// store.
+// TT mate-score normalization
+//
+// Search returns mate-class scores relative to the current
+// root, e.g. "MATE - (rootPlyToMate)" or "-MATE +
+// (rootPlyToMate)". The TT must store these in a root-
+// independent form so the same position can be reused from a
+// different ply later without shifting the mate distance.
+//
+// For a node searched at ply P:
+//
+//   winning score  MATE - (P + d)  -> store as  MATE - d
+//   losing score  -MATE + (P + d)  -> store as -MATE + d
+//
+// where d is the number of plies from THIS position to mate.
+// Probing inverts that transform back into the node-relative
+// score needed for alpha/beta comparisons at the current ply.
 //----------------------------------
+
+export function scoreToTT(score, ply) {
+
+    if (!isMateScore(score)) {
+        return score;
+    }
+
+    return score > 0
+        ? score + ply
+        : score - ply;
+
+}
+
+export function scoreFromTT(score, ply) {
+
+    if (!isMateScore(score)) {
+        return score;
+    }
+
+    return score > 0
+        ? score - ply
+        : score + ply;
+
+}
 
 //==================================
 // Transposition Table
