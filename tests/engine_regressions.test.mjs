@@ -1188,6 +1188,42 @@ test("quiescence still detects real checkmate even past the in-check ply cap", (
 
 });
 
+test("quiescence does not prune a winning capture when the only recapturer is absolutely pinned", () => {
+
+    const {
+        board,
+        search
+    } = createEngine(
+        "4k3/4p3/3n4/2Q5/8/8/8/4R1K1 w - - 0 1"
+    );
+
+    const before =
+        snapshotBoard(board);
+
+    const standPat =
+        search.toSideToMoveScore(
+            search.whiteRelativeEval()
+        );
+
+    const result =
+        withMutedConsole(
+            () => search.quiescence(
+                -SearchConstants.INFINITY,
+                SearchConstants.INFINITY,
+                0,
+                0
+            )
+        );
+
+    assert.ok(
+        result > standPat + 200,
+        `Expected qsearch to search the winning Qxd6 capture, got ${result} vs stand-pat ${standPat}`
+    );
+
+    assertBoardSnapshot(board, before);
+
+});
+
 //----------------------------------
 // Late Move Reduction regression tests
 //

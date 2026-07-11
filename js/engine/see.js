@@ -82,6 +82,12 @@ export default class SEE {
         occupied[captureSquare] =
             pieceOnSquare;
 
+        let whiteKingSquare =
+            board.whiteKing;
+
+        let blackKingSquare =
+            board.blackKing;
+
         let side =
             move.piece > 0
                 ? -1
@@ -95,7 +101,9 @@ export default class SEE {
                 this.findLeastValuableAttacker(
                     occupied,
                     captureSquare,
-                    side
+                    side,
+                    whiteKingSquare,
+                    blackKingSquare
                 );
 
             if (!attacker) {
@@ -115,6 +123,18 @@ export default class SEE {
 
             pieceOnSquare =
                 attacker.piece;
+
+            if (attacker.piece === Piece.WK) {
+
+                whiteKingSquare = captureSquare;
+
+            }
+
+            else if (attacker.piece === Piece.BK) {
+
+                blackKingSquare = captureSquare;
+
+            }
 
             occupied[captureSquare] =
                 pieceOnSquare;
@@ -139,23 +159,26 @@ export default class SEE {
 
     }
 
-    static findLeastValuableAttacker(occupied, square, side) {
+    static findLeastValuableAttacker(
+        occupied,
+        square,
+        side,
+        whiteKingSquare,
+        blackKingSquare
+    ) {
 
-        return (
-
-            this.findPawnAttacker(
+        const candidates = [
+            ...this.findPawnAttackers(
                 occupied,
                 square,
                 side
-            ) ||
-
-            this.findKnightAttacker(
+            ),
+            ...this.findKnightAttackers(
                 occupied,
                 square,
                 side
-            ) ||
-
-            this.findSlidingAttacker(
+            ),
+            ...this.findSlidingAttackers(
                 occupied,
                 square,
                 side,
@@ -163,9 +186,8 @@ export default class SEE {
                 side > 0
                     ? Piece.WB
                     : Piece.BB
-            ) ||
-
-            this.findSlidingAttacker(
+            ),
+            ...this.findSlidingAttackers(
                 occupied,
                 square,
                 side,
@@ -173,25 +195,43 @@ export default class SEE {
                 side > 0
                     ? Piece.WR
                     : Piece.BR
-            ) ||
-
-            this.findQueenAttacker(
+            ),
+            ...this.findQueenAttackers(
                 occupied,
                 square,
                 side
-            ) ||
-
-            this.findKingAttacker(
+            ),
+            ...this.findKingAttackers(
                 occupied,
                 square,
                 side
             )
+        ];
 
-        );
+        for (const attacker of candidates) {
+
+            if (
+                this.isLegalExchangeAttacker(
+                    occupied,
+                    square,
+                    attacker,
+                    side,
+                    whiteKingSquare,
+                    blackKingSquare
+                )
+            ) {
+
+                return attacker;
+
+            }
+
+        }
+
+        return null;
 
     }
 
-    static findPawnAttacker(occupied, square, side) {
+    static findPawnAttackers(occupied, square, side) {
 
         const offsets =
             side > 0
@@ -203,6 +243,8 @@ export default class SEE {
             side > 0
                 ? Piece.WP
                 : Piece.BP;
+
+        const attackers = [];
 
         for (const offset of offsets) {
 
@@ -226,20 +268,20 @@ export default class SEE {
 
             if (occupied[attackerSquare] === pawn) {
 
-                return {
+                attackers.push({
                     square: attackerSquare,
                     piece: pawn
-                };
+                });
 
             }
 
         }
 
-        return null;
+        return attackers;
 
     }
 
-    static findKnightAttacker(occupied, square, side) {
+    static findKnightAttackers(occupied, square, side) {
 
         const startRank = square >> 3;
         const startFile = square & 7;
@@ -247,6 +289,8 @@ export default class SEE {
             side > 0
                 ? Piece.WN
                 : Piece.BN;
+
+        const attackers = [];
 
         for (const offset of KNIGHT_OFFSETS) {
 
@@ -279,20 +323,20 @@ export default class SEE {
 
             if (occupied[attackerSquare] === knight) {
 
-                return {
+                attackers.push({
                     square: attackerSquare,
                     piece: knight
-                };
+                });
 
             }
 
         }
 
-        return null;
+        return attackers;
 
     }
 
-    static findSlidingAttacker(
+    static findSlidingAttackers(
 
         occupied,
 
@@ -306,6 +350,8 @@ export default class SEE {
 
     ) {
 
+        const attackers = [];
+
         for (const direction of directions) {
 
             const attackerSquare =
@@ -318,25 +364,27 @@ export default class SEE {
 
             if (attackerSquare !== -1) {
 
-                return {
+                attackers.push({
                     square: attackerSquare,
                     piece: attackerPiece
-                };
+                });
 
             }
 
         }
 
-        return null;
+        return attackers;
 
     }
 
-    static findQueenAttacker(occupied, square, side) {
+    static findQueenAttackers(occupied, square, side) {
 
         const queen =
             side > 0
                 ? Piece.WQ
                 : Piece.BQ;
+
+        const attackers = [];
 
         for (const direction of [
             ...BISHOP_DIRECTIONS,
@@ -353,16 +401,16 @@ export default class SEE {
 
             if (attackerSquare !== -1) {
 
-                return {
+                attackers.push({
                     square: attackerSquare,
                     piece: queen
-                };
+                });
 
             }
 
         }
 
-        return null;
+        return attackers;
 
     }
 
@@ -420,7 +468,7 @@ export default class SEE {
 
     }
 
-    static findKingAttacker(occupied, square, side) {
+    static findKingAttackers(occupied, square, side) {
 
         const startRank = square >> 3;
         const startFile = square & 7;
@@ -428,6 +476,8 @@ export default class SEE {
             side > 0
                 ? Piece.WK
                 : Piece.BK;
+
+        const attackers = [];
 
         for (const offset of KING_OFFSETS) {
 
@@ -460,16 +510,173 @@ export default class SEE {
 
             if (occupied[attackerSquare] === king) {
 
-                return {
+                attackers.push({
                     square: attackerSquare,
                     piece: king
-                };
+                });
 
             }
 
         }
 
-        return null;
+        return attackers;
+
+    }
+
+    static isLegalExchangeAttacker(
+        occupied,
+        targetSquare,
+        attacker,
+        side,
+        whiteKingSquare,
+        blackKingSquare
+    ) {
+
+        if (Math.abs(attacker.piece) === 6) {
+
+            return true;
+
+        }
+
+        return !this.exposesOwnKingToSlider(
+            occupied,
+            attacker.square,
+            targetSquare,
+            attacker.piece,
+            side,
+            whiteKingSquare,
+            blackKingSquare
+        );
+
+    }
+
+    static exposesOwnKingToSlider(
+        occupied,
+        fromSquare,
+        targetSquare,
+        piece,
+        side,
+        whiteKingSquare,
+        blackKingSquare
+    ) {
+
+        const kingSquare =
+            side > 0
+                ? whiteKingSquare
+                : blackKingSquare;
+
+        if (kingSquare < 0) {
+
+            return false;
+
+        }
+
+        const capturedPiece =
+            occupied[targetSquare];
+
+        occupied[fromSquare] = Piece.EMPTY;
+        occupied[targetSquare] = piece;
+
+        const exposed =
+            this.kingExposedToSlider(
+                occupied,
+                kingSquare,
+                side
+            );
+
+        occupied[fromSquare] = piece;
+        occupied[targetSquare] = capturedPiece;
+
+        return exposed;
+
+    }
+
+    static kingExposedToSlider(
+        occupied,
+        kingSquare,
+        side
+    ) {
+
+        const enemyBishop =
+            side > 0
+                ? Piece.BB
+                : Piece.WB;
+
+        const enemyRook =
+            side > 0
+                ? Piece.BR
+                : Piece.WR;
+
+        const enemyQueen =
+            side > 0
+                ? Piece.BQ
+                : Piece.WQ;
+
+        for (const direction of BISHOP_DIRECTIONS) {
+
+            const attackerSquare =
+                this.findRayAttacker(
+                    occupied,
+                    kingSquare,
+                    direction,
+                    enemyBishop
+                );
+
+            if (attackerSquare !== -1) {
+
+                return true;
+
+            }
+
+            const queenSquare =
+                this.findRayAttacker(
+                    occupied,
+                    kingSquare,
+                    direction,
+                    enemyQueen
+                );
+
+            if (queenSquare !== -1) {
+
+                return true;
+
+            }
+
+        }
+
+        for (const direction of ROOK_DIRECTIONS) {
+
+            const attackerSquare =
+                this.findRayAttacker(
+                    occupied,
+                    kingSquare,
+                    direction,
+                    enemyRook
+                );
+
+            if (attackerSquare !== -1) {
+
+                return true;
+
+            }
+
+            const queenSquare =
+                this.findRayAttacker(
+                    occupied,
+                    kingSquare,
+                    direction,
+                    enemyQueen
+                );
+
+            if (queenSquare !== -1) {
+
+                return true;
+
+            }
+
+        }
+
+        return false;
 
     }
 

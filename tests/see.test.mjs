@@ -245,6 +245,164 @@ test("promotion SEE includes x-ray recaptures revealed by the promotion capture"
 
 });
 
+test("SEE excludes an absolutely pinned knight recapturer", () => {
+
+    const {
+        board,
+        legalMoveGenerator
+    } = createEngine(
+        "8/k7/n7/8/1r6/2B5/8/R5K1 w - - 0 1"
+    );
+
+    const move =
+        findMoveByUci(
+            legalMoveGenerator,
+            "c3b4"
+        );
+
+    assert.equal(
+        SEE.evaluateCapture(board, move),
+        500
+    );
+
+});
+
+test("SEE excludes an absolutely pinned bishop recapturer", () => {
+
+    const {
+        board,
+        legalMoveGenerator
+    } = createEngine(
+        "5k2/8/5b2/4r3/6N1/8/8/5RK1 w - - 0 1"
+    );
+
+    const move =
+        findMoveByUci(
+            legalMoveGenerator,
+            "g4e5"
+        );
+
+    assert.equal(
+        SEE.evaluateCapture(board, move),
+        500
+    );
+
+});
+
+test("SEE excludes an absolutely pinned pawn recapturer", () => {
+
+    const {
+        board,
+        legalMoveGenerator
+    } = createEngine(
+        "4k3/4p3/3n4/2B5/8/8/8/4R1K1 w - - 0 1"
+    );
+
+    const move =
+        findMoveByUci(
+            legalMoveGenerator,
+            "c5d6"
+        );
+
+    assert.equal(
+        SEE.evaluateCapture(board, move),
+        300
+    );
+
+});
+
+test("SEE retains a relative-pin attacker that is still legally usable", () => {
+
+    const {
+        board,
+        legalMoveGenerator
+    } = createEngine(
+        "5q2/8/5b2/4r3/6N1/8/8/5RK1 w - - 0 1"
+    );
+
+    const move =
+        findMoveByUci(
+            legalMoveGenerator,
+            "g4e5"
+        );
+
+    assert.equal(
+        SEE.evaluateCapture(board, move),
+        200
+    );
+
+});
+
+test("SEE keeps a recapture along the pin line when it still shields the king", () => {
+
+    const {
+        board,
+        legalMoveGenerator
+    } = createEngine(
+        "4k3/4r3/8/4r3/6N1/8/8/4R1K1 w - - 0 1"
+    );
+
+    const move =
+        findMoveByUci(
+            legalMoveGenerator,
+            "g4e5"
+        );
+
+    assert.equal(
+        SEE.evaluateCapture(board, move),
+        500
+    );
+
+});
+
+test("pinned-attacker filtering can lift a good capture above the qsearch SEE prune threshold", () => {
+
+    const {
+        board,
+        legalMoveGenerator
+    } = createEngine(
+        "4k3/4p3/3n4/2Q5/8/8/8/4R1K1 w - - 0 1"
+    );
+
+    const move =
+        findMoveByUci(
+            legalMoveGenerator,
+            "c5d6"
+        );
+
+    assert.equal(
+        SEE.evaluateCapture(board, move),
+        300
+    );
+
+    assert.ok(
+        SEE.evaluateCapture(board, move) > -300
+    );
+
+});
+
+test("en passant SEE behavior remains stable", () => {
+
+    const {
+        board,
+        legalMoveGenerator
+    } = createEngine(
+        "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1"
+    );
+
+    const move =
+        findMoveByUci(
+            legalMoveGenerator,
+            "e5d6"
+        );
+
+    assert.equal(
+        SEE.evaluateCapture(board, move),
+        100
+    );
+
+});
+
 test("quiet promotions get no SEE but checking promotions still order ahead", () => {
 
     const {
