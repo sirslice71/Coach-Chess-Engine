@@ -299,7 +299,7 @@ export default class MoveOrdering {
 
     moveKey(move) {
 
-        return (move.fromSquare << 6) | move.toSquare;
+        return move.key;
 
     }
 

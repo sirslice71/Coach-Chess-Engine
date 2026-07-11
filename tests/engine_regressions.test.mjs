@@ -9,6 +9,7 @@ import Zobrist from "../js/engine/zobrist.js";
 import Evaluation from "../js/engine/evaluation.js";
 import Search from "../js/engine/search.js";
 import Attack from "../js/engine/attack.js";
+import MoveOrdering from "../js/engine/moveordering.js";
 import TranspositionTable, {
     TTFlag,
     scoreFromTT,
@@ -16,6 +17,7 @@ import TranspositionTable, {
 } from "../js/engine/transpositiontable.js";
 import { Piece } from "../js/core/piece.js";
 import { SearchConstants } from "../js/engine/searchconstants.js";
+import { moveToUci } from "../js/uci/uciengine.js";
 
 function createEngine(fen) {
 
@@ -243,6 +245,20 @@ function searchMoveScore(fen, notation, depth) {
         score,
         rootSideToMove
     );
+
+}
+
+function promotionMoves(fen, predicate = () => true) {
+
+    const { legalMoveGenerator } =
+        createEngine(fen);
+
+    return legalMoveGenerator
+        .generateMoves()
+        .filter(move =>
+            move.isPromotion() &&
+            predicate(move)
+        );
 
 }
 
@@ -2107,6 +2123,226 @@ test("Coach Lab exposes pawn promotion terms without mutating board state", () =
         typeof detailed.delta.stopperQuality,
         "number",
         "detailed lab should compute a numeric stopper quality delta"
+    );
+
+});
+
+test("promotion siblings have unique move keys while non-promotions keep the historical key", () => {
+
+    const quietWhite =
+        promotionMoves(
+            "6k1/P7/8/8/8/8/8/4K3 w - - 0 1"
+        );
+
+    const captureWhite =
+        promotionMoves(
+            "1nr3k1/2P5/8/8/8/8/8/4K3 w - - 0 1",
+            move => move.isCapture()
+        );
+
+    const quietBlack =
+        promotionMoves(
+            "4k3/8/8/8/8/8/p7/4K3 b - - 0 1"
+        );
+
+    const captureBlack =
+        promotionMoves(
+            "4k3/8/8/8/8/8/1p6/R3K3 b - - 0 1",
+            move => move.isCapture()
+        );
+
+    for (const family of [
+        quietWhite,
+        captureWhite,
+        quietBlack,
+        captureBlack
+    ]) {
+
+        assert.equal(family.length, 4);
+
+        assert.equal(
+            new Set(family.map(move => move.key)).size,
+            4,
+            "promotion siblings should no longer collide in move.key"
+        );
+
+        assert.equal(
+            new Set(family.map(move => move.squareKey)).size,
+            1,
+            "promotion siblings should still share the same from/to squareKey"
+        );
+
+    }
+
+    const {
+        legalMoveGenerator
+    } = createEngine(
+        "4k3/8/8/8/8/8/8/4K3 w - - 0 1"
+    );
+
+    const quietKingMove =
+        legalMoveGenerator
+            .generateMoves()
+            .find(move => move.toString() === "e1-e2");
+
+    assert.ok(quietKingMove);
+
+    assert.equal(
+        quietKingMove.key,
+        quietKingMove.squareKey,
+        "non-promotion move keys should stay unchanged"
+    );
+
+});
+
+test("TT move ordering matches the exact quiet and capture promotion piece", () => {
+
+    for (const {
+        fen,
+        predicate
+    } of [
+        {
+            fen: "6k1/P7/8/8/8/8/8/4K3 w - - 0 1",
+            predicate: () => true
+        },
+        {
+            fen: "1nr3k1/2P5/8/8/8/8/8/4K3 w - - 0 1",
+            predicate: move => move.isCapture()
+        }
+    ]) {
+
+        const {
+            board,
+            legalMoveGenerator,
+            search
+        } = createEngine(fen);
+
+        const moveOrdering =
+            new MoveOrdering(board);
+
+        const promotions =
+            promotionMoves(fen, predicate);
+
+        for (const ttMove of promotions) {
+
+            const moves =
+                legalMoveGenerator.generateMoves();
+
+            moveOrdering.order(
+                moves,
+                [-1, -1],
+                ttMove,
+                search.history
+            );
+
+            const orderedPromotions =
+                moves.filter(move =>
+                    move.isPromotion() &&
+                    predicate(move)
+                );
+
+            assert.equal(
+                moveToUci(orderedPromotions[0]),
+                moveToUci(ttMove)
+            );
+
+            assert.equal(
+                orderedPromotions.filter(
+                    move => move.score === 1000000
+                ).length,
+                1,
+                "exact TT promotion match should bonus only one sibling"
+            );
+
+        }
+
+    }
+
+});
+
+test("killer matching does not leak across sibling promotions", () => {
+
+    const fen =
+        "6k1/P7/8/8/8/8/8/4K3 w - - 0 1";
+
+    const {
+        board,
+        legalMoveGenerator
+    } = createEngine(fen);
+
+    const moveOrdering =
+        new MoveOrdering(board);
+
+    const promotions =
+        promotionMoves(fen);
+
+    const knightPromotion =
+        promotions.find(move =>
+            moveToUci(move) === "a7a8n"
+        );
+
+    assert.ok(knightPromotion);
+
+    const moves =
+        legalMoveGenerator.generateMoves();
+
+    moveOrdering.order(
+        moves,
+        [knightPromotion.key, -1],
+        null,
+        null
+    );
+
+    const orderedPromotions =
+        moves.filter(move => move.isPromotion());
+
+    assert.equal(
+        moveToUci(orderedPromotions[0]),
+        "a7a8n"
+    );
+
+    assert.equal(
+        orderedPromotions.filter(
+            move => move.score >= 59000
+        ).length,
+        1,
+        "only the exact killer promotion should receive the killer bonus"
+    );
+
+});
+
+test("PV reconstruction preserves the exact underpromotion suffix from TT", () => {
+
+    const fen =
+        "6k1/P7/8/8/8/8/8/4K3 w - - 0 1";
+
+    const { board, search } =
+        createEngine(fen);
+
+    const knightPromotion =
+        promotionMoves(fen)
+            .find(move =>
+                moveToUci(move) === "a7a8n"
+            );
+
+    assert.ok(knightPromotion);
+
+    search.tt.store(
+        board.hashKey,
+        1,
+        0,
+        TTFlag.EXACT,
+        knightPromotion
+    );
+
+    const pv =
+        search.buildPV(1);
+
+    assert.equal(pv.length, 1);
+
+    assert.equal(
+        moveToUci(pv[0]),
+        "a7a8n"
     );
 
 });

@@ -24,6 +24,13 @@ const DEBUG_PROMOTION_LETTERS = {
     5: "Q"
 };
 
+const PROMOTION_KEY_CODES = {
+    2: 1,
+    3: 2,
+    4: 3,
+    5: 4
+};
+
 export const MoveFlags = {
 
     NONE: 0,
@@ -43,6 +50,16 @@ export const MoveFlags = {
 };
 
 export default class Move {
+
+    static promotionKey(promotedPiece) {
+
+        return (
+            PROMOTION_KEY_CODES[
+                Math.abs(promotedPiece)
+            ] || 0
+        );
+
+    }
 
     constructor(
 
@@ -76,7 +93,23 @@ export default class Move {
         // Used by search engine
         this.score = 0;
 
-        this.key = (fromSquare << 6) | toSquare;
+        //----------------------------------
+        // from/to-only identity remains available for any
+        // deliberate square-indexed tables, but move.key must
+        // distinguish sibling promotions:
+        //
+        //   a7a8q / a7a8r / a7a8b / a7a8n
+        //
+        // Non-promotion keys stay bit-for-bit identical to the
+        // historical representation.
+        //----------------------------------
+
+        this.squareKey =
+            (fromSquare << 6) | toSquare;
+
+        this.key =
+            this.squareKey |
+            (Move.promotionKey(promotedPiece) << 12);
 
     }
 
