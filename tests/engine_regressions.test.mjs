@@ -142,6 +142,43 @@ function evaluatePosition(fen) {
 
 }
 
+function castlingCalibrationSnapshot(fen) {
+
+    const {
+        board,
+        evaluation
+    } = createEngine(fen);
+
+    const score =
+        evaluation.evaluate();
+
+    return {
+        fen,
+        phase: evaluation.gamePhase(),
+        queens:
+            board.whitePieces.queens.length +
+            board.blackPieces.queens.length,
+        rooks:
+            board.whitePieces.rooks.length +
+            board.blackPieces.rooks.length,
+        rights:
+            FEN.export(board).split(" ")[2],
+        whiteKing: board.whiteKing,
+        blackKing: board.blackKing,
+        live:
+            score.opening.castlingLiveReadiness,
+        complete:
+            score.opening.castlingCompleteHistory,
+        aborted:
+            score.opening.castlingAbortedHistory,
+        historical:
+            score.opening.castlingHistoricalTotal,
+        urgency:
+            score.opening.castlingUrgency
+    };
+
+}
+
 function searchBestMove(fen, depth) {
 
     const { search } =
@@ -789,6 +826,184 @@ for (const position of PGN_COLLAPSE_REGRESSIONS) {
     );
 
 }
+
+test.skip(
+    "castling calibration: queenless aborted-history residue",
+    () => {
+
+        //----------------------------------
+        // This queenless low-material position still carries a
+        // full white aborted-castling penalty even though the
+        // remaining danger is far smaller than in the opening.
+        // Broad removal was unsafe, so this stays as a skipped
+        // calibration diagnostic rather than an active engine
+        // change request.
+        //----------------------------------
+
+        const fen =
+            "r3k2r/8/8/8/8/3P4/4K3/R6R w kq - 0 1";
+
+        const first =
+            castlingCalibrationSnapshot(fen);
+
+        const second =
+            castlingCalibrationSnapshot(fen);
+
+        assert.deepEqual(second, first);
+
+        assert.deepEqual(
+            first,
+            {
+                fen,
+                phase: 8,
+                queens: 0,
+                rooks: 4,
+                rights: "kq",
+                whiteKing: 52,
+                blackKing: 4,
+                live: 8,
+                complete: 0,
+                aborted: -60,
+                historical: -60,
+                urgency: -52
+            }
+        );
+
+    }
+);
+
+test.skip(
+    "castling calibration: combined historical residue",
+    () => {
+
+        //----------------------------------
+        // This tournament position carries a full +/-78 of
+        // combined castling history (completed + aborted) even
+        // though no live castling opportunity remains. The
+        // audit showed that broad suppression can improve the
+        // score story here without isolating a safe rule, so we
+        // preserve it as calibration evidence only.
+        //----------------------------------
+
+        const fen =
+            "1bk2rr1/3n2p1/p2P1pP1/2B1pB1p/2P4P/3K1P2/1R6/R7 b - - 1 37";
+
+        const first =
+            castlingCalibrationSnapshot(fen);
+
+        const second =
+            castlingCalibrationSnapshot(fen);
+
+        assert.deepEqual(second, first);
+
+        assert.deepEqual(
+            first,
+            {
+                fen,
+                phase: 12,
+                queens: 0,
+                rooks: 4,
+                rights: "-",
+                whiteKing: 43,
+                blackKing: 2,
+                live: 0,
+                complete: -18,
+                aborted: -60,
+                historical: -78,
+                urgency: -78
+            }
+        );
+
+    }
+);
+
+test.skip(
+    "castling calibration: completed history after structure dissolves",
+    () => {
+
+        //----------------------------------
+        // Black has already castled, but the castled rook is no
+        // longer on its post-castling square and the entire pawn
+        // shield is gone. Completed-castling credit still
+        // contributes, so this remains a useful skipped residue
+        // diagnostic for future state-validity work.
+        //----------------------------------
+
+        const fen =
+            "r4rk1/8/8/8/8/8/8/R3K2R b KQ - 0 1";
+
+        const first =
+            castlingCalibrationSnapshot(fen);
+
+        const second =
+            castlingCalibrationSnapshot(fen);
+
+        assert.deepEqual(second, first);
+
+        assert.deepEqual(
+            first,
+            {
+                fen,
+                phase: 8,
+                queens: 0,
+                rooks: 4,
+                rights: "KQ",
+                whiteKing: 60,
+                blackKing: 6,
+                live: 8,
+                complete: -18,
+                aborted: 0,
+                historical: -18,
+                urgency: -26
+            }
+        );
+
+    }
+);
+
+test.skip(
+    "castling calibration control: live readiness remains relevant",
+    () => {
+
+        //----------------------------------
+        // Control case: this is an honest live-castling position.
+        // Rights remain, king and rook geometry are valid, and
+        // the score comes entirely from live readiness with no
+        // historical residue. This guards against treating every
+        // castling term as stale.
+        //----------------------------------
+
+        const fen =
+            "rnbqk2r/ppp1bppp/4pn2/3p4/2PP4/2N1PN2/PP3PPP/R1BQKB1R b KQkq - 0 5";
+
+        const first =
+            castlingCalibrationSnapshot(fen);
+
+        const second =
+            castlingCalibrationSnapshot(fen);
+
+        assert.deepEqual(second, first);
+
+        assert.deepEqual(
+            first,
+            {
+                fen,
+                phase: 24,
+                queens: 2,
+                rooks: 4,
+                rights: "KQkq",
+                whiteKing: 60,
+                blackKing: 4,
+                live: 4,
+                complete: 0,
+                aborted: 0,
+                historical: 0,
+                urgency: 4
+            }
+        );
+
+    }
+);
 
 //----------------------------------
 // Quiescence: SEE Capture Pruning /
