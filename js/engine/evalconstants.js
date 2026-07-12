@@ -44,6 +44,10 @@ export const Eval = Object.freeze({
 
     KING_EXPOSED: -70,
 
+    CENTER_FILE_SEMI_OPEN: -4,
+
+    CENTER_FILE_OPEN: -8,
+
     ROOK_OPEN_FILE: 8,
 
     ROOK_HALF_OPEN_FILE: 4,

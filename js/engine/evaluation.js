@@ -2933,22 +2933,6 @@ export default class Evaluation {
 
     evaluateKingExposureForSide(white) {
 
-        const kingSquare = white
-            ? this.board.whiteKing
-            : this.board.blackKing;
-
-        const homeSquare = white
-            ? 60
-            : 4;
-
-        if (
-            kingSquare === homeSquare ||
-            this.isCastled(white) ||
-            !this.hasCastledRookStructure(white)
-        ) {
-            return 0;
-        }
-
         const enemyHeavyPieces = white
             ? this.board.blackPieces.queens.length +
                 this.board.blackPieces.rooks.length
@@ -2959,7 +2943,115 @@ export default class Evaluation {
             return 0;
         }
 
-        return Eval.KING_EXPOSED;
+        const kingSquare = white
+            ? this.board.whiteKing
+            : this.board.blackKing;
+
+        const homeSquare = white
+            ? 60
+            : 4;
+
+        let score =
+            this.evaluateCentralLineExposureForSide(white);
+
+        if (
+            kingSquare === homeSquare ||
+            this.isCastled(white) ||
+            !this.hasCastledRookStructure(white)
+        ) {
+            return score;
+        }
+
+        return score + Eval.KING_EXPOSED;
+
+    }
+
+    evaluateCentralLineExposureForSide(white) {
+
+        if (this.isCastled(white)) {
+            return 0;
+        }
+
+        const kingSquare = white
+            ? this.board.whiteKing
+            : this.board.blackKing;
+
+        const kingFile = kingSquare & 7;
+
+        if (kingFile < 3 || kingFile > 5) {
+            return 0;
+        }
+
+        const enemyHasLinePressure = white
+            ? this.board.blackPieces.queens.length > 0 ||
+                this.board.blackPieces.rooks.length > 0
+            : this.board.whitePieces.queens.length > 0 ||
+                this.board.whitePieces.rooks.length > 0;
+
+        if (!enemyHasLinePressure) {
+            return 0;
+        }
+
+        if (this.isFileLaneBlockedByFriendlyPiece(white, kingFile)) {
+            return 0;
+        }
+
+        const ownPawns = white
+            ? this.board.whitePieces.pawns
+            : this.board.blackPieces.pawns;
+
+        const enemyPawns = white
+            ? this.board.blackPieces.pawns
+            : this.board.whitePieces.pawns;
+
+        const ownPawnPresent =
+            ownPawns.some(square => (square & 7) === kingFile);
+
+        if (ownPawnPresent) {
+            return 0;
+        }
+
+        const enemyPawnPresent =
+            enemyPawns.some(square => (square & 7) === kingFile);
+
+        return enemyPawnPresent
+            ? Eval.CENTER_FILE_SEMI_OPEN
+            : Eval.CENTER_FILE_OPEN;
+
+    }
+
+    isFileLaneBlockedByFriendlyPiece(white, file) {
+
+        const kingSquare = white
+            ? this.board.whiteKing
+            : this.board.blackKing;
+
+        const direction = white ? -8 : 8;
+
+        for (
+            let square = kingSquare + direction;
+            square >= 0 && square < 64;
+            square += direction
+        ) {
+
+            if ((square & 7) !== file) {
+                break;
+            }
+
+            const piece =
+                this.board.pieceAt(square);
+
+            if (piece === Piece.EMPTY) {
+                continue;
+            }
+
+            return white
+                ? piece > 0
+                : piece < 0;
+
+        }
+
+        return false;
 
     }
 
