@@ -231,6 +231,39 @@ const LMR_MIN_MOVE_INDEX = 4;
 const LMR_REDUCTION = 1;
 
 //----------------------------------
+// Null-Move Pruning (conservative v1)
+//
+// See the gate list at the null-move block inside negamax().
+// R = 2 with a minimum depth of 3 means the null child depth
+// is at least 0, i.e. at worst a direct quiescence probe.
+//----------------------------------
+
+const NULL_MOVE_MIN_DEPTH = 3;
+
+const NULL_MOVE_REDUCTION = 2;
+
+//----------------------------------
+// Null-move decisive-disadvantage margin (centipawns).
+//
+// When beta for the side to move is already at or below
+// -NULL_MOVE_DECISIVE_MARGIN, the node is asking "can I prove
+// I am not losing decisively?" -- which is exactly where the
+// opponent tends to have a deep forcing attack or mate net,
+// and where a depth-reduced null probe is most likely to fail
+// high on a horizon mirage and hide the refutation (observed
+// directly: the queen/rook mate sentinel lost its forced mate
+// to such a cutoff during screening, even with the static-eval
+// gate active). Nodes this lopsided are a small fraction of
+// the tree, so disabling null moves there costs little and
+// keeps deep mate proofs intact. Screening showed some such
+// gate is necessary for Coach's current mate-net handling;
+// 500 is retained as the current middle ground pending a
+// broader mate-corpus audit.
+//----------------------------------
+
+const NULL_MOVE_DECISIVE_MARGIN = 500;
+
+//----------------------------------
 // Check Extension (near-horizon only, budget-capped v2)
 //
 // A move that gives check is forcing; searching the reply one
@@ -336,6 +369,8 @@ export default class Search {
         this.pvsResearches = 0;
         this.lmrReductions = 0;
         this.lmrResearches = 0;
+        this.nullAttempts = 0;
+        this.nullCutoffs = 0;
 
         //----------------------------------
         // History Heuristic
@@ -1083,7 +1118,7 @@ export default class Search {
     // Never return moves or statistics.
     //----------------------------------
 
-    negamax(depth, alpha, beta, ply = 0, isRoot = false, extensionsLeft = MAX_CHECK_EXTENSIONS) {
+    negamax(depth, alpha, beta, ply = 0, isRoot = false, extensionsLeft = MAX_CHECK_EXTENSIONS, nullAllowed = true) {
 
         this.checkSearchDeadline();
 
@@ -1194,6 +1229,116 @@ export default class Search {
         }
 
         //----------------------------------
+        // Null-Move Pruning (conservative v1)
+        //
+        // If the side to move could pass the turn and a reduced
+        // null-window search STILL fails high against beta, the
+        // real position (where an actual move gets to be played)
+        // will almost certainly fail high as well, so the subtree
+        // is cut off. Gated hard, all conditions required:
+        //   - never at the root
+        //   - never in PV (full-window) nodes
+        //   - never while in check
+        //   - never twice in a row (nullAllowed flag)
+        //   - never when beta is a mate-class bound
+        //   - never without heavy material (rook or queen) for
+        //     the side to move; minor-piece endings were safe in
+        //     shallow screening but offered little benefit and
+        //     more zugzwang risk than rook/queen positions
+        // The reduced child keeps the check-extension budget
+        // unchanged and may not answer with a second null. A
+        // cutoff returns plain fail-hard beta and is never
+        // stored in the TT, so null results cannot pollute PV
+        // reconstruction, TT bounds, or mate normalization.
+        //----------------------------------
+
+        const inCheck = this.board.isInCheck();
+
+        if (
+            !isRoot &&
+            nullAllowed &&
+            !inCheck &&
+            beta === alpha + 1 &&
+            depth >= NULL_MOVE_MIN_DEPTH &&
+            beta > -NULL_MOVE_DECISIVE_MARGIN
+        ) {
+
+            if (Math.abs(beta) < SearchConstants.MATE_THRESHOLD) {
+
+                const sidePieces =
+                    this.board.sideToMove > 0
+                        ? this.board.whitePieces
+                        : this.board.blackPieces;
+
+                const hasHeavyPiece =
+                    sidePieces.rooks.length +
+                    sidePieces.queens.length > 0;
+
+                //----------------------------------
+                // Static-eval gate (N2): only try a null move
+                // when the standing evaluation already meets
+                // beta. A side that is statically below beta
+                // gains nothing provable by passing, and -- far
+                // more important -- this keeps null cutoffs out
+                // of the losing side's nodes inside deep mate
+                // proofs, where a reduced null probe can
+                // otherwise fail high on a horizon mirage and
+                // hide the mate (observed directly on the
+                // queen/rook mate sentinel during screening).
+                //----------------------------------
+
+                const nullStaticEval =
+                    this.toSideToMoveScore(
+                        this.whiteRelativeEval()
+                    );
+
+                if (
+                    hasHeavyPiece &&
+                    nullStaticEval >= beta
+                ) {
+
+                    this.nullAttempts++;
+
+                    this.board.makeNullMove();
+
+                    let nullScore;
+
+                    try {
+
+                        nullScore =
+                            -this.negamax(
+                                depth - 1 - NULL_MOVE_REDUCTION,
+                                -beta,
+                                -beta + 1,
+                                ply + 1,
+                                false,
+                                extensionsLeft,
+                                false
+                            );
+
+                    }
+
+                    finally {
+
+                        this.board.undoNullMove();
+
+                    }
+
+                    if (nullScore >= beta) {
+
+                        this.nullCutoffs++;
+
+                        return beta;
+
+                    }
+
+                }
+
+            }
+
+        }
+
+        //----------------------------------
         // Generate Moves
         //----------------------------------
 
@@ -1231,8 +1376,6 @@ export default class Search {
         //----------------------------------
         // Mate / Stalemate
         //----------------------------------
-
-        const inCheck = this.board.isInCheck();
 
         if (moves.length === 0) {
 

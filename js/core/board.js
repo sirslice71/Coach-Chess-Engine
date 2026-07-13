@@ -41,6 +41,7 @@ export default class Board {
         this.fullMoveNumber = 1;
 
         this.moveHistory = [];
+        this.nullMoveHistory = [];
         this.repetitionTable = [];
 
         this.hashKey = 0n;
@@ -66,6 +67,7 @@ export default class Board {
         //----------------------------------
 
         this.moveHistory = [];
+        this.nullMoveHistory = [];
 
     }
 
@@ -173,6 +175,7 @@ export default class Board {
         this.blackPieces = {};
 
         this.moveHistory = [];
+        this.nullMoveHistory = [];
         this.repetitionTable = [];
 
         this.sideToMove = WHITE;
@@ -568,6 +571,7 @@ export default class Board {
         this.fullMoveNumber = 1;
 
         this.moveHistory = [];
+        this.nullMoveHistory = [];
 
     }
 
@@ -941,6 +945,73 @@ export default class Board {
     //-----------------------------------------
     // Make / Undo Moves
     //-----------------------------------------
+
+    //-----------------------------------------
+    // Null Move (search-only)
+    //
+    // Passes the turn without moving a piece, for null-move
+    // pruning in search. Never legal chess: only search may
+    // call this, always paired with undoNullMove() via
+    // try/finally. State handled exactly:
+    //   - side to move flips (and its Zobrist key)
+    //   - en passant availability is cleared for the skipped
+    //     turn (and its Zobrist file key), restored on undo
+    //   - halfMoveClock / fullMoveNumber are NOT changed:
+    //     a null move is speculative search state, not a legal
+    //     chess move, so it must not create or advance legal
+    //     fifty-move-draw state
+    //   - repetitionTable is NOT touched for the same reason:
+    //     only legal positions belong in the legal repetition
+    //     history used by draw adjudication
+    //   - hashKey is snapshot-restored bit-for-bit like
+    //     makeMove()/undoMove() already do
+    // Piece lists, material, king squares, and castling rights
+    // are untouched by a null move. Uses its own history stack
+    // so moveHistory/undoMove() semantics stay untouched.
+    //-----------------------------------------
+
+    makeNullMove() {
+
+        this.nullMoveHistory.push({
+
+            enPassantSquare: this.enPassantSquare,
+
+            hashBefore: this.hashKey
+
+        });
+
+        let hash = this.hashKey;
+
+        if (this.enPassantSquare !== -1) {
+
+            hash = this.zobrist.toggleEnPassant(
+                hash,
+                this.enPassantSquare & 7
+            );
+
+        }
+
+        hash = this.zobrist.toggleSide(hash);
+
+        this.hashKey = hash;
+
+        this.enPassantSquare = -1;
+
+        this.sideToMove *= -1;
+
+    }
+
+    undoNullMove() {
+
+        const history = this.nullMoveHistory.pop();
+
+        this.sideToMove *= -1;
+
+        this.enPassantSquare = history.enPassantSquare;
+
+        this.hashKey = history.hashBefore;
+
+    }
 
     makeMove(move) {
 
