@@ -1,0 +1,28 @@
+{
+  "_comment": "Copy to config.local.json and edit. NEVER put the Stockfish path here (it is machine-specific and must come from --sf or COACH_STOCKFISH_PATH).",
+  "sampling": {
+    "skipFirstPlies": 8,
+    "sampleEveryPlies": 4,
+    "maxPositionsPerGame": 20,
+    "includeTerminal": false,
+    "includeInCheck": true,
+    "balanceOffset": true,
+    "seed": 20260714
+  },
+  "split": {
+    "train": 0.8,
+    "val": 0.1,
+    "test": 0.1,
+    "seed": 20260714
+  },
+  "caps": {
+    "perPhase": null,
+    "maxDuplicateMaterial": null
+  },
+  "labelling": {
+    "nodes": 25000,
+    "hash": 64,
+    "threads": 1,
+    "multipv": 1
+  }
+}

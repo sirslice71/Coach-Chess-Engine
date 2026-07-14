@@ -1,0 +1,24 @@
+# Neural pipeline generated artifacts (never commit datasets/labels/models).
+artifacts/
+*.jsonl
+*.checkpoint.json
+*.extract-summary.json
+*.report.json
+*.log
+config.local.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Models / large binaries
+*.pt
+*.onnx
+*.nnue
+stockfish*
+!lib/stockfish.mjs
+
+# Node
+node_modules/

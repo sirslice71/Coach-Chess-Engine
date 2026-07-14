@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LabelledRecord",
+  "description": "A PositionRecord plus a Stockfish label. Scores are White-positive; mate is separate from centipawns.",
+  "allOf": [{ "$ref": "position-record.schema.json" }],
+  "type": "object",
+  "required": ["stockfish","labelling","labelError"],
+  "properties": {
+    "stockfish": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["version","depth","nodes","scoreCpWhite","mate","wdl","bestMove","pv"],
+          "properties": {
+            "version": { "type": "string" },
+            "depth": { "type": ["integer","null"] },
+            "seldepth": { "type": ["integer","null"] },
+            "nodes": { "type": ["integer","null"] },
+            "scoreCpWhite": { "type": ["integer","null"], "description": "null when mate is set" },
+            "mate": { "type": ["integer","null"], "description": "signed mate distance, White-positive; null when cp is set" },
+            "wdl": { "type": ["array","null"], "items": { "type": "integer" }, "minItems": 3, "maxItems": 3, "description": "White-relative [win,draw,loss] per mille" },
+            "bestMove": { "type": ["string","null"] },
+            "pv": { "type": "array", "items": { "type": "string" } },
+            "timeMs": { "type": ["integer","null"] }
+          }
+        }
+      ]
+    },
+    "labelling": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["engine","version","scorePerspective"],
+          "properties": {
+            "engine": { "const": "stockfish" },
+            "version": { "type": "string" },
+            "nodesLimit": { "type": ["integer","null"] },
+            "depthLimit": { "type": ["integer","null"] },
+            "hash": { "type": "integer" },
+            "threads": { "type": "integer" },
+            "multipv": { "type": "integer" },
+            "showWDL": { "type": "boolean" },
+            "hashResetPerPosition": { "type": "boolean", "description": "ucinewgame issued before each position so labels are order/resume-independent" },
+            "scorePerspective": { "const": "white" },
+            "labelledAt": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "labelError": { "type": ["string","null"] }
+  }
+}

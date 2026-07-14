@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PositionRecord",
+  "description": "One extracted, deduplicated, split position (pre-Stockfish).",
+  "type": "object",
+  "required": ["fen","positionKey","source","sideToMove","gamePhase","materialSignature","result","inCheck","coachClassicalCpWhite","split"],
+  "properties": {
+    "fen": { "type": "string", "description": "Canonical FEN: ep field normalized to '-' unless a legal en-passant capture exists; clocks preserved" },
+    "positionKey": { "type": "string", "description": "placement stm castling ep(only-if-legal) halfmoveBucket(0-49/50-79/80-99/100+); fullmove excluded" },
+    "source": {
+      "type": "object",
+      "required": ["file","game","ply"],
+      "properties": {
+        "file": { "type": "string" },
+        "game": { "type": "integer" },
+        "ply": { "type": "integer" }
+      }
+    },
+    "sideToMove": { "enum": ["w","b"] },
+    "gamePhase": { "enum": ["opening","middlegame","endgame"] },
+    "materialSignature": { "type": "string" },
+    "result": { "type": "string", "description": "PGN game result of the source game" },
+    "inCheck": { "type": "boolean" },
+    "coachClassicalCpWhite": { "type": "number", "description": "Coach static eval, White-positive" },
+    "split": { "enum": ["train","val","test"] }
+  }
+}
