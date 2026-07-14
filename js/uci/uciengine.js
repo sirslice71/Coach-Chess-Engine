@@ -1379,7 +1379,12 @@ export class UciSession {
 
             const deadlineMs =
                 performance.now() +
-                Math.max(0, movetime - 5);
+                Math.max(
+                    0,
+                    movetime -
+                    this.moveOverheadMs -
+                    5
+                );
 
             result =
                 this.runSearchSafely(

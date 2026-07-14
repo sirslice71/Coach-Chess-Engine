@@ -1463,7 +1463,7 @@ test("setoption Move Overhead clamps low, high, and non-numeric values safely", 
 
 });
 
-test("Move Overhead does not affect go movetime", () => {
+test("Move Overhead is reserved from go movetime", () => {
 
     const originalNow =
         performance.now;
@@ -1506,7 +1506,7 @@ test("Move Overhead does not affect go movetime", () => {
             "go movetime 100"
         );
 
-        assert.equal(lastDeadlineMs, 5095);
+        assert.equal(lastDeadlineMs, 5000);
 
     }
 
@@ -1557,7 +1557,7 @@ test("movestogo does not affect go movetime", () => {
             "go movetime 100 movestogo 5"
         );
 
-        assert.equal(lastDeadlineMs, 7095);
+        assert.equal(lastDeadlineMs, 7045);
 
     }
 
