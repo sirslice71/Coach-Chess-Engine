@@ -11,6 +11,23 @@ import Attack from "../engine/attack.js";
 import EngineDebug from "../dev/enginedebug.js";
 import FEN from "./fen.js";
 
+function insertSquareSorted(list, square) {
+
+    let index = list.length;
+
+    list.push(square);
+
+    while (index > 0 && list[index - 1] > square) {
+
+        list[index] = list[index - 1];
+        index--;
+
+    }
+
+    list[index] = square;
+
+}
+
 export default class Board {
 
     constructor(zobrist = null) {
@@ -300,28 +317,23 @@ export default class Board {
         switch (Math.abs(piece)) {
 
             case 1:
-                list.pawns.push(square);
-                list.pawns.sort((a, b) => a - b);
+                insertSquareSorted(list.pawns, square);
                 break;
 
             case 2:
-                list.knights.push(square);
-                list.knights.sort((a, b) => a - b);
+                insertSquareSorted(list.knights, square);
                 break;
 
             case 3:
-                list.bishops.push(square);
-                list.bishops.sort((a, b) => a - b);
+                insertSquareSorted(list.bishops, square);
                 break;
 
             case 4:
-                list.rooks.push(square);
-                list.rooks.sort((a, b) => a - b);
+                insertSquareSorted(list.rooks, square);
                 break;
 
             case 5:
-                list.queens.push(square);
-                list.queens.sort((a, b) => a - b);
+                insertSquareSorted(list.queens, square);
                 break;
 
             case 6:
