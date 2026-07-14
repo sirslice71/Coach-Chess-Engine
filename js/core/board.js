@@ -301,22 +301,27 @@ export default class Board {
 
             case 1:
                 list.pawns.push(square);
+                list.pawns.sort((a, b) => a - b);
                 break;
 
             case 2:
                 list.knights.push(square);
+                list.knights.sort((a, b) => a - b);
                 break;
 
             case 3:
                 list.bishops.push(square);
+                list.bishops.sort((a, b) => a - b);
                 break;
 
             case 4:
                 list.rooks.push(square);
+                list.rooks.sort((a, b) => a - b);
                 break;
 
             case 5:
                 list.queens.push(square);
+                list.queens.sort((a, b) => a - b);
                 break;
 
             case 6:
@@ -1035,6 +1040,9 @@ export default class Board {
             whiteKing: this.whiteKing,
             blackKing: this.blackKing,
 
+            whiteMaterial: this.whiteMaterial,
+            blackMaterial: this.blackMaterial,
+
             castlingRights: { ...this.castlingRights },
 
             enPassantSquare: this.enPassantSquare,
@@ -1554,21 +1562,49 @@ export default class Board {
             );
 
             this.squares[history.to] =
-                history.capturedPiece;
-
-            this.squares[history.from] =
-                history.movedPiece;
+                Piece.EMPTY;
 
             this.addPiece(
                 history.from,
                 history.movedPiece
             );
 
+            if (history.capturedPiece !== Piece.EMPTY) {
+
+                this.addPiece(
+                    history.to,
+                    history.capturedPiece
+                );
+
+            }
+
         }  
         else {
 
-        this.squares[history.from] = history.movedPiece;
-        this.squares[history.to] = history.capturedPiece;
+            this.removePiece(
+                history.to,
+                history.movedPiece
+            );
+
+            this.squares[history.to] =
+                Piece.EMPTY;
+
+            this.addPiece(
+                history.from,
+                history.movedPiece
+            );
+
+            if (
+                history.capturedPiece !== Piece.EMPTY &&
+                (history.flags & MoveFlags.EN_PASSANT) === 0
+            ) {
+
+                this.addPiece(
+                    history.to,
+                    history.capturedPiece
+                );
+
+            }
 
         }
 
@@ -1584,7 +1620,6 @@ export default class Board {
 
             if (history.movedPiece === Piece.WP) {
 
-                this.squares[history.to + 8] = Piece.BP;
                 this.addPiece(
                     history.to + 8,
                     Piece.BP
@@ -1593,7 +1628,6 @@ export default class Board {
             }
             else {
 
-                this.squares[history.to - 8] = Piece.WP;
                 this.addPiece(
                     history.to - 8,
                     Piece.WP
@@ -1650,6 +1684,9 @@ export default class Board {
         this.whiteKing = history.whiteKing;
         this.blackKing = history.blackKing;
 
+        this.whiteMaterial = history.whiteMaterial;
+        this.blackMaterial = history.blackMaterial;
+
         this.castlingRights = { ...history.castlingRights };
 
         this.enPassantSquare = history.enPassantSquare;
@@ -1667,7 +1704,7 @@ export default class Board {
                 ? performance.now()
                 : 0;
 
-        this.updatePieceLists();
+        // Piece lists were repaired incrementally above.
 
         if (this.profileEnabled) {
 

@@ -10,6 +10,7 @@ import Evaluation from "../js/engine/evaluation.js";
 import Search from "../js/engine/search.js";
 import Attack from "../js/engine/attack.js";
 import MoveOrdering from "../js/engine/moveordering.js";
+import { MoveFlags } from "../js/core/move.js";
 import TranspositionTable, {
     TTFlag,
     scoreFromTT,
@@ -1833,6 +1834,37 @@ test("make/undo restores hash and repetition table through EP, castling, and pro
 
     assert.equal(board.hashKey, hashBefore);
     assert.equal(board.repetitionTable.length, tableBefore);
+
+});
+
+test("occupied en-passant target is treated as a normal capture and undo restores it", () => {
+
+    const fen =
+        "4k3/8/2n1n3/3Pp3/2P1P3/3N1N2/8/4K3 w - e6 0 1";
+
+    const { board, search, legalMoveGenerator } =
+        createEngine(fen);
+
+    const before = snapshotBoard(board);
+    const hashBefore = board.hashKey;
+
+    const move =
+        findMove(legalMoveGenerator, "d5-e6");
+
+    assert.equal(
+        (move.flags & MoveFlags.EN_PASSANT) !== 0,
+        false
+    );
+
+    assert.equal(move.capturedPiece, Piece.BN);
+
+    board.makeMove(move);
+    board.undoMove();
+
+    assert.deepEqual(snapshotBoard(board), before);
+    assert.equal(FEN.export(board), fen);
+    assert.equal(board.hashKey, hashBefore);
+    assert.equal(board.hashKey, search.zobrist.generate(board));
 
 });
 

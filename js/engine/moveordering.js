@@ -101,7 +101,8 @@ export default class MoveOrdering {
 
             (a, b) =>
 
-                b.score - a.score
+                (b.score - a.score) ||
+                this.compareMoveIdentity(a, b)
 
         );
 
@@ -300,6 +301,47 @@ export default class MoveOrdering {
     moveKey(move) {
 
         return move.key;
+
+    }
+
+    compareMoveIdentity(a, b) {
+
+        const squareDiff =
+            a.squareKey - b.squareKey;
+
+        if (squareDiff !== 0) {
+
+            return squareDiff;
+
+        }
+
+        return (
+            this.promotionOrder(a.promotedPiece) -
+            this.promotionOrder(b.promotedPiece)
+        );
+
+    }
+
+    promotionOrder(piece) {
+
+        switch (Math.abs(piece)) {
+
+            case 5:
+                return 0;
+
+            case 4:
+                return 1;
+
+            case 3:
+                return 2;
+
+            case 2:
+                return 3;
+
+            default:
+                return 0;
+
+        }
 
     }
 

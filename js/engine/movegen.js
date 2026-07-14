@@ -268,6 +268,8 @@ export default class MoveGenerator {
             if (Math.abs(targetFile - fromFile) !== 1)
                 continue;
 
+            const targetPiece = this.board.pieceAt(target);
+
             //----------------------------------
             // En Passant Candidate
             //----------------------------------
@@ -288,7 +290,10 @@ export default class MoveGenerator {
 
             );
             */
-            if (target === this.board.enPassantSquare) {
+            if (
+                target === this.board.enPassantSquare &&
+                targetPiece === Piece.EMPTY
+            ) {
                 /*
                 console.error(
 
@@ -333,8 +338,6 @@ export default class MoveGenerator {
             //==========================
             // Normal Capture
             //==========================
-
-            const targetPiece = this.board.pieceAt(target);
 
             if (targetPiece === Piece.EMPTY)
                 continue;
