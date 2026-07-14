@@ -1,0 +1,274 @@
+{
+  "schemaVersion": 1,
+  "baselineCommit": "87062e3",
+  "description": "Permanent diagnostic anchors for Coach strength drift and exact-search equivalence checks.",
+  "anchors": [
+    {
+      "id": "early-minor-g44",
+      "category": "early-minor-piece",
+      "mode": "strength-diagnostic",
+      "fen": "r2qkb1r/pbpp1ppp/1pn1pn2/3P4/2P5/2N2NP1/PP2PP1P/R1BQKB1R b KQkq - 0 6",
+      "depths": [6, 8],
+      "gameMove": "f8b4",
+      "reference": { "type": "preferred", "moves": ["c6a5"], "strict": false },
+      "tags": ["opening", "minor-piece", "stockfish-reference"]
+    },
+    {
+      "id": "early-minor-g48",
+      "category": "early-minor-piece",
+      "mode": "strength-diagnostic",
+      "fen": "r1bqkb1r/ppp2p1p/2n3p1/3Pp3/4P3/2P2N2/P4PPP/R1BQKB1R b KQkq - 0 8",
+      "depths": [6, 8],
+      "gameMove": "c8g4",
+      "reference": { "type": "preferred", "moves": ["c6a5"], "strict": false },
+      "tags": ["opening", "minor-piece", "stockfish-reference"]
+    },
+    {
+      "id": "early-minor-g58",
+      "category": "early-minor-piece",
+      "mode": "strength-diagnostic",
+      "fen": "r2qk2r/pp2bppp/2p2n2/3pNb2/Qn1P4/2N3P1/PP2PPBP/R1B2RK1 b kq - 1 10",
+      "depths": [6, 8],
+      "gameMove": "b4c2",
+      "reference": { "type": "preferred", "moves": ["f5c2"], "strict": false },
+      "tags": ["opening", "minor-piece", "stockfish-reference"]
+    },
+    {
+      "id": "early-minor-g32",
+      "category": "early-minor-piece",
+      "mode": "strength-diagnostic",
+      "fen": "r2qk2r/ppp1p1bp/2npp1p1/1B1nP3/2PP4/8/PP3PPP/RNBQK2R b KQkq c3 0 9",
+      "depths": [6, 8],
+      "gameMove": "d5b4",
+      "reference": { "type": "preferred", "moves": ["d5b6"], "strict": false },
+      "tags": ["opening", "minor-piece", "stockfish-reference"]
+    },
+    {
+      "id": "early-minor-g56",
+      "category": "early-minor-piece",
+      "mode": "strength-diagnostic",
+      "fen": "r2q1rk1/ppp2pbp/2n1pnp1/3pNb2/3P1B2/2N1P1P1/PPP2PBP/R2Q1RK1 b - - 2 9",
+      "depths": [6, 8],
+      "gameMove": "c6b4",
+      "reference": { "type": "preferred", "moves": ["h7h6"], "strict": false },
+      "tags": ["opening", "minor-piece", "stockfish-reference"]
+    },
+    {
+      "id": "early-minor-g20",
+      "category": "early-minor-piece",
+      "mode": "strength-diagnostic",
+      "fen": "r1bq1rk1/pppn1ppp/2n1p3/3pP3/2PP4/3B1N2/P1P2PPP/R1BQ1RK1 b - - 0 9",
+      "depths": [6, 8],
+      "gameMove": "c6d4",
+      "reference": { "type": "preferred-family", "moves": ["h7h6", "f7f6"], "strict": false },
+      "tags": ["opening", "minor-piece", "stockfish-reference"]
+    },
+    {
+      "id": "sentinel-game8",
+      "category": "strict-sentinel",
+      "mode": "exact-search",
+      "fen": "8/k7/7p/P2q2p1/3b1pB1/2p4P/P1P1QP2/6K1 w - - 1 73",
+      "depths": [8],
+      "expected": { "depth": 8, "moves": ["g4f3"], "strict": true },
+      "tags": ["sentinel", "late-endgame"]
+    },
+    {
+      "id": "sentinel-game10",
+      "category": "strict-sentinel",
+      "mode": "exact-search",
+      "fen": "2r1r1k1/1p1b1ppp/4p3/PP1p4/NRn2B2/6P1/P5KP/3R4 b - - 1 24",
+      "depths": [8],
+      "expected": { "depth": 8, "moves": ["e6e5"], "strict": true },
+      "tags": ["sentinel", "middlegame"]
+    },
+    {
+      "id": "sentinel-game4",
+      "category": "strict-sentinel",
+      "mode": "exact-search",
+      "fen": "8/Qp1q2k1/2pN3p/2Pb2p1/3P3n/P7/1P4PP/4R1K1 w - - 1 37",
+      "depths": [9],
+      "expected": { "depth": 9, "moves": ["a7b7"], "strict": true },
+      "tags": ["sentinel", "tactical"]
+    },
+    {
+      "id": "sentinel-queen-rook-mate",
+      "category": "strict-sentinel",
+      "mode": "exact-search",
+      "fen": "5r1k/6pp/5q2/1Rb1p3/4p3/1QP3Pb/P3RP1K/8 b - - 4 54",
+      "depths": [8],
+      "expected": { "depth": 8, "moves": ["f6f3"], "strict": true },
+      "tags": ["sentinel", "mate-threat"]
+    },
+    {
+      "id": "sentinel-quiet-defense",
+      "category": "strict-sentinel",
+      "mode": "exact-search",
+      "fen": "8/2p3pk/7p/5p2/1Nb1q3/4b3/2R3KP/3Q4 w - - 4 47",
+      "depths": [8],
+      "expected": { "depth": 8, "moves": ["d1f3"], "strict": true },
+      "tags": ["sentinel", "defense"]
+    },
+    {
+      "id": "sentinel-promotion-race",
+      "category": "strict-sentinel",
+      "mode": "exact-search",
+      "fen": "3Qr3/1R4k1/4q1p1/P3P3/3pP3/2bp4/6PP/5RK1 b - - 8 61",
+      "depths": [8],
+      "expected": { "depth": 8, "moves": ["e8e7", "e6e7"], "strict": false },
+      "tags": ["sentinel", "promotion-race"]
+    },
+    {
+      "id": "sentinel-attacking-conversion",
+      "category": "strict-sentinel",
+      "mode": "exact-search",
+      "fen": "8/1p6/p3k3/3np3/1P1n4/P4P2/5N2/2R1KBq1 b - - 2 30",
+      "depths": [7],
+      "expected": { "depth": 7, "moves": ["d5e3"], "strict": true },
+      "tags": ["sentinel", "conversion"]
+    },
+    {
+      "id": "control-startpos",
+      "category": "equivalence-control",
+      "mode": "exact-search",
+      "fen": "startpos",
+      "depths": [4, 5],
+      "tags": ["control", "opening"]
+    },
+    {
+      "id": "control-kiwipete",
+      "category": "equivalence-control",
+      "mode": "exact-search",
+      "fen": "r3k2r/p1ppqpb1/bn2pnp1/2pPN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+      "depths": [4],
+      "tags": ["control", "castling", "perft-classic"]
+    },
+    {
+      "id": "control-castling-both",
+      "category": "equivalence-control",
+      "mode": "exact-search",
+      "fen": "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
+      "depths": [4],
+      "tags": ["control", "castling"]
+    },
+    {
+      "id": "control-en-passant-legal",
+      "category": "equivalence-control",
+      "mode": "exact-search",
+      "fen": "7k/8/8/3pP3/8/8/8/4K3 w - d6 0 1",
+      "depths": [5],
+      "tags": ["control", "en-passant"]
+    },
+    {
+      "id": "control-occupied-ep-target",
+      "category": "equivalence-control",
+      "mode": "exact-search",
+      "fen": "4k3/8/2n1n3/3Pp3/2P1P3/3N1N2/8/4K3 w - e6 0 1",
+      "depths": [4],
+      "tags": ["control", "en-passant"]
+    },
+    {
+      "id": "control-quiet-middlegame",
+      "category": "equivalence-control",
+      "mode": "exact-search",
+      "fen": "r2qk2r/ppp2ppp/2n1bn2/3pp3/3PP3/2N2N2/PPP2PPP/R1BQKB1R w KQkq - 0 1",
+      "depths": [5],
+      "tags": ["control", "middlegame"]
+    },
+    {
+      "id": "control-high-branching",
+      "category": "equivalence-control",
+      "mode": "exact-search",
+      "fen": "rnbq1rk1/ppp1bppp/3p1n2/4p3/3PP3/2N2N2/PPPBBPPP/R2QK2R w KQ - 0 8",
+      "depths": [4],
+      "tags": ["control", "middlegame"]
+    },
+    {
+      "id": "control-tactical-capture",
+      "category": "equivalence-control",
+      "mode": "exact-search",
+      "fen": "r1bqk2r/pppp1ppp/2n2n2/4p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 0 1",
+      "depths": [5],
+      "tags": ["control", "tactical"]
+    },
+    {
+      "id": "control-check-evasion",
+      "category": "equivalence-control",
+      "mode": "exact-search",
+      "fen": "4k3/8/8/8/8/8/4r3/4K3 w - - 0 1",
+      "depths": [5],
+      "tags": ["control", "check"]
+    },
+    {
+      "id": "control-pinned-piece",
+      "category": "equivalence-control",
+      "mode": "exact-search",
+      "fen": "4k3/8/8/8/8/4r3/4B3/4K3 w - - 0 1",
+      "depths": [5],
+      "tags": ["control", "pin"]
+    },
+    {
+      "id": "control-rook-ending",
+      "category": "equivalence-control",
+      "mode": "exact-search",
+      "fen": "8/5pk1/6p1/8/8/6P1/5PK1/4R3 w - - 0 40",
+      "depths": [6],
+      "tags": ["control", "endgame"]
+    },
+    {
+      "id": "control-queen-ending",
+      "category": "equivalence-control",
+      "mode": "exact-search",
+      "fen": "6k1/5ppp/5q2/8/8/8/5PPP/5RK1 b - - 0 1",
+      "depths": [5],
+      "tags": ["control", "endgame"]
+    },
+    {
+      "id": "control-pawn-promotion",
+      "category": "equivalence-control",
+      "mode": "exact-search",
+      "fen": "7k/P7/8/8/8/8/6pK/8 w - - 0 1",
+      "depths": [6],
+      "tags": ["control", "promotion"]
+    },
+    {
+      "id": "control-nullmove-low-material",
+      "category": "equivalence-control",
+      "mode": "exact-search",
+      "fen": "8/8/8/8/8/2k5/5K2/6N1 w - - 0 1",
+      "depths": [6],
+      "tags": ["control", "low-material"]
+    },
+    {
+      "id": "control-lone-king-mopup",
+      "category": "equivalence-control",
+      "mode": "exact-search",
+      "fen": "6k1/8/8/8/8/8/5K2/6Q1 w - - 0 1",
+      "depths": [5],
+      "tags": ["control", "endgame"]
+    },
+    {
+      "id": "control-bishop-pair",
+      "category": "equivalence-control",
+      "mode": "exact-search",
+      "fen": "r2q1rk1/ppp2ppp/2nbpn2/3p4/3P4/2NBPN2/PPP2PPP/R2Q1RK1 w - - 0 9",
+      "depths": [5],
+      "tags": ["control", "evaluation"]
+    },
+    {
+      "id": "control-space-advantage",
+      "category": "equivalence-control",
+      "mode": "exact-search",
+      "fen": "r1bq1rk1/pp2bppp/2n1pn2/2ppP3/3P4/2PB1N2/PP1N1PPP/R1BQ1RK1 w - - 0 9",
+      "depths": [5],
+      "tags": ["control", "evaluation"]
+    },
+    {
+      "id": "control-open-file-pressure",
+      "category": "equivalence-control",
+      "mode": "exact-search",
+      "fen": "2r2rk1/pp2qppp/2n1pn2/3p4/3P4/2NBPN2/PPQ2PPP/2RR2K1 w - - 0 15",
+      "depths": [5],
+      "tags": ["control", "rook-file"]
+    }
+  ]
+}
