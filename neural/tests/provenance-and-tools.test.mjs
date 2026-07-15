@@ -14,6 +14,7 @@ import { sourceIdFor, normalizeSep, abnormalTermination, loadSourceManifest } fr
 import { splitIntegrity } from "../validate-dataset.mjs";
 import { analyzeDataset, stats, pearson, spearman } from "../tools/analyze-dataset.mjs";
 import { mergeRecords, verifySplitsPreserved } from "../tools/merge-corpus.mjs";
+import { analyzePgnGames, terminationOf, bookVerdict } from "../tools/analyze-pgn.mjs";
 
 const tmp = (name) => path.join(os.tmpdir(), `neural-prov-${process.pid}-${name}`);
 
@@ -249,6 +250,68 @@ test("verifySplitsPreserved: reports unchanged vs changed prior splits", () => {
     assert.deepEqual(ok, { checked: 2, changed: 0 });
     const bad = verifySplitsPreserved(prior, [mk({ positionKey: "A", split: "test" }), mk({ positionKey: "B", split: "val" })]);
     assert.equal(bad.changed, 1);
+});
+
+// ---------- PGN corpus triage (opening diversity / duplicate games) ----------
+const pgnGame = (o = {}) => ({
+    index: o.index ?? 0,
+    headers: { Event: o.event ?? "E", Site: "?", Date: "2026.01.01", Round: "1",
+        White: o.white ?? "Coach", Black: o.black ?? "Opp", Result: o.result ?? "1-0",
+        ECO: o.eco ?? "A00", ...(o.termination ? { Termination: o.termination } : {}) },
+    sanMoves: o.moves ?? ["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6"],
+});
+
+test("terminationOf: absent/normal -> 'normal'; abnormal -> tag value", () => {
+    assert.equal(terminationOf({}), "normal");
+    assert.equal(terminationOf({ Termination: "normal" }), "normal");
+    assert.equal(terminationOf({ Termination: "abandoned" }), "abandoned");
+});
+
+test("analyzePgnGames: counts, exact duplicates, exclusions, score perspective", () => {
+    const line = ["d4", "d5", "c4", "e6", "Nc3", "Nf6", "Bg5", "Be7"];
+    const games = [
+        pgnGame({ index: 0, moves: line, result: "1-0", white: "Coach" }),          // dup A
+        pgnGame({ index: 1, moves: line, result: "1-0", white: "Coach" }),          // dup A (identical)
+        pgnGame({ index: 2, moves: ["e4", "c5", "Nf3", "d6"], result: "0-1", white: "Coach" }),
+        pgnGame({ index: 3, moves: ["e4", "e6"], result: "1/2-1/2", white: "Opp", black: "Coach" }),
+        pgnGame({ index: 4, moves: line, result: "1-0", termination: "abandoned" }), // excluded
+    ];
+    const a = analyzePgnGames(games, { player: "Coach" });
+    assert.equal(a.totalRecords, 5);
+    assert.equal(a.valid, 4);
+    assert.equal(a.excluded, 1);
+    assert.deepEqual(a.byTermination, { normal: 4, abandoned: 1 });
+    // two identical games collapse to one gameKey -> 3 distinct of 4 valid
+    assert.equal(a.duplicates.distinctGames, 3);
+    assert.equal(a.duplicates.duplicateGroups, 1);
+    assert.equal(a.duplicates.largestGroup, 2);
+    assert.equal(a.duplicates.exactDuplicateRatePct, 25);
+    // Coach: win(0), win(1), loss(2), draw(3) => 2W 1L 1D = 62.5%
+    assert.equal(a.score.wins, 2); assert.equal(a.score.losses, 1); assert.equal(a.score.draws, 1);
+    assert.equal(a.score.scorePct, 62.5);
+    assert.equal(a.score.asWhiteGames, 3);
+    assert.equal(a.score.asBlackGames, 1);
+});
+
+test("analyzePgnGames: opening diversity + concentration", () => {
+    const A = ["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6"];
+    const B = ["d4", "d5", "c4", "e6", "Nc3", "Nf6", "Bg5", "Be7"];
+    // 3 games on line A, 1 on line B -> 2 distinct 8-ply lines, top1 = 75%
+    const games = [pgnGame({ moves: A, eco: "C78" }), pgnGame({ moves: [...A, "O-O"], eco: "C78" }),
+        pgnGame({ moves: [...A, "d3"], eco: "C78" }), pgnGame({ moves: B, eco: "D37" })];
+    const a = analyzePgnGames(games);
+    assert.equal(a.openings.distinctLines.ply8, 2);
+    assert.equal(a.openings.largestOpeningGroup, 3);
+    assert.equal(a.openings.top1Pct, 75);
+    assert.equal(a.openings.distinctEco, 2);
+});
+
+test("bookVerdict: flags replay/concentration, passes a diverse book", () => {
+    const mk = (dupPct, top1, ply8) => ({ duplicates: { exactDuplicateRatePct: dupPct }, openings: { top1Pct: top1, distinctLines: { ply8 } } });
+    assert.match(bookVerdict(mk(40, 51, 5)), /unsuitable/);      // the komodo case
+    assert.match(bookVerdict(mk(0, 62, 5)), /unsuitable/);       // no dupes but one line dominates
+    assert.match(bookVerdict(mk(6, 12, 30)), /still concentrated/);
+    assert.match(bookVerdict(mk(0, 6, 39)), /good for larger/);  // the rodent case
 });
 
 test("analyze read path leaves the input file byte-identical", () => {

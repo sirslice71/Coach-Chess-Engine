@@ -46,6 +46,7 @@ validate-dataset.mjs   inspect-dataset.mjs   features.mjs / features.py (+ parit
 | `inspect-dataset.mjs`   | Distribution / histogram / Coach-vs-SF report |
 | `tools/analyze-dataset.mjs` | Read-only deterministic dataset analysis → JSON + console |
 | `tools/merge-corpus.mjs` | Safe incremental corpus merging (first input wins; splits preserved) |
+| `tools/analyze-pgn.mjs` | Read-only PGN triage: validity, exact-duplicate games, opening diversity, book verdict |
 | `features.mjs` / `features.py` | Identical JS + Python feature encoders |
 | `fixtures/feature-parity.json` | ≥20 FEN → expected feature indices |
 | `lib/*.mjs` | prng, coach loader, position identity, pgn reader, replay, sampling, splits, features, jsonl, stockfish, moveutil |
@@ -136,6 +137,28 @@ to the extract summary keyed by id, so no machine-specific path enters records:
 
 Duplicate ids or paths are rejected. `source.id` is what family-aware reporting
 and `--exclude-family` match against.
+
+### Triage a PGN batch BEFORE labelling it
+
+```powershell
+node .\tools\analyze-pgn.mjs --in "C:\...\match.pgn" --player Coach --json "C:\...\pgn-report.json"
+```
+
+Read-only and engine-free. Reports validity/terminations, **exact-duplicate games**,
+opening diversity (distinct 4/8/12/16-ply lines, top-1/5/10 concentration, ECO
+spread), the player's score, game lengths, and a book verdict
+(`good for larger corpus generation` / `usable but still concentrated` /
+`unsuitable`).
+
+**Why this matters:** a deterministic engine pair plus a non-randomising book
+can emit hundreds of byte-identical games from a handful of opening lines, and
+raw game counts hide it completely. A real example from this project: a
+600-game batch contained only **417 distinct games** (largest duplicate group:
+**34 identical games**) drawn from **5–6 opening lines** — every duplicate costs
+Stockfish labelling time and skews match statistics. Switching books took the
+same 100-game format from **5 → 39 distinct 8-ply lines**, **5 → 37 ECO codes**,
+top-1 opening share **62% → 6%**, and exact-duplicate rate **40% → 0%**. Run this
+before committing engine time to a large match.
 
 ### PGN validation (abnormal terminations)
 
