@@ -62,6 +62,8 @@ export function loadDataset(path, cfg = DEFAULT_TARGET) {
                 cp: r.stockfish.scoreCpWhite, mate: r.stockfish.mate,
                 coach: typeof r.coachClassicalCpWhite === "number" ? r.coachClassicalCpWhite : null,
                 queenless: !/[Qq]/.test(r.fen.split(" ")[0]),
+                // provenance for family-aware reporting / source-family holdouts
+                sourceId: (r.source && (r.source.id ?? r.source.file)) ?? "unknown",
                 fen: r.fen,
             },
         };

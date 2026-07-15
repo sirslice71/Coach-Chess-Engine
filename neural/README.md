@@ -45,6 +45,7 @@ validate-dataset.mjs   inspect-dataset.mjs   features.mjs / features.py (+ parit
 | `validate-dataset.mjs`  | Structural + chess-legality validation (gameKey-authoritative split check) |
 | `inspect-dataset.mjs`   | Distribution / histogram / Coach-vs-SF report |
 | `tools/analyze-dataset.mjs` | Read-only deterministic dataset analysis → JSON + console |
+| `tools/merge-corpus.mjs` | Safe incremental corpus merging (first input wins; splits preserved) |
 | `features.mjs` / `features.py` | Identical JS + Python feature encoders |
 | `fixtures/feature-parity.json` | ≥20 FEN → expected feature indices |
 | `lib/*.mjs` | prng, coach loader, position identity, pgn reader, replay, sampling, splits, features, jsonl, stockfish, moveutil |
@@ -115,6 +116,36 @@ spans multiple splits. `id + gameIndex` is used only for provenance reporting.
 Pass `--source-root DIR` to `extract-positions.mjs` so ids are stable, unique,
 and free of absolute paths; extraction **fails fast** if two inputs resolve to
 the same id.
+
+### Semantic source ids + metadata (`--sources`)
+
+For corpora where a filename is a poor family label, pass a manifest that gives
+each input a **semantic id** and provenance metadata (opponent, time control,
+book, engine strength). The manifest lives **outside Git** (it holds absolute
+paths); records store only the lean `source.id`, and the metadata map is written
+to the extract summary keyed by id, so no machine-specific path enters records:
+
+```json
+{ "sources": [
+  { "path": "C:\\...\\Coach_vs_Shallowblue_1s_komodo_500games.pgn",
+    "id": "shallowblue-1s-komodo-part1",
+    "meta": { "opponent": "Shallowblue", "timeControl": "1s/move",
+              "book": "komodo.bin", "bookDepth": 10 } }
+] }
+```
+
+Duplicate ids or paths are rejected. `source.id` is what family-aware reporting
+and `--exclude-family` match against.
+
+### PGN validation (abnormal terminations)
+
+CuteChess writes `[Termination "..."]` **only for abnormal endings**
+(`abandoned` after a disconnect, `time forfeit`, `illegal move`, stalled
+connection); a normally-finished game has **no** Termination tag. Extraction
+therefore **excludes any game with a non-`normal` Termination by default** and
+reports the counts per source (`--include-abnormal` keeps them). Never assume a
+game is valid just because it has a `Result` tag — a disconnected game still
+carries one.
 
 **Backward compatibility:** datasets produced before provenance existed have no
 `source.gameKey`/`source.id`. The validator then falls back to a proxy identity
@@ -207,6 +238,34 @@ python features.py fixtures\feature-parity.json   # JS/Python parity check (use 
 **50000** nodes (see the trial report). Labelling is resumable — re-running the
 same command after an interruption skips already-labelled positions; add
 `--retry-failed` to re-attempt any `stockfish:null` records.
+
+### Growing the corpus safely (incremental merge)
+
+Adding new games never re-splits old ones: `assignSplit` is a pure function of a
+game's `gameKey`, so an existing game's split cannot change when new games are
+added. To fold a new labelled batch into an accepted corpus **without relabelling
+anything already accepted**:
+
+```powershell
+# 1) extract the new games (semantic ids, abnormal games auto-excluded)
+node extract-positions.mjs --sources "C:\...\run-002\sources.json" --out "C:\...\run-002\positions.jsonl"
+# 2) label ONLY positionKeys not already present in the accepted corpus, then
+# 3) merge — the FIRST --in wins, so accepted labels/splits are preserved
+node .\tools\merge-corpus.mjs --in "C:\...\run-001-fixed\labelled.jsonl" `
+     --in "C:\...\run-002\labelled-new.jsonl" `
+     --out "C:\...\combined\labelled.jsonl" --json "C:\...\combined\merge-report.json"
+```
+
+`merge-corpus.mjs` verifies the merged result (unique keys, no positionKey in two
+splits, no `gameKey` spanning splits) and confirms the prior corpus's split
+assignments are unchanged; it exits non-zero on any violation.
+
+### Source-family holdouts
+
+`train-value.mjs --exclude-family <substring>` (repeatable) drops matching
+`source.id`s from **training only**, leaving val/test intact, so a family can be
+scored on its stored test rows after being excluded from training. Every run also
+reports `bySourceFamilyTest`. Game-level split boundaries are never crossed.
 
 `analyze-dataset.mjs` is **read-only** (never modifies its input) and
 deterministic. It prints a console summary and, with `--json`, writes a report

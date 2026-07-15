@@ -26,7 +26,7 @@ import { mse, mae, pearson, mean, round } from "./metrics.mjs";
 function parseArgs(argv) {
     const a = { in: null, model: "mlp", hidden: 32, target: "tanh", scale: 400, clipCp: 1000,
         epochs: 60, lr: 0.01, batch: 256, seed: 1, patience: 8, shuffleLabels: false, subset: null,
-        outModel: null, report: null, quiet: false };
+        excludeFamily: null, outModel: null, report: null, quiet: false };
     for (let i = 0; i < argv.length; i++) {
         const t = argv[i];
         const n = () => argv[++i];
@@ -42,6 +42,7 @@ function parseArgs(argv) {
         else if (t === "--seed") a.seed = +n();
         else if (t === "--patience") a.patience = +n();
         else if (t === "--shuffle-labels") a.shuffleLabels = true;
+        else if (t === "--exclude-family") (a.excludeFamily = a.excludeFamily || []).push(n());
         else if (t === "--subset") a.subset = +n();
         else if (t === "--out-model") a.outModel = n();
         else if (t === "--report") a.report = n();
@@ -94,6 +95,20 @@ function headToHead(items, predict, cfg) {
     };
 }
 
+// Per-source-family metrics on a held-out set (family generalization).
+function bySourceFamily(items, predict, cfg) {
+    const groups = new Map();
+    for (const it of items) {
+        const id = String(it.meta.sourceId);
+        (groups.get(id) || groups.set(id, []).get(id)).push(it);
+    }
+    const out = {};
+    for (const [id, rows] of [...groups.entries()].sort((a, b) => b[1].length - a[1].length)) {
+        out[id] = evalSet(rows, predict, cfg);
+    }
+    return out;
+}
+
 function breakdowns(items, predict, cfg) {
     const groups = {
         opening: (m) => m.phase === "opening", middlegame: (m) => m.phase === "middlegame", endgame: (m) => m.phase === "endgame",
@@ -113,6 +128,17 @@ async function main() {
     const t0 = Date.now();
     const { splits, featureDim, skipped } = loadDataset(args.in, cfg);
     let train = splits.train, val = splits.val, test = splits.test;
+
+    // Source-family holdout: drop matching sources from TRAIN only (val/test are
+    // left intact so held-out families can be scored on their stored test rows).
+    // Game-level split boundaries are never crossed.
+    let excluded = null;
+    if (args.excludeFamily && args.excludeFamily.length) {
+        const before = train.length;
+        const hit = (it) => args.excludeFamily.some((f) => String(it.meta.sourceId).includes(f));
+        train = train.filter((it) => !hit(it));
+        excluded = { patterns: args.excludeFamily, trainBefore: before, trainAfter: train.length, removed: before - train.length };
+    }
     if (args.subset) train = train.slice(0, args.subset);
 
     // shuffled-label control: destroy the feature->target relationship in TRAIN only
@@ -127,6 +153,7 @@ async function main() {
 
     const report = {
         config: { ...args, featureDim }, dataset: { train: train.length, val: val.length, test: test.length, skipped },
+        excludedFamilies: excluded,
         target: cfg, constant: round(constant),
         baselines: { constant: { val: evalSet(val, constPredict, cfg), test: evalSet(test, constPredict, cfg) } },
     };
@@ -162,6 +189,7 @@ async function main() {
             bestEpoch, bestValMSE: round(bestVal, 5), epochsRun: curve.length, curveTail: curve.slice(-5) };
         report.metrics = { train: evalSet(train, predict, cfg), val: evalSet(val, predict, cfg), test: evalSet(test, predict, cfg) };
         report.breakdownTest = breakdowns(test, predict, cfg);
+        report.bySourceFamilyTest = bySourceFamily(test, predict, cfg);
         report.headToHeadTest = headToHead(test, predict, cfg);
         if (args.outModel) {
             const dir = path.dirname(path.resolve(args.outModel));

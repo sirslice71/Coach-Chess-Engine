@@ -10,9 +10,10 @@ import os from "node:os";
 import fs from "node:fs";
 import path from "node:path";
 
-import { sourceIdFor, normalizeSep } from "../extract-positions.mjs";
+import { sourceIdFor, normalizeSep, abnormalTermination, loadSourceManifest } from "../extract-positions.mjs";
 import { splitIntegrity } from "../validate-dataset.mjs";
 import { analyzeDataset, stats, pearson, spearman } from "../tools/analyze-dataset.mjs";
+import { mergeRecords, verifySplitsPreserved } from "../tools/merge-corpus.mjs";
 
 const tmp = (name) => path.join(os.tmpdir(), `neural-prov-${process.pid}-${name}`);
 
@@ -177,6 +178,77 @@ test("analyzeDataset: JSON report is deterministic", () => {
     seq = 0; const a1 = JSON.stringify(analyzeDataset(build()));
     seq = 0; const a2 = JSON.stringify(analyzeDataset(build()));
     assert.equal(a1, a2);
+});
+
+// ---------- PGN validation: abnormal terminations ----------
+test("abnormalTermination: absent/normal -> null; abnormal -> the tag value", () => {
+    // CuteChess only writes [Termination] for abnormal endings
+    assert.equal(abnormalTermination({}), null);
+    assert.equal(abnormalTermination({ Termination: "normal" }), null);
+    assert.equal(abnormalTermination({ Termination: "Normal" }), null);
+    assert.equal(abnormalTermination({ Termination: "abandoned" }), "abandoned");
+    assert.equal(abnormalTermination({ Termination: "time forfeit" }), "time forfeit");
+    assert.equal(abnormalTermination({ Termination: "illegal move" }), "illegal move");
+});
+
+test("loadSourceManifest: reads ids+meta, rejects missing fields and duplicate ids", () => {
+    const p = tmp("man.json");
+    fs.writeFileSync(p, JSON.stringify({ sources: [
+        { path: "C:\\a\\x.pgn", id: "src-a", meta: { opponent: "X", timeControl: "1s/move" } },
+        { path: "C:\\b\\x.pgn", id: "src-b" },
+    ] }));
+    const m = loadSourceManifest(p);
+    assert.deepEqual(m.paths, ["C:\\a\\x.pgn", "C:\\b\\x.pgn"]);
+    assert.equal(m.idByPath.get("C:\\a\\x.pgn"), "src-a");
+    assert.deepEqual(m.metaById["src-a"], { opponent: "X", timeControl: "1s/move" });
+    // duplicate id rejected
+    fs.writeFileSync(p, JSON.stringify({ sources: [{ path: "a", id: "dup" }, { path: "b", id: "dup" }] }));
+    assert.throws(() => loadSourceManifest(p), /duplicate manifest id/);
+    // missing id rejected
+    fs.writeFileSync(p, JSON.stringify({ sources: [{ path: "a" }] }));
+    assert.throws(() => loadSourceManifest(p), /require both/);
+    fs.unlinkSync(p);
+});
+
+// ---------- safe incremental corpus merge ----------
+test("mergeRecords: first dataset wins on duplicate keys; later adds only new", () => {
+    const oldDs = { name: "old", records: [
+        mk({ positionKey: "A", gameKey: "G1", split: "train", cp: 10 }),
+        mk({ positionKey: "B", gameKey: "G1", split: "train", cp: 20 }),
+    ] };
+    const newDs = { name: "new", records: [
+        mk({ positionKey: "B", gameKey: "G9", split: "test", cp: 999 }), // dup key -> dropped
+        mk({ positionKey: "C", gameKey: "G2", split: "val", cp: 30 }),
+    ] };
+    const r = mergeRecords([oldDs, newDs]);
+    assert.equal(r.merged.length, 3);
+    assert.equal(r.contributed.old, 2);
+    assert.equal(r.contributed.new, 1);
+    assert.equal(r.dropped.new, 1);
+    assert.equal(r.failures.length, 0);
+    // the surviving "B" is the OLD record (label + split preserved)
+    const b = r.merged.find((x) => x.positionKey === "B");
+    assert.equal(b.stockfish.scoreCpWhite, 20);
+    assert.equal(b.split, "train");
+    assert.equal(r.origin.B, "old");
+});
+
+test("mergeRecords: detects gameKey spanning splits and positionKey in two splits", () => {
+    const ds = { name: "d", records: [
+        mk({ positionKey: "A", gameKey: "G1", split: "train" }),
+        mk({ positionKey: "B", gameKey: "G1", split: "test" }), // same game, two splits
+    ] };
+    const r = mergeRecords([ds]);
+    assert.equal(r.gameKeyLeak, 1);
+    assert.ok(r.failures.some((f) => f.msg === "gameKey spans multiple splits"));
+});
+
+test("verifySplitsPreserved: reports unchanged vs changed prior splits", () => {
+    const prior = [mk({ positionKey: "A", split: "train" }), mk({ positionKey: "B", split: "val" })];
+    const ok = verifySplitsPreserved(prior, [mk({ positionKey: "A", split: "train" }), mk({ positionKey: "B", split: "val" })]);
+    assert.deepEqual(ok, { checked: 2, changed: 0 });
+    const bad = verifySplitsPreserved(prior, [mk({ positionKey: "A", split: "test" }), mk({ positionKey: "B", split: "val" })]);
+    assert.equal(bad.changed, 1);
 });
 
 test("analyze read path leaves the input file byte-identical", () => {

@@ -9,6 +9,7 @@
 //        [--config config.json] [--skip-first N] [--every N]
 //        [--max-per-game N] [--seed N] [--include-terminal]
 //        [--exclude-in-check] [--limit-games N] [--source-root DIR]
+//        [--sources manifest.json] [--include-abnormal]
 //
 // Provenance: each record's `source` carries a human-readable basename
 // (`file`), a STABLE UNIQUE source id (`id`), the per-file `gameIndex`, the
@@ -17,6 +18,19 @@
 // when the input is under that root, else "<parentDir>/<basename>". This makes
 // two different inputs that share a basename distinguishable. No absolute path
 // or username is stored. If two inputs resolve to the same id, extraction fails.
+//
+// --sources manifest.json assigns SEMANTIC source ids and per-source metadata
+// (opponent, time control, book, engine strength). Shape:
+//   { "sources": [ { "path": "C:\\...\\a.pgn", "id": "shallowblue-1s-part1",
+//                    "meta": { "opponent": "Shallowblue", "timeControl": "1s/move" } } ] }
+// Record identity stays lean (`source.id`); the meta map is written to the
+// extract summary keyed by id, so no machine-specific path enters the records.
+//
+// PGN validation: games whose [Termination] tag is present and NOT "normal"
+// (e.g. "abandoned" from a disconnect, "time forfeit", "illegal move") are
+// EXCLUDED by default and counted per source. CuteChess only emits Termination
+// for abnormal endings, so an absent tag means a normally-finished game. Use
+// --include-abnormal to keep them.
 //======================================================
 
 import fs from "node:fs";
@@ -30,12 +44,15 @@ import { positionIdentity, materialSignature, gamePhase } from "./lib/position.m
 import { AppendWriter, writeJson } from "./lib/jsonl.mjs";
 
 function parseArgs(argv) {
-    const a = { pgns: [], out: null, config: null, overrides: {}, limitGames: null, sourceRoot: null };
+    const a = { pgns: [], out: null, config: null, overrides: {}, limitGames: null, sourceRoot: null,
+        sources: null, includeAbnormal: false };
     for (let i = 0; i < argv.length; i++) {
         const t = argv[i];
         if (t === "--out") a.out = argv[++i];
         else if (t === "--config") a.config = argv[++i];
         else if (t === "--source-root") a.sourceRoot = argv[++i];
+        else if (t === "--sources") a.sources = argv[++i];
+        else if (t === "--include-abnormal") a.includeAbnormal = true;
         else if (t === "--skip-first") a.overrides.skipFirstPlies = Number(argv[++i]);
         else if (t === "--every") a.overrides.sampleEveryPlies = Number(argv[++i]);
         else if (t === "--max-per-game") a.overrides.maxPositionsPerGame = Number(argv[++i]);
@@ -46,9 +63,34 @@ function parseArgs(argv) {
         else if (t.startsWith("--")) throw new Error("unknown flag " + t);
         else a.pgns.push(t);
     }
-    if (!a.pgns.length) throw new Error("no PGN input paths given");
+    if (!a.pgns.length && !a.sources) throw new Error("no PGN input paths given (pass paths or --sources manifest.json)");
     if (!a.out) throw new Error("--out required");
     return a;
+}
+
+// PGN validation: CuteChess writes [Termination] only for ABNORMAL endings
+// (abandoned/disconnect, time forfeit, illegal move, stalled connection).
+// Returns the abnormal termination string, or null when the game ended normally.
+export function abnormalTermination(headers) {
+    const t = headers && headers.Termination;
+    if (!t) return null;
+    return String(t).toLowerCase() === "normal" ? null : String(t);
+}
+
+// Load a --sources manifest: [{ path, id, meta? }]. Returns { paths, idByPath, metaById }.
+export function loadSourceManifest(manifestPath) {
+    const raw = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    const list = Array.isArray(raw) ? raw : raw.sources;
+    if (!Array.isArray(list) || !list.length) throw new Error("--sources manifest must contain a non-empty `sources` array");
+    const paths = [], idByPath = new Map(), metaById = {};
+    for (const s of list) {
+        if (!s.path || !s.id) throw new Error("--sources entries require both `path` and `id`");
+        if (idByPath.has(s.path)) throw new Error("duplicate manifest path: " + s.path);
+        for (const [p, id] of idByPath) if (id === s.id) throw new Error(`duplicate manifest id "${s.id}" (${p} and ${s.path})`);
+        paths.push(s.path); idByPath.set(s.path, s.id);
+        if (s.meta) metaById[s.id] = s.meta;
+    }
+    return { paths, idByPath, metaById };
 }
 
 // Normalize any path separators to "/".
@@ -80,6 +122,7 @@ async function main() {
     const stats = {
         files: [], gamesRead: 0, gamesFailed: 0, positionsSampled: 0,
         duplicatesRemoved: 0, uniqueRetained: 0, capped: 0,
+        gamesExcludedAbnormal: 0, abnormalByTermination: {},
         splits: { train: 0, val: 0, test: 0 },
         errors: [],
     };
@@ -87,29 +130,44 @@ async function main() {
     const phaseCount = { opening: 0, middlegame: 0, endgame: 0 };
     const materialCount = new Map();
 
-    // Precompute unique source ids and fail fast on ambiguous provenance.
+    // Resolve inputs + source ids. A --sources manifest gives semantic ids and
+    // per-source metadata; otherwise ids are derived from the path.
+    const manifest = args.sources ? loadSourceManifest(args.sources) : null;
+    const inputs = manifest ? manifest.paths : args.pgns;
+    const sourceMeta = manifest ? manifest.metaById : {};
     const idFor = new Map();
     const idsSeen = new Map();
-    for (const pgnPath of args.pgns) {
-        const sid = sourceIdFor(pgnPath, args.sourceRoot);
+    for (const pgnPath of inputs) {
+        const sid = manifest ? manifest.idByPath.get(pgnPath) : sourceIdFor(pgnPath, args.sourceRoot);
         if (idsSeen.has(sid) && idsSeen.get(sid) !== pgnPath) {
-            throw new Error(`ambiguous source id "${sid}" for both "${idsSeen.get(sid)}" and "${pgnPath}" — pass --source-root or rename inputs`);
+            throw new Error(`ambiguous source id "${sid}" for both "${idsSeen.get(sid)}" and "${pgnPath}" — pass --source-root, --sources, or rename inputs`);
         }
         idsSeen.set(sid, pgnPath);
         idFor.set(pgnPath, sid);
     }
 
-    for (const pgnPath of args.pgns) {
+    for (const pgnPath of inputs) {
         let games;
         try { games = readPgnFile(pgnPath); }
         catch (e) { stats.errors.push({ file: pgnPath, error: e.message }); continue; }
         const base = path.basename(pgnPath);
         const srcId = idFor.get(pgnPath);
-        stats.files.push({ file: base, id: srcId, games: games.length });
+        const fileStat = { file: base, id: srcId, games: games.length, excludedAbnormal: 0, accepted: 0 };
+        stats.files.push(fileStat);
 
         for (const game of games) {
             if (args.limitGames && stats.gamesRead >= args.limitGames) break;
+            // PGN validation: drop abnormally-terminated games (disconnects etc.)
+            const abnormal = abnormalTermination(game.headers);
+            if (abnormal && !args.includeAbnormal) {
+                stats.gamesExcludedAbnormal++;
+                fileStat.excludedAbnormal++;
+                stats.abnormalByTermination[abnormal] = (stats.abnormalByTermination[abnormal] || 0) + 1;
+                stats.errors.push({ file: base, id: srcId, gameIndex: game.index, excluded: "abnormal termination", termination: abnormal });
+                continue;
+            }
             stats.gamesRead++;
+            fileStat.accepted++;
             const gk = gameKey(game);
             const sp = assignSplit(game, split);
             let rep;
@@ -155,17 +213,20 @@ async function main() {
         }
     }
     writer.close();
-    writeJson(args.out.replace(/\.jsonl$/, "") + ".extract-summary.json", { config: { sampling, split, caps }, stats, phaseCount });
+    writeJson(args.out.replace(/\.jsonl$/, "") + ".extract-summary.json",
+        { config: { sampling, split, caps }, sourceMeta, stats, phaseCount });
 
     console.log("== extraction ==");
-    console.log("games read:      ", stats.gamesRead);
+    console.log("games accepted:  ", stats.gamesRead);
+    if (stats.gamesExcludedAbnormal) console.log("games EXCLUDED (abnormal termination):", stats.gamesExcludedAbnormal, JSON.stringify(stats.abnormalByTermination));
     console.log("positions sampled:", stats.positionsSampled);
     console.log("duplicates removed:", stats.duplicatesRemoved);
     console.log("capped:          ", stats.capped);
     console.log("unique retained: ", stats.uniqueRetained);
     console.log("splits:          ", stats.splits);
     console.log("phase:           ", phaseCount);
-    if (stats.errors.length) console.log("errors:", stats.errors.length, "(see summary json)");
+    for (const f of stats.files) console.log(`   source ${f.id}: accepted ${f.accepted}/${f.games}` + (f.excludedAbnormal ? ` (excluded ${f.excludedAbnormal})` : ""));
+    if (stats.errors.length) console.log("errors/exclusions:", stats.errors.length, "(see summary json)");
     console.log("out:", args.out);
 }
 
