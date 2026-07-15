@@ -50,7 +50,10 @@ validate-dataset.mjs   inspect-dataset.mjs   features.mjs / features.py (+ parit
 | `lib/*.mjs` | prng, coach loader, position identity, pgn reader, replay, sampling, splits, features, jsonl, stockfish, moveutil |
 | `schemas/*.json` | JSON Schemas for both record types |
 | `tools/gen-selfplay-pgn.mjs` | **DEV/TEST ONLY** synthetic seeded games (not training data) |
-| `tests/*.test.mjs` | `node --test` suites (`neural`, `provenance-and-tools`) |
+| `train/*.mjs` | Offline value-network proof: `dataset`, `model`, `metrics`, `train-value`, `infer` (JS) |
+| `train/infer.py` / `train/test_infer.py` | Pure-Python inference twin + tests |
+| `train/fixtures/*.json` | Tiny parity fixture model + FEN→output cases (**not** a trained model) |
+| `tests/*.test.mjs` | `node --test` suites (`neural`, `provenance-and-tools`, `train`) |
 
 ## Position identity (dedup key)
 
@@ -212,6 +215,60 @@ id, position/score/mate distributions, and Coach-vs-Stockfish error breakdowns.
 The `--json` output directory is **not** created automatically — it errors
 clearly if the directory is missing. Reports and datasets stay **outside Git**
 (or under the git-ignored `neural\artifacts\`).
+
+## Neural value-network proof (`train/`)
+
+An **offline engineering proof** that the 781-dim sparse features carry learnable
+signal. It is **not** wired into Coach — no search/eval integration, no Elo
+claim. Pure Node.js (training + inference) with a pure-Python inference twin; no
+NumPy/PyTorch/TensorFlow.
+
+- **Purpose / limits:** proves mechanics only, on the narrow `run-001-fixed`
+  corpus (100% Coach-vs-Shallowblue @ 500 ms). Not evidence of playing-strength
+  improvement.
+- **Target convention (primary):** `target = tanh(cp / 400)`, White-positive
+  (`>0` ⇒ White better); centipawns clipped to ±1000; mate → `sign(mate)·0.999`.
+  Secondary comparison: WDL expected score `(w + 0.5·d)/total`. Invert with
+  `cp = atanh(value)·400`.
+- **Architecture:** sparse `781 → H` (ReLU) `→ 1` (tanh); `H ∈ {16,32,64}`, plus
+  `constant` and `linear` baselines. Deterministic Adam, seeded init, batching,
+  best-validation checkpoint (early stopping). Uses the stored game-level split
+  **as-is** — no reshuffling, no label/source/split used as a feature.
+- **Export format** (plain JSON, `train/model.mjs`): `modelVersion`,
+  `featureDim` (781), `kind` (`linear`|`mlp`), `hidden`, `hiddenActivation`,
+  `outputActivation`, `targetTransform`, dense `layers` (`W`/`b` or
+  `W1`/`b1`/`W2`/`b2`), `output` convention, and `training` metadata.
+- **Validation/test policy:** select the model by best **validation** loss;
+  report **test** only once after selection. Do not tune on test.
+
+```powershell
+cd "<USERPROFILE>\OneDrive\Desktop\Coach Neural\neural"
+$IN  = "<USERPROFILE>\OneDrive\Desktop\Coach Neural Data\run-001-fixed\labelled.jsonl"
+$OUT = "<USERPROFILE>\OneDrive\Desktop\Coach Neural Data\proof-run"   # OUTSIDE Git
+New-Item -ItemType Directory -Force -Path $OUT | Out-Null
+
+# Train (primary model). Model + report are written OUTSIDE the repo.
+node train\train-value.mjs --in $IN --model mlp --hidden 64 --target tanh --scale 400 `
+     --lr 0.005 --patience 15 --epochs 120 --seed 1 `
+     --out-model "$OUT\proof-model.json" --report "$OUT\mlp64.json"
+
+# Baselines / ablations: --model constant | linear ; --shuffle-labels (control)
+# Python/JS inference parity (uses the tiny committed fixture model):
+node --test tests\train.test.mjs                              # JS side
+python train\infer.py train\fixtures\proof-model-fixture.json train\fixtures\inference-parity.json
+python train\test_infer.py                                   # Python side
+
+# Node inference benchmark (standalone; NOT engine-integrated):
+node train\infer.mjs --model "$OUT\proof-model.json" --bench --in $IN --n 5000
+```
+
+**Parity:** JS and Python inference must agree within tolerance **1e-6** (chosen
+generously; actual difference is ~machine-epsilon because both iterate the
+sorted sparse indices in identical order and use IEEE-754 doubles). The
+committed `train/fixtures/proof-model-fixture.json` is a **tiny** deterministic
+model for parity only — **the full trained model is never committed** (it lives
+under `proof-run\`, outside Git). ⚠️ **No model is integrated into Coach**;
+classical evaluation is unchanged.
 
 ## Output location & Git hygiene
 
