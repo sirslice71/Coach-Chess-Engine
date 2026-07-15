@@ -150,6 +150,20 @@ spread), the player's score, game lengths, and a book verdict
 (`good for larger corpus generation` / `usable but still concentrated` /
 `unsuitable`).
 
+**Score reporting distinguishes win% from score%** and always prints a 95% CI:
+
+```
+Coach: W81 L111 D8 | win 40.5% draw 4% loss 55.5% -> SCORE 42.5% 95%CI [35.8, 49.2] | Elo -52.5 [-101.7, -5.4]
+```
+
+`score% = (wins + 0.5*draws)/games` (Elo is derived from the **score**, never the
+win rate). The interval matters: a 100-game match carries roughly **±10 points**
+of 95% uncertainty, so consecutive batches scoring 43.0% and 42.5% are **not**
+distinguishable (that real pair differs by 0.5 pp with a 95% CI of ±11.5 pp).
+Treat a single match score as an estimate, not a measurement. Games are treated
+as independent; paired openings (`-repeat`) add mild correlation, so the
+interval is approximate.
+
 **Why this matters:** a deterministic engine pair plus a non-randomising book
 can emit hundreds of byte-identical games from a handful of opening lines, and
 raw game counts hide it completely. A real example from this project: a

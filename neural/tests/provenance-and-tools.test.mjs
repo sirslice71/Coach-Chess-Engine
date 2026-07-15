@@ -14,7 +14,7 @@ import { sourceIdFor, normalizeSep, abnormalTermination, loadSourceManifest } fr
 import { splitIntegrity } from "../validate-dataset.mjs";
 import { analyzeDataset, stats, pearson, spearman } from "../tools/analyze-dataset.mjs";
 import { mergeRecords, verifySplitsPreserved } from "../tools/merge-corpus.mjs";
-import { analyzePgnGames, terminationOf, bookVerdict } from "../tools/analyze-pgn.mjs";
+import { analyzePgnGames, terminationOf, bookVerdict, scoreStats } from "../tools/analyze-pgn.mjs";
 
 const tmp = (name) => path.join(os.tmpdir(), `neural-prov-${process.pid}-${name}`);
 
@@ -304,6 +304,44 @@ test("analyzePgnGames: opening diversity + concentration", () => {
     assert.equal(a.openings.largestOpeningGroup, 3);
     assert.equal(a.openings.top1Pct, 75);
     assert.equal(a.openings.distinctEco, 2);
+});
+
+test("scoreStats: score%, CI and Elo from per-game scores (1/0.5/0)", () => {
+    // The real SF2000 batch-1 result: W39 D8 L53 -> (39 + 4)/100 = 43.00%
+    const b1 = [...Array(39).fill(1), ...Array(8).fill(0.5), ...Array(53).fill(0)];
+    const s1 = scoreStats(b1);
+    assert.equal(s1.scorePct, 43);
+    assert.equal(s1.sePct, 4.77);
+    assert.deepEqual(s1.ci95Pct, [33.7, 52.3]);
+    assert.equal(s1.impliedElo, -49);           // -400*log10(1/0.43 - 1)
+    // The real batch-2 result: W81 D8 L111 -> (81 + 4)/200 = 42.50%
+    const b2 = [...Array(81).fill(1), ...Array(8).fill(0.5), ...Array(111).fill(0)];
+    const s2 = scoreStats(b2);
+    assert.equal(s2.scorePct, 42.5);
+    assert.deepEqual(s2.ci95Pct, [35.8, 49.2]);
+    // more games -> tighter interval
+    assert.ok(s2.sePct < s1.sePct, "200 games must give a smaller SE than 100");
+    // a 50% score is 0 Elo; CI brackets the point estimate
+    const even = [...Array(50).fill(1), ...Array(50).fill(0)];
+    assert.equal(scoreStats(even).impliedElo, 0);
+    assert.equal(scoreStats([]), null);
+});
+
+test("analyzePgnGames: exposes win/draw/loss vs total score and a CI", () => {
+    const games = [
+        pgnGame({ index: 0, result: "1-0", white: "Coach" }),   // win
+        pgnGame({ index: 1, result: "1/2-1/2", white: "Coach" }), // draw
+        pgnGame({ index: 2, result: "0-1", white: "Coach" }),   // loss
+        pgnGame({ index: 3, result: "0-1", white: "Coach" }),   // loss
+    ];
+    const a = analyzePgnGames(games, { player: "Coach" });
+    // win% 25, draw% 25, loss% 50 -> score% = (1 + 0.5)/4 = 37.5 (distinct from win%)
+    assert.equal(a.score.winPct, 25);
+    assert.equal(a.score.drawPct, 25);
+    assert.equal(a.score.lossPct, 50);
+    assert.equal(a.score.scorePct, 37.5);
+    assert.ok(Array.isArray(a.score.ci95Pct) && a.score.ci95Pct.length === 2);
+    assert.ok(a.score.ci95Pct[0] < a.score.scorePct && a.score.ci95Pct[1] > a.score.scorePct);
 });
 
 test("bookVerdict: flags replay/concentration, passes a diverse book", () => {
