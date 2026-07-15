@@ -9,10 +9,12 @@
     "positionKey": { "type": "string", "description": "placement stm castling ep(only-if-legal) halfmoveBucket(0-49/50-79/80-99/100+); fullmove excluded" },
     "source": {
       "type": "object",
-      "required": ["file","game","ply"],
+      "required": ["file","id","gameIndex","gameKey","ply"],
       "properties": {
-        "file": { "type": "string" },
-        "game": { "type": "integer" },
+        "file": { "type": "string", "description": "human-readable basename; NOT unique across inputs that share a basename" },
+        "id": { "type": "string", "description": "stable unique source id: path relative to --source-root ('/'-normalized) or '<parentDir>/<basename>'; never an absolute path or username" },
+        "gameIndex": { "type": "integer", "description": "0-based index of the game within its source file" },
+        "gameKey": { "type": "string", "description": "content-derived game identity (headers + full mainline hash); AUTHORITATIVE for split-leakage detection" },
         "ply": { "type": "integer" }
       }
     },

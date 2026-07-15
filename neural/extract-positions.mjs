@@ -8,7 +8,15 @@
 //   node extract-positions.mjs <pgn...> --out positions.jsonl
 //        [--config config.json] [--skip-first N] [--every N]
 //        [--max-per-game N] [--seed N] [--include-terminal]
-//        [--exclude-in-check] [--limit-games N]
+//        [--exclude-in-check] [--limit-games N] [--source-root DIR]
+//
+// Provenance: each record's `source` carries a human-readable basename
+// (`file`), a STABLE UNIQUE source id (`id`), the per-file `gameIndex`, the
+// content-derived `gameKey` (authoritative game identity for split leakage),
+// and `ply`. `id` is the path relative to --source-root (normalized to `/`)
+// when the input is under that root, else "<parentDir>/<basename>". This makes
+// two different inputs that share a basename distinguishable. No absolute path
+// or username is stored. If two inputs resolve to the same id, extraction fails.
 //======================================================
 
 import fs from "node:fs";
@@ -22,11 +30,12 @@ import { positionIdentity, materialSignature, gamePhase } from "./lib/position.m
 import { AppendWriter, writeJson } from "./lib/jsonl.mjs";
 
 function parseArgs(argv) {
-    const a = { pgns: [], out: null, config: null, overrides: {}, limitGames: null };
+    const a = { pgns: [], out: null, config: null, overrides: {}, limitGames: null, sourceRoot: null };
     for (let i = 0; i < argv.length; i++) {
         const t = argv[i];
         if (t === "--out") a.out = argv[++i];
         else if (t === "--config") a.config = argv[++i];
+        else if (t === "--source-root") a.sourceRoot = argv[++i];
         else if (t === "--skip-first") a.overrides.skipFirstPlies = Number(argv[++i]);
         else if (t === "--every") a.overrides.sampleEveryPlies = Number(argv[++i]);
         else if (t === "--max-per-game") a.overrides.maxPositionsPerGame = Number(argv[++i]);
@@ -40,6 +49,22 @@ function parseArgs(argv) {
     if (!a.pgns.length) throw new Error("no PGN input paths given");
     if (!a.out) throw new Error("--out required");
     return a;
+}
+
+// Normalize any path separators to "/".
+export function normalizeSep(p) { return String(p).split("\\").join("/"); }
+
+// Stable, unique, human-readable source id. Relative to sourceRoot when the
+// input lives under it (no absolute path / username stored), else the last two
+// path segments ("<parentDir>/<basename>"). Always "/"-normalized.
+export function sourceIdFor(pgnPath, sourceRoot) {
+    if (sourceRoot) {
+        const rel = path.relative(sourceRoot, pgnPath);
+        if (rel && !rel.startsWith("..") && !path.isAbsolute(rel)) return normalizeSep(rel);
+    }
+    const base = path.basename(pgnPath);
+    const parent = path.basename(path.dirname(pgnPath));
+    return normalizeSep(parent ? parent + "/" + base : base);
 }
 
 async function main() {
@@ -62,23 +87,37 @@ async function main() {
     const phaseCount = { opening: 0, middlegame: 0, endgame: 0 };
     const materialCount = new Map();
 
+    // Precompute unique source ids and fail fast on ambiguous provenance.
+    const idFor = new Map();
+    const idsSeen = new Map();
+    for (const pgnPath of args.pgns) {
+        const sid = sourceIdFor(pgnPath, args.sourceRoot);
+        if (idsSeen.has(sid) && idsSeen.get(sid) !== pgnPath) {
+            throw new Error(`ambiguous source id "${sid}" for both "${idsSeen.get(sid)}" and "${pgnPath}" — pass --source-root or rename inputs`);
+        }
+        idsSeen.set(sid, pgnPath);
+        idFor.set(pgnPath, sid);
+    }
+
     for (const pgnPath of args.pgns) {
         let games;
         try { games = readPgnFile(pgnPath); }
         catch (e) { stats.errors.push({ file: pgnPath, error: e.message }); continue; }
         const base = path.basename(pgnPath);
-        stats.files.push({ file: base, games: games.length });
+        const srcId = idFor.get(pgnPath);
+        stats.files.push({ file: base, id: srcId, games: games.length });
 
         for (const game of games) {
             if (args.limitGames && stats.gamesRead >= args.limitGames) break;
             stats.gamesRead++;
+            const gk = gameKey(game);
             const sp = assignSplit(game, split);
             let rep;
             try { rep = replayGame(coach, game); }
-            catch (e) { stats.gamesFailed++; stats.errors.push({ file: base, game: game.index, error: e.message }); continue; }
-            if (rep.error) stats.errors.push({ file: base, game: game.index, ...rep.error });
+            catch (e) { stats.gamesFailed++; stats.errors.push({ file: base, id: srcId, gameIndex: game.index, error: e.message }); continue; }
+            if (rep.error) stats.errors.push({ file: base, id: srcId, gameIndex: game.index, ...rep.error });
 
-            const chosen = sampleFrames(rep.frames, gameKey(game), sampling);
+            const chosen = sampleFrames(rep.frames, gk, sampling);
             for (const frame of chosen) {
                 stats.positionsSampled++;
                 const core = coach.createEngineCore(frame.fen);
@@ -102,7 +141,7 @@ async function main() {
                 writer.append({
                     fen: canonicalFen,
                     positionKey: key,
-                    source: { file: base, game: game.index, ply: frame.ply },
+                    source: { file: base, id: srcId, gameIndex: game.index, gameKey: gk, ply: frame.ply },
                     sideToMove: frame.sideToMove,
                     gamePhase: phase,
                     materialSignature: matSig,
@@ -130,4 +169,8 @@ async function main() {
     console.log("out:", args.out);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// Only run as a CLI, not when imported (e.g. by the test suite).
+import { pathToFileURL } from "node:url";
+const invokedDirectly = process.argv[1] &&
+    import.meta.url === pathToFileURL(process.argv[1]).href;
+if (invokedDirectly) main().catch((e) => { console.error(e); process.exit(1); });

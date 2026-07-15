@@ -42,14 +42,15 @@ validate-dataset.mjs   inspect-dataset.mjs   features.mjs / features.py (+ parit
 |------|------|
 | `extract-positions.mjs` | PGN → unique sampled split positions (+ Coach static eval) |
 | `label-positions.mjs`   | Resumable Stockfish labelling |
-| `validate-dataset.mjs`  | Structural + chess-legality validation |
+| `validate-dataset.mjs`  | Structural + chess-legality validation (gameKey-authoritative split check) |
 | `inspect-dataset.mjs`   | Distribution / histogram / Coach-vs-SF report |
+| `tools/analyze-dataset.mjs` | Read-only deterministic dataset analysis → JSON + console |
 | `features.mjs` / `features.py` | Identical JS + Python feature encoders |
 | `fixtures/feature-parity.json` | ≥20 FEN → expected feature indices |
 | `lib/*.mjs` | prng, coach loader, position identity, pgn reader, replay, sampling, splits, features, jsonl, stockfish, moveutil |
 | `schemas/*.json` | JSON Schemas for both record types |
 | `tools/gen-selfplay-pgn.mjs` | **DEV/TEST ONLY** synthetic seeded games (not training data) |
-| `tests/neural.test.mjs` | `node --test` suite |
+| `tests/*.test.mjs` | `node --test` suites (`neural`, `provenance-and-tools`) |
 
 ## Position identity (dedup key)
 
@@ -86,6 +87,41 @@ oversampling consecutive plies. Optional global caps: `perPhase`,
 Game-level, deterministic, seeded: 80/10/10 train/val/test. Split is a hash of
 a stable `gameKey` (headers + full mainline). **Every position of a game stays
 in one split** — no position-level leakage.
+
+## Source provenance (record `source` block)
+
+Each record carries:
+
+| field | meaning |
+|-------|---------|
+| `file` | human-readable **basename** (e.g. `baseline_vs_shallowblue_500ms_60games.pgn`) — **not unique**: two inputs in different folders can share a basename |
+| `id` | **stable unique source id**: the input path relative to `--source-root` (`/`-normalized, e.g. `Coach AB/baseline_vs_shallowblue_500ms_60games.pgn`), or `<parentDir>/<basename>` when no root is given. Never an absolute path or username |
+| `gameIndex` | 0-based index of the game within its source file |
+| `gameKey` | **content-derived** game identity (hash of headers + full mainline). **Authoritative** for split-leakage |
+| `ply` | ply at which the position was sampled |
+
+**Why basenames alone are insufficient:** two different PGNs that share a
+basename (e.g. `baseline_vs_shallowblue_500ms_60games.pgn` under both `Coach AB`
+and `Coach Null AB`) would collide on `basename + gameIndex`, making unrelated
+games look like one game "spanning multiple splits." `id` disambiguates the
+files, and `gameKey` identifies the actual game by content.
+
+**Authoritative split-leakage identity:** the validator groups records by
+`gameKey` (never by basename/path/index/PGN order) to decide whether one game
+spans multiple splits. `id + gameIndex` is used only for provenance reporting.
+Pass `--source-root DIR` to `extract-positions.mjs` so ids are stable, unique,
+and free of absolute paths; extraction **fails fast** if two inputs resolve to
+the same id.
+
+**Backward compatibility:** datasets produced before provenance existed have no
+`source.gameKey`/`source.id`. The validator then falls back to a proxy identity
+and downgrades any game-level leakage to a **WARNING** (never a hard failure),
+printing a note that the legacy basename proxy over-reports on basename
+collisions and that the dataset should be regenerated with provenance for
+authoritative validation. To migrate an existing labelled set without re-running
+Stockfish: re-run `extract-positions.mjs` with `--source-root`, confirm the
+regenerated `positionKey` set exactly matches the old set, then join the old
+labels onto the new records by `positionKey`.
 
 ## Stockfish labelling
 
@@ -154,11 +190,13 @@ cd "<USERPROFILE>\OneDrive\Desktop\Coach Neural\neural"
 # Stockfish path via env (never hard-code it in tracked config)
 $env:COACH_STOCKFISH_PATH = "G:\Program Files (x86)\ChessBase\Engines\stockfish-windows-x86-64-avx2_180.exe"
 
-node extract-positions.mjs "game1.pgn" "game2.pgn" --out artifacts\positions.jsonl
+# --source-root makes source ids stable/unique and free of absolute paths
+node extract-positions.mjs "game1.pgn" "sub\game2.pgn" --source-root . --out artifacts\positions.jsonl
 node label-positions.mjs   --in artifacts\positions.jsonl --out artifacts\labelled.jsonl --nodes 50000
 node validate-dataset.mjs  --in artifacts\labelled.jsonl
 node inspect-dataset.mjs   --in artifacts\labelled.jsonl --json artifacts\report.json
-node --test tests\neural.test.mjs
+node tools\analyze-dataset.mjs --in artifacts\labelled.jsonl --json artifacts\analysis.json
+node --test tests\neural.test.mjs tests\provenance-and-tools.test.mjs
 python features.py fixtures\feature-parity.json   # JS/Python parity check (use `py` if `python` is unavailable)
 ```
 
@@ -166,6 +204,14 @@ python features.py fixtures\feature-parity.json   # JS/Python parity check (use 
 **50000** nodes (see the trial report). Labelling is resumable — re-running the
 same command after an interruption skips already-labelled positions; add
 `--retry-failed` to re-attempt any `stockfish:null` records.
+
+`analyze-dataset.mjs` is **read-only** (never modifies its input) and
+deterministic. It prints a console summary and, with `--json`, writes a report
+covering integrity (incl. `gameKey`-based leakage), provenance by unique source
+id, position/score/mate distributions, and Coach-vs-Stockfish error breakdowns.
+The `--json` output directory is **not** created automatically — it errors
+clearly if the directory is missing. Reports and datasets stay **outside Git**
+(or under the git-ignored `neural\artifacts\`).
 
 ## Output location & Git hygiene
 

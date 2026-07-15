@@ -13,8 +13,15 @@
 //     - FEN imports cleanly through Coach's parser;
 //     - record.sideToMove matches the FEN side-to-move token;
 //     - split is one of train/val/test;
-//     - each source game maps to exactly one split (no leakage);
-//     - positionKey is unique across the dataset.
+//     - each game maps to exactly one split (no leakage). Game identity is the
+//       content-derived source.gameKey (AUTHORITATIVE). When gameKey is absent
+//       (older datasets) a proxy identity is used and leakage is downgraded to
+//       a WARNING — the legacy basename proxy over-reports when two inputs
+//       share a basename, so basenames alone are NOT a reliable game identity;
+//     - no positionKey occurs in more than one split;
+//     - positionKey is unique across the dataset;
+//     - for new-format datasets, source.id / source.gameKey / source.gameIndex
+//       are present.
 //   Board sanity (static, per FEN)
 //     - side-to-move token is 'w' or 'b';
 //     - placement has 8 ranks;
@@ -66,6 +73,50 @@ function opponentInCheck(coach, fen) {
     } catch { return false; }
 }
 
+// Pure split-integrity + provenance check (no Coach dependency; unit-testable).
+// gameKey is the AUTHORITATIVE game identity; when absent, a proxy is used and
+// game-level leakage is downgraded to a WARNING. Also checks duplicate keys,
+// positionKey-in-multiple-splits (always a failure), split enum, and — for
+// new-format datasets — presence of source.id / gameKey / gameIndex.
+export function splitIntegrity(records) {
+    const failures = [], warnings = [];
+    const hasGameKey = records.length > 0 && records.every(r => r.source && typeof r.source.gameKey === "string" && r.source.gameKey.length > 0);
+    const hasSourceId = records.length > 0 && records.every(r => r.source && typeof r.source.id === "string" && r.source.id.length > 0);
+    const anyNewProvenance = records.some(r => r.source && (r.source.gameKey != null || r.source.id != null));
+    const authoritative = hasGameKey;
+    if (!authoritative) warnings.push(hasSourceId
+        ? "no source.gameKey: split leakage checked by PROXY identity (source.id + gameIndex); cannot detect content-identical games across files. Regenerate with provenance for authoritative validation."
+        : "no source.gameKey/source.id: split leakage checked by LEGACY identity (basename + game index), which OVER-REPORTS when two inputs share a basename. Regenerate with provenance for authoritative validation.");
+    const gameIdentity = (r) => authoritative ? "gk:" + r.source.gameKey
+        : hasSourceId ? "id:" + r.source.id + "#" + (r.source.gameIndex ?? r.source.game)
+        : "legacy:" + (r.source && r.source.file) + "#" + (r.source && (r.source.gameIndex ?? r.source.game));
+
+    const keys = new Set(); let duplicateKeys = 0;
+    const identityToSplits = new Map(), keyToSplits = new Map();
+    for (const r of records) {
+        if (keys.has(r.positionKey)) { duplicateKeys++; failures.push({ msg: "duplicate positionKey", ctx: r.positionKey }); }
+        keys.add(r.positionKey);
+        if (!["train", "val", "test"].includes(r.split)) failures.push({ msg: "invalid split", ctx: r.split });
+        if (anyNewProvenance) {
+            if (!(r.source && typeof r.source.id === "string")) failures.push({ msg: "missing source.id", ctx: r.positionKey });
+            if (!(r.source && typeof r.source.gameKey === "string")) failures.push({ msg: "missing source.gameKey", ctx: r.positionKey });
+            if (!(r.source && r.source.gameIndex !== undefined)) failures.push({ msg: "missing source.gameIndex", ctx: r.positionKey });
+        }
+        const gid = gameIdentity(r);
+        (identityToSplits.get(gid) || identityToSplits.set(gid, new Set()).get(gid)).add(r.split);
+        (keyToSplits.get(r.positionKey) || keyToSplits.set(r.positionKey, new Set()).get(r.positionKey)).add(r.split);
+    }
+    let gameLeak = 0, keyLeak = 0;
+    for (const [gid, splits] of identityToSplits) if (splits.size > 1) {
+        gameLeak++;
+        if (authoritative) failures.push({ msg: "game spans multiple splits (gameKey)", ctx: gid });
+        else warnings.push("proxy game identity spans splits: " + gid);
+    }
+    for (const [k, splits] of keyToSplits) if (splits.size > 1) { keyLeak++; failures.push({ msg: "positionKey occurs in multiple splits", ctx: k }); }
+    const idMode = authoritative ? "by gameKey (authoritative)" : hasSourceId ? "by source.id (proxy)" : "by basename (legacy)";
+    return { authoritative, hasSourceId, idMode, uniqueKeys: keys.size, duplicateKeys, distinctGames: identityToSplits.size, gameLeak, keyLeak, failures, warnings };
+}
+
 async function main() {
     const inPath = arg("--in");
     if (!inPath) throw new Error("--in required");
@@ -79,10 +130,12 @@ async function main() {
     // (A single torn TRAILING line is reported via droppedTrailing, not failed.)
     for (const m of malformed) fail.push({ msg: "malformed JSONL line (non-trailing)", ctx: m });
 
-    const keys = new Set();
-    const gameSplit = new Map(); // file:game -> split
-    let labelled = 0, mateCount = 0, wdlMissing = 0;
+    // Structural split + provenance integrity (pure, gameKey-authoritative).
+    const si = splitIntegrity(records);
+    for (const f of si.failures) fail.push(f);
+    const warnings = [...si.warnings];
 
+    let labelled = 0, mateCount = 0, wdlMissing = 0;
     for (const r of records) {
         // FEN imports + side to move
         let core;
@@ -95,25 +148,12 @@ async function main() {
         for (const p of fenSanity(r.fen)) fail.push({ msg: p, ctx: r.fen });
         if (opponentInCheck(coach, r.fen)) fail.push({ msg: "side-not-to-move is in check (illegal)", ctx: r.fen });
 
-        // duplicate key
-        note(!keys.has(r.positionKey), "duplicate positionKey", r.positionKey);
-        keys.add(r.positionKey);
-
-        // one game -> one split
-        const gk = r.source.file + "#" + r.source.game;
-        if (gameSplit.has(gk)) note(gameSplit.get(gk) === r.split, "game spans multiple splits", gk);
-        else gameSplit.set(gk, r.split);
-
-        note(["train", "val", "test"].includes(r.split), "invalid split", r.split);
-
         if (r.stockfish) {
             labelled++;
             const sf = r.stockfish;
             const legal = legalUciSet(core);
-            // best move legal (unless terminal/no bestmove)
             if (sf.bestMove) note(legal.has(sf.bestMove), "bestMove illegal", { fen: r.fen, bm: sf.bestMove });
             if (sf.pv && sf.pv.length) note(legal.has(sf.pv[0]), "pv[0] illegal", { fen: r.fen, pv0: sf.pv[0] });
-            // score present: cp or mate
             note(sf.scoreCpWhite !== null || sf.mate !== null, "no score/mate", r.fen);
             note(!(sf.scoreCpWhite !== null && sf.mate !== null), "both cp and mate set", r.fen);
             if (sf.mate !== null) mateCount++;
@@ -125,12 +165,19 @@ async function main() {
     console.log("== validation ==");
     console.log("records:            ", records.length);
     console.log("labelled:           ", labelled);
-    console.log("unique keys:        ", keys.size);
-    console.log("distinct games:     ", gameSplit.size);
+    console.log("unique keys:        ", si.uniqueKeys);
+    console.log("distinct games:     ", si.distinctGames, "(" + si.idMode + ")");
+    console.log("game-level leakage: ", si.gameLeak, si.authoritative ? "" : "(proxy — see warnings, not counted as failure)");
+    console.log("positionKey cross-split:", si.keyLeak);
     console.log("mate-labelled:      ", mateCount);
     console.log("wdl missing:        ", wdlMissing);
     console.log("malformed lines:    ", malformed.length, malformed.length ? JSON.stringify(malformed) : "");
     console.log("dropped torn trailing line:", droppedTrailing);
+    if (warnings.length) {
+        console.log("WARNINGS:           ", warnings.length);
+        for (const w of warnings.slice(0, 10)) console.log("  ! ", w);
+        if (warnings.length > 10) console.log("  ...", warnings.length - 10, "more");
+    }
     console.log("FAILURES:           ", fail.length);
     for (const f of fail.slice(0, 20)) console.log("  -", f.msg, JSON.stringify(f.ctx));
     if (fail.length > 20) console.log("  ...", fail.length - 20, "more");
