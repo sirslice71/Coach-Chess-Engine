@@ -1,0 +1,596 @@
+#!/usr/bin/env node
+
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import {
+    mkdir,
+    readFile,
+    rename,
+    writeFile
+} from "node:fs/promises";
+import os from "node:os";
+import {
+    dirname,
+    resolve
+} from "node:path";
+import { performance } from "node:perf_hooks";
+import { pathToFileURL } from "node:url";
+
+import {
+    checkResumeCompatibility,
+    classifyCandidate,
+    classifyControl,
+    generatePairedOrder,
+    hasSample,
+    loadCorpus,
+    makeRunConfig,
+    mapToSamples,
+    samplesToMap,
+    selectCorpus,
+    serializeSummaryCsv,
+    summarizeRun
+} from "./benchmark-search-ab-utils.mjs";
+
+const DEFAULT_CORPUS_PATH =
+    new URL("../tests/data/search_benchmark_corpus.json", import.meta.url);
+
+function parseArgs(argv) {
+
+    const args = {
+        warmups: 5,
+        pairs: 10,
+        corpus: "primary",
+        seed: 0x51ab2026,
+        timeoutMs: 0,
+        exact: true,
+        control: false
+    };
+
+    for (let index = 0; index < argv.length; index += 1) {
+        const arg = argv[index];
+        const value = () => argv[++index];
+
+        switch (arg) {
+            case "--baseline":
+                args.baseline = resolve(value());
+                break;
+            case "--candidate":
+                args.candidate = resolve(value());
+                break;
+            case "--corpus-file":
+                args.corpusFile = resolve(value());
+                break;
+            case "--corpus":
+                args.corpus = value();
+                break;
+            case "--warmups":
+                args.warmups = parseInteger(value(), "--warmups");
+                break;
+            case "--pairs":
+                args.pairs = parseInteger(value(), "--pairs");
+                break;
+            case "--seed":
+                args.seed = parseSeed(value());
+                break;
+            case "--timeout":
+            case "--timeout-ms":
+                args.timeoutMs = parseInteger(value(), "--timeout");
+                break;
+            case "--json":
+                args.json = resolve(value());
+                break;
+            case "--csv":
+                args.csv = resolve(value());
+                break;
+            case "--checkpoint":
+                args.checkpoint = resolve(value());
+                break;
+            case "--resume":
+                args.resume = true;
+                args.checkpoint = resolve(value());
+                break;
+            case "--control":
+                args.control = true;
+                break;
+            case "--non-exact":
+                args.exact = false;
+                break;
+            case "--priority":
+                args.priority = value();
+                break;
+            case "--affinity":
+                args.affinity = value();
+                break;
+            case "--trace-gc":
+                args.traceGc = true;
+                break;
+            case "--help":
+                args.help = true;
+                break;
+            default:
+                throw new Error(`Unknown argument: ${arg}`);
+        }
+    }
+
+    return args;
+
+}
+
+function parseInteger(text, name) {
+
+    const value =
+        Number.parseInt(text, 10);
+
+    if (!Number.isInteger(value) || value < 0) {
+        throw new Error(`${name} must be a non-negative integer.`);
+    }
+
+    return value;
+
+}
+
+function parseSeed(text) {
+
+    if (/^0x/i.test(text)) {
+        return Number.parseInt(text, 16) >>> 0;
+    }
+
+    return Number.parseInt(text, 10) >>> 0;
+
+}
+
+function printHelp() {
+
+    console.log(`Usage:
+  node scripts/benchmark-search-ab.mjs --baseline <repo> --candidate <repo> [options]
+
+Options:
+  --control                  Mark this as an identical-build control.
+  --corpus primary|diagnostic|all
+  --warmups <n>              Position-specific warmups per label (default 5).
+  --pairs <n>                Measured AB/BA pairs per position (default 10).
+  --seed <n|0x...>           Deterministic pairing seed.
+  --json <path>              Write full JSON report.
+  --csv <path>               Write per-position CSV summary.
+  --checkpoint <path>        Save resume checkpoint.
+  --resume <path>            Resume a compatible checkpoint.
+  --non-exact                Report identity mismatches but exit zero for them.
+  --priority above-normal|normal
+  --affinity <hex mask>      Best-effort temporary affinity for this Node process.
+`);
+
+}
+
+async function loadEngine(repoPath) {
+
+    const moduleUrl =
+        pathToFileURL(`${repoPath.replaceAll("\\", "/")}/js/uci/uciengine.js`);
+
+    const module =
+        await import(moduleUrl.href);
+
+    return {
+        repoPath,
+        createEngineCore: module.createEngineCore,
+        moveToUci: module.moveToUci
+    };
+
+}
+
+function runSearch(engine, position) {
+
+    const core =
+        engine.createEngineCore(position.fen);
+
+    const startedAt =
+        performance.now();
+
+    const result =
+        core.search.bestMove(position.depth, { quiet: true });
+
+    const elapsedMs =
+        performance.now() - startedAt;
+
+    return {
+        elapsedMs,
+        bestMove: result.move
+            ? engine.moveToUci(result.move)
+            : null,
+        score: result.evaluation,
+        nodes: result.nodes ?? null,
+        leafNodes: result.leafNodes ?? null,
+        completedDepth: result.depth ?? position.depth,
+        qsearchEntries: result.leafNodes ?? null,
+        pv: (result.pv || []).map(engine.moveToUci)
+    };
+
+}
+
+async function gitMetadata(repoPath) {
+
+    const run = args => {
+        try {
+            return execFileSync("git", args, {
+                cwd: repoPath,
+                encoding: "utf8",
+                stdio: ["ignore", "pipe", "ignore"]
+            }).trim();
+        }
+        catch {
+            return "unavailable";
+        }
+    };
+
+    return {
+        branch: run(["branch", "--show-current"]),
+        head: run(["rev-parse", "--short", "HEAD"]),
+        status: run(["status", "--short"])
+    };
+
+}
+
+function powershell(command) {
+
+    try {
+        return execFileSync(
+            "powershell",
+            ["-NoProfile", "-Command", command],
+            {
+                encoding: "utf8",
+                stdio: ["ignore", "pipe", "ignore"]
+            }
+        ).trim();
+    }
+    catch {
+        return "unavailable";
+    }
+
+}
+
+async function environmentMetadata(args) {
+
+    const cpuModel =
+        powershell("(Get-ItemProperty 'HKLM:\\HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0').ProcessorNameString");
+
+    const powerPlan =
+        powershell("powercfg /getactivescheme");
+
+    const availableMemoryMb =
+        powershell("(Get-Counter '\\Memory\\Available MBytes').CounterSamples.CookedValue");
+
+    return {
+        timestamp: new Date().toISOString(),
+        node: process.version,
+        windows: os.version?.() || process.platform,
+        cpuModel,
+        logicalProcessors: os.cpus().length,
+        availableMemoryMb,
+        powerPlan,
+        cwd: process.cwd(),
+        processPriority: args.priority || "default",
+        processAffinity: args.affinity || "default",
+        seed: args.seed,
+        warmups: args.warmups,
+        pairs: args.pairs,
+        traceGc: args.traceGc === true
+    };
+
+}
+
+function applyProcessTuning(args) {
+
+    const applied = [];
+
+    if (args.priority) {
+        const allowed =
+            new Set(["normal", "above-normal"]);
+
+        if (!allowed.has(args.priority)) {
+            throw new Error("--priority supports normal or above-normal.");
+        }
+
+        const priority =
+            args.priority === "above-normal"
+                ? "AboveNormal"
+                : "Normal";
+
+        const result =
+            powershell(`$p = Get-Process -Id ${process.pid}; $p.PriorityClass = '${priority}'; $p.PriorityClass`);
+
+        applied.push({
+            option: "priority",
+            requested: priority,
+            result
+        });
+    }
+
+    if (args.affinity) {
+        const mask =
+            Number.parseInt(args.affinity, 16);
+
+        if (!Number.isFinite(mask) || mask <= 0) {
+            throw new Error("--affinity must be a positive hexadecimal mask.");
+        }
+
+        const result =
+            powershell(`$p = Get-Process -Id ${process.pid}; $p.ProcessorAffinity = ${mask}; $p.ProcessorAffinity`);
+
+        applied.push({
+            option: "affinity",
+            requested: args.affinity,
+            result
+        });
+    }
+
+    return applied;
+
+}
+
+async function writeJson(path, value) {
+
+    await mkdir(dirname(path), { recursive: true });
+
+    const temporaryPath =
+        `${path}.${process.pid}.tmp`;
+
+    await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`);
+    await rename(temporaryPath, path);
+
+}
+
+async function writeCsv(path, value) {
+
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, value);
+
+}
+
+async function readCheckpoint(path) {
+
+    if (!path || !existsSync(path)) {
+        return null;
+    }
+
+    return JSON.parse(await readFile(path, "utf8"));
+
+}
+
+async function main() {
+
+    const args =
+        parseArgs(process.argv.slice(2));
+
+    if (args.help) {
+        printHelp();
+        return 0;
+    }
+
+    if (!args.baseline || !args.candidate) {
+        throw new Error("Provide --baseline and --candidate repository paths.");
+    }
+
+    if (args.control && args.baseline !== args.candidate) {
+        console.warn("Control mode normally uses the same path for both labels.");
+    }
+
+    const tuning =
+        applyProcessTuning(args);
+
+    const corpus =
+        await loadCorpus(args.corpusFile || DEFAULT_CORPUS_PATH);
+
+    const positions =
+        selectCorpus(corpus, args.corpus);
+
+    const buildIdentity = {
+        baseline: await gitMetadata(args.baseline),
+        candidate: await gitMetadata(args.candidate)
+    };
+
+    args.buildIdentity = buildIdentity;
+
+    const config =
+        makeRunConfig(args, positions);
+
+    const checkpoint =
+        await readCheckpoint(args.checkpoint);
+
+    let samplesByPosition =
+        new Map();
+
+    if (checkpoint) {
+        const compatibility =
+            checkResumeCompatibility(checkpoint, config);
+
+        if (!compatibility.ok) {
+            throw new Error(compatibility.reason);
+        }
+
+        samplesByPosition =
+            samplesToMap(checkpoint.samples);
+    }
+
+    const baseline =
+        await loadEngine(args.baseline);
+
+    const candidate =
+        await loadEngine(args.candidate);
+
+    const engines = {
+        baseline,
+        candidate
+    };
+
+    const order =
+        generatePairedOrder(args.pairs, args.seed);
+
+    console.log("Coach search A/B benchmark");
+    console.log(`baseline:  ${args.baseline}`);
+    console.log(`candidate: ${args.candidate}`);
+    console.log(`corpus:    ${args.corpus} (${positions.length} position(s))`);
+    console.log(`warmups:   ${args.warmups}`);
+    console.log(`pairs:     ${args.pairs}`);
+    console.log(`seed:      ${args.seed}`);
+
+    if (args.control) {
+        console.log("mode:      identical-build control");
+    }
+
+    if (!args.exact) {
+        console.log("identity:  non-exact mode (mismatches do not set exit code)");
+    }
+
+    for (const item of tuning) {
+        console.log(`${item.option}: ${item.requested} -> ${item.result}`);
+    }
+
+    for (const position of positions) {
+        if (!samplesByPosition.has(position.id)) {
+            samplesByPosition.set(position.id, []);
+        }
+
+        const bucket =
+            samplesByPosition.get(position.id);
+
+        if (bucket.length === 0) {
+            for (let index = 0; index < args.warmups; index += 1) {
+                runSearch(baseline, position);
+                runSearch(candidate, position);
+            }
+        }
+
+        for (let index = 0; index < order.length; index += 1) {
+            if (hasSample(samplesByPosition, position.id, index)) {
+                continue;
+            }
+
+            const label =
+                order[index];
+
+            const heapBefore =
+                process.memoryUsage().heapUsed;
+
+            const result =
+                runSearch(engines[label], position);
+
+            const heapAfter =
+                process.memoryUsage().heapUsed;
+
+            if (args.timeoutMs > 0 && result.elapsedMs > args.timeoutMs) {
+                result.timeoutExceeded = true;
+            }
+
+            const sample = {
+                positionId: position.id,
+                sampleIndex: index,
+                pairIndex: Math.floor(index / 2),
+                label,
+                heapBefore,
+                heapAfter,
+                ...result
+            };
+
+            bucket.push(sample);
+
+            if (args.checkpoint) {
+                await writeJson(args.checkpoint, {
+                    schemaVersion: 1,
+                    config,
+                    samples: mapToSamples(samplesByPosition)
+                });
+            }
+        }
+
+        const partial =
+            summarizeRun([position], samplesByPosition, { exact: args.exact });
+
+        const row =
+            partial.positions[0];
+
+        console.log(
+            `${position.id.padEnd(20)} ` +
+            `${row.percentChange.toFixed(3).padStart(8)}% ` +
+            `identity=${row.identityOk ? "ok" : "mismatch"}`
+        );
+    }
+
+    const summary =
+        summarizeRun(positions, samplesByPosition, { exact: args.exact });
+
+    const environment =
+        await environmentMetadata(args);
+
+    const report = {
+        schemaVersion: 1,
+        control: args.control,
+        config,
+        paths: {
+            baseline: args.baseline,
+            candidate: args.candidate
+        },
+        git: {
+            baseline: buildIdentity.baseline,
+            candidate: buildIdentity.candidate
+        },
+        environment,
+        tuning,
+        summary,
+        samples: mapToSamples(samplesByPosition)
+    };
+
+    report.assessment =
+        args.control
+            ? { control: classifyControl(summary.aggregates.primary) }
+            : { candidate: classifyCandidate(summary.aggregates.primary) };
+
+    console.log("");
+    console.log(
+        `primary geomean: ${formatPercent(summary.aggregates.primary.geomeanPercent)}`
+    );
+    console.log(
+        `primary median:  ${formatPercent(summary.aggregates.primary.medianPercent)}`
+    );
+
+    if (args.control) {
+        console.log(`control: ${report.assessment.control.status}`);
+    }
+    else {
+        console.log(`candidate: ${report.assessment.candidate.status}`);
+    }
+
+    if (args.json) {
+        await writeJson(args.json, report);
+    }
+
+    if (args.csv) {
+        await writeCsv(args.csv, serializeSummaryCsv(summary));
+    }
+
+    if (args.exact && !summary.identityOk) {
+        return 2;
+    }
+
+    if (args.control && !report.assessment.control.ok) {
+        return 3;
+    }
+
+    return 0;
+
+}
+
+function formatPercent(value) {
+
+    return Number.isFinite(value)
+        ? `${value.toFixed(3)}%`
+        : "unavailable";
+
+}
+
+main()
+    .then(code => {
+        process.exitCode = code;
+    })
+    .catch(error => {
+        console.error(error.message);
+        process.exitCode = 1;
+    });

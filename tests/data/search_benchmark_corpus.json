@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "description": "Fixed-depth search benchmark corpus for Coach A/B performance checks.",
+  "positions": [
+    {
+      "id": "quiet-defense",
+      "description": "Quiet defensive middlegame",
+      "fen": "8/2p3pk/7p/5p2/1Nb1q3/4b3/2R3KP/3Q4 w - - 4 47",
+      "depth": 6,
+      "classification": "primary",
+      "expectedBestMove": "g2-g3"
+    },
+    {
+      "id": "tactical-capture",
+      "description": "Early tactical capture position",
+      "fen": "r1bqk2r/pppp1ppp/2n2n2/4p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 0 1",
+      "depth": 4,
+      "classification": "primary",
+      "expectedBestMove": "c3-d5"
+    },
+    {
+      "id": "game8",
+      "description": "Game 8 promotion-race conversion",
+      "fen": "8/k7/7p/P2q2p1/3b1pB1/2p4P/P1P1QP2/6K1 w - - 1 73",
+      "depth": 6,
+      "classification": "primary",
+      "expectedBestMove": "a2-a4"
+    },
+    {
+      "id": "game10",
+      "description": "Game 10 active-piece middlegame",
+      "fen": "2r1r1k1/1p1b1ppp/4p3/PP1p4/NRn2B2/6P1/P5KP/3R4 b - - 1 24",
+      "depth": 6,
+      "classification": "primary",
+      "expectedBestMove": "c4-a3"
+    },
+    {
+      "id": "high-branching",
+      "description": "Symmetric high-branching middlegame",
+      "fen": "r2q1rk1/ppp2ppp/2nbpn2/3p4/3P4/2NBPN2/PPP2PPP/R2Q1RK1 w - - 0 9",
+      "depth": 4,
+      "classification": "primary",
+      "expectedBestMove": "d1-d2"
+    },
+    {
+      "id": "quiet-open",
+      "description": "Quiet opening with castling rights",
+      "fen": "r2qk2r/ppp2ppp/2n1bn2/3pp3/3PP3/2N2N2/PPP2PPP/R1BQKB1R w KQkq - 0 1",
+      "depth": 4,
+      "classification": "primary",
+      "expectedBestMove": "f1-b5"
+    },
+    {
+      "id": "capture-rich",
+      "description": "Capture-rich closed center",
+      "fen": "r1bq1rk1/pp2bppp/2n1pn2/2ppP3/3P4/2PB1N2/PP1N1PPP/R1BQ1RK1 w - - 0 9",
+      "depth": 5,
+      "classification": "primary",
+      "expectedBestMove": "e5-f6"
+    },
+    {
+      "id": "queen-rook-mate",
+      "description": "Queen and rook attacking sentinel",
+      "fen": "5r1k/6pp/5q2/1Rb1p3/4p3/1QP3Pb/P3RP1K/8 b - - 4 54",
+      "depth": 6,
+      "classification": "primary",
+      "expectedBestMove": "h3-f1"
+    },
+    {
+      "id": "kiwipete",
+      "description": "Kiwipete tactical/castling benchmark",
+      "fen": "r3k2r/p1ppqpb1/bn2pnp1/2pPN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+      "depth": 4,
+      "classification": "primary",
+      "expectedBestMove": "e2-a6"
+    },
+    {
+      "id": "promotion-race",
+      "description": "Promotion-race defense",
+      "fen": "3Qr3/1R4k1/4q1p1/P3P3/3pP3/2bp4/6PP/5RK1 b - - 8 61",
+      "depth": 6,
+      "classification": "primary",
+      "expectedBestMove": "g7-g8"
+    },
+    {
+      "id": "startpos",
+      "description": "Starting position",
+      "fen": "startpos",
+      "depth": 5,
+      "classification": "diagnostic",
+      "expectedBestMove": "d2-d4"
+    },
+    {
+      "id": "game4",
+      "description": "Game 4 active sentinel, diagnostic timing only due to bimodal runtime",
+      "fen": "8/Qp1q2k1/2pN3p/2Pb2p1/3P3n/P7/1P4PP/4R1K1 w - - 1 37",
+      "depth": 6,
+      "classification": "diagnostic",
+      "expectedBestMove": "a7-b8"
+    },
+    {
+      "id": "rook-ending",
+      "description": "Simple rook ending",
+      "fen": "8/5pk1/6p1/8/8/6P1/5PK1/4R3 w - - 0 40",
+      "depth": 5,
+      "classification": "diagnostic",
+      "expectedBestMove": "g2-f3"
+    },
+    {
+      "id": "in-check",
+      "description": "Single-check evasion",
+      "fen": "4k3/8/8/8/8/8/4r3/4K3 w - - 0 1",
+      "depth": 5,
+      "classification": "diagnostic",
+      "expectedBestMove": "e1-e2"
+    },
+    {
+      "id": "ep-sensitive",
+      "description": "En-passant-sensitive pawn ending",
+      "fen": "7k/8/8/3pP3/8/8/8/4K3 w - d6 0 1",
+      "depth": 5,
+      "classification": "diagnostic",
+      "expectedBestMove": "e5-d6"
+    },
+    {
+      "id": "in-check-tactical",
+      "description": "In-check tactical evasion",
+      "fen": "4k3/8/8/8/8/4r3/4B3/4K3 w - - 0 1",
+      "depth": 5,
+      "classification": "diagnostic",
+      "expectedBestMove": "e1-d2"
+    },
+    {
+      "id": "promotion-capture",
+      "description": "Promotion/capture race",
+      "fen": "7k/P7/8/8/8/8/6pK/8 w - - 0 1",
+      "depth": 6,
+      "classification": "diagnostic",
+      "expectedBestMove": "a7-a8"
+    },
+    {
+      "id": "king-capture-ending",
+      "description": "Small king-capture ending",
+      "fen": "8/8/8/8/8/2k5/5K2/6N1 w - - 0 1",
+      "depth": 6,
+      "classification": "diagnostic",
+      "expectedBestMove": "f2-e3"
+    }
+  ]
+}
