@@ -21,6 +21,9 @@ param(
     [string]$ResultDirectory = "",
     [ValidateSet("full", "stability-short")]
     [string]$BenchmarkProfile = "full",
+    [ValidateSet("Exact", "SearchStable")]
+    [string]$IdentityMode = "Exact",
+    [int]$ScoreToleranceCp = 0,
     [int]$ControlSeed = 26071521,
     [int[]]$CandidateSeeds = @(26071522, 26071523),
     [int]$CandidateRuns = 2,
@@ -124,6 +127,10 @@ function Write-CoachRunOverview {
     Write-CoachConsoleHeader -Title "Coach Benchmark"
     Write-Host "Mode: $Mode"
     Write-Host "Profile: $BenchmarkProfile"
+    Write-Host "Identity mode: $IdentityMode"
+    if ($IdentityMode -ne "Exact") {
+        Write-Host "Score tolerance: $ScoreToleranceCp cp"
+    }
     Write-Host "Baseline: $BaselinePath"
     Write-Host "Candidate: $CandidatePath"
     Write-Host "Results: $ResultDirectory"
@@ -835,6 +842,12 @@ function Invoke-CoachBenchmarkPipeline {
             "--json", $json,
             "--csv", $csv
         )
+        if ($IdentityMode -ne "Exact") {
+            $candidateArgs += @("--identity-mode", $IdentityMode)
+            if ($ScoreToleranceCp -ne 0) {
+                $candidateArgs += @("--score-tolerance-cp", "$ScoreToleranceCp")
+            }
+        }
         if ($BenchmarkProfile -ne "full") {
             $candidateArgs += @("--profile", $BenchmarkProfile)
         }

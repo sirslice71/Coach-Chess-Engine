@@ -27,6 +27,8 @@ import {
     loadCorpus,
     makeRunConfig,
     mapToSamples,
+    IDENTITY_MODE_EXACT,
+    normalizeIdentityMode,
     resolveBenchmarkProfile,
     samplesToMap,
     selectProfilePositions,
@@ -50,6 +52,8 @@ function parseArgs(argv) {
         timeoutMs: 0,
         maxRunMs: 45 * 60 * 1000,
         exact: true,
+        identityMode: IDENTITY_MODE_EXACT,
+        scoreToleranceCp: 0,
         control: false
     };
 
@@ -108,6 +112,13 @@ function parseArgs(argv) {
             case "--control":
                 args.control = true;
                 break;
+            case "--identity-mode":
+            case "--identity":
+                args.identityMode = value();
+                break;
+            case "--score-tolerance-cp":
+                args.scoreToleranceCp = parseInteger(value(), "--score-tolerance-cp");
+                break;
             case "--non-exact":
                 args.exact = false;
                 break;
@@ -162,6 +173,8 @@ function printHelp() {
 
 Options:
   --control                  Mark this as an identical-build control.
+  --identity-mode Exact|SearchStable
+  --score-tolerance-cp <n>   SearchStable score tolerance, default 0.
   --profile full|stability-short
   --corpus primary|diagnostic|all
   --warmups <n>              Position-specific warmups per label (default 5).
@@ -388,6 +401,9 @@ async function main() {
         throw new Error("Provide --baseline and --candidate repository paths.");
     }
 
+    args.identityMode =
+        normalizeIdentityMode(args.identityMode);
+
     if (args.control && args.baseline !== args.candidate) {
         console.warn("Control mode normally uses the same path for both labels.");
     }
@@ -470,13 +486,17 @@ async function main() {
         console.log(`pairs:     ${args.pairs}`);
     }
     console.log(`seed:      ${args.seed}`);
+    console.log(`identity:  ${args.identityMode}`);
+    if (args.identityMode.toLowerCase() !== "exact") {
+        console.log(`score tolerance: ${args.scoreToleranceCp} cp`);
+    }
 
     if (args.control) {
         console.log("mode:      identical-build control");
     }
 
     if (!args.exact) {
-        console.log("identity:  non-exact mode (mismatches do not set exit code)");
+        console.log("exit mode: non-exact (mismatches do not set exit code)");
     }
 
     for (const item of tuning) {
@@ -563,6 +583,8 @@ async function main() {
         const partial =
             summarizeRun([position], samplesByPosition, {
                 exact: args.exact,
+                identityMode: args.identityMode,
+                scoreToleranceCp: args.scoreToleranceCp,
                 profile
             });
 
@@ -573,7 +595,10 @@ async function main() {
             `${position.id.padEnd(20)} ` +
             `${args.control ? "control" : "candidate"} ` +
             `${formatTimingDifference(row.percentChange)} ` +
-            `identity=${row.identityOk ? "ok" : "mismatch"}`
+            `identity=${row.identityOk ? "ok" : "mismatch"}` +
+            (row.identityMode === "SearchStable"
+                ? ` tree=${row.treeShape.changed ? "changed" : "same"}`
+                : "")
         );
 
         if (timedOut) {
@@ -584,6 +609,8 @@ async function main() {
     const summary =
         summarizeRun(benchmarkPositions, samplesByPosition, {
             exact: args.exact,
+            identityMode: args.identityMode,
+            scoreToleranceCp: args.scoreToleranceCp,
             profile
         });
 
@@ -638,6 +665,25 @@ async function main() {
     }
     else {
         console.log(`candidate: ${report.assessment.candidate.status}`);
+    }
+
+    if (args.identityMode === "SearchStable") {
+        console.log("");
+        console.log(`Search stability: ${summary.identityOk ? "OK" : "MISMATCH"}`);
+        console.log(
+            `Tree shape changed: ${summary.treeShape.changed ? "expected" : "no"}`
+        );
+        console.log(
+            `Nodes: ${formatTreeDelta(summary.treeShape.metrics.nodes)}`
+        );
+        console.log(
+            `Leaf nodes: ${formatTreeDelta(summary.treeShape.metrics.leafNodes)}`
+        );
+        console.log(
+            `Qsearch: ${formatTreeDelta(summary.treeShape.metrics.qsearchEntries)}`
+        );
+        console.log(`PV changes: ${summary.treeShape.pvChanges}`);
+        console.log(`Root-order changes: ${summary.treeShape.rootOrderChanges}`);
     }
 
     if (args.json) {
@@ -700,6 +746,16 @@ function formatSpeedGain(timingDifferencePercent) {
         -timingDifferencePercent;
 
     return `${speedGain >= 0 ? "+" : ""}${speedGain.toFixed(3)}%`;
+
+}
+
+function formatTreeDelta(metric) {
+
+    if (!metric || !Number.isFinite(metric.deltaPercent)) {
+        return "n/a";
+    }
+
+    return `${metric.delta >= 0 ? "+" : ""}${metric.delta} (${metric.deltaPercent >= 0 ? "+" : ""}${metric.deltaPercent.toFixed(2)}%)`;
 
 }
 

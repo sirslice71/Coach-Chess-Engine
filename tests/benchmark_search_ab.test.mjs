@@ -16,10 +16,13 @@ import {
     classifyControl,
     coefficientOfVariation,
     compareIdentity,
+    compareSearchStableIdentity,
     generateAbbaOrder,
     generatePairedOrder,
     geometricMean,
     hasSample,
+    IDENTITY_MODE_EXACT,
+    IDENTITY_MODE_SEARCH_STABLE,
     loadCorpus,
     makeRunConfig,
     median,
@@ -244,6 +247,78 @@ test("identity comparison reports exact-tree mismatches", () => {
 
 });
 
+test("SearchStable identity accepts intentional tree-shape differences", () => {
+
+    const baseline =
+        sample("x", 0, "baseline", 1);
+
+    const candidate = {
+        ...baseline,
+        label: "candidate",
+        nodes: 8,
+        leafNodes: 5,
+        qsearchEntries: 5,
+        pv: ["e2-e4", "e7-e5"]
+    };
+
+    const comparison =
+        compareSearchStableIdentity(baseline, candidate);
+
+    assert.equal(comparison.ok, true);
+    assert.equal(comparison.expectedTreeDifferences.length, 4);
+    assert.equal(comparison.scoreDeltaCp, 0);
+
+});
+
+test("SearchStable identity rejects unstable or tactically meaningful fields", () => {
+
+    const baseline =
+        sample("x", 0, "baseline", 1);
+
+    assert.equal(
+        compareSearchStableIdentity(
+            baseline,
+            { ...baseline, bestMove: "d2-d4" }
+        ).ok,
+        false
+    );
+
+    assert.equal(
+        compareSearchStableIdentity(
+            baseline,
+            { ...baseline, score: "0.11" }
+        ).ok,
+        false
+    );
+
+    assert.equal(
+        compareSearchStableIdentity(
+            baseline,
+            { ...baseline, score: "0.11" },
+            { scoreToleranceCp: 1 }
+        ).ok,
+        true
+    );
+
+    assert.equal(
+        compareSearchStableIdentity(
+            { ...baseline, score: "mate 2" },
+            { ...baseline, score: "0.10" },
+            { scoreToleranceCp: 1000 }
+        ).ok,
+        false
+    );
+
+    assert.equal(
+        compareSearchStableIdentity(
+            baseline,
+            { ...baseline, pv: ["not-a-move"] }
+        ).ok,
+        false
+    );
+
+});
+
 test("summarizeRun computes ratios and mismatch state from mocked samples", () => {
 
     const positions = [
@@ -283,6 +358,77 @@ test("summarizeRun computes ratios and mismatch state from mocked samples", () =
         summarizeRun(positions, samples, { exact: false });
 
     assert.equal(nonExact.identityOk, true);
+
+});
+
+test("summarizeRun keeps Exact as default and gates SearchStable explicitly", () => {
+
+    const positions = [
+        {
+            id: "x",
+            description: "mock",
+            classification: "primary",
+            depth: 4
+        }
+    ];
+
+    const treeChanged =
+        samplesToMap([
+            sample("x", 0, "baseline", 100),
+            sample("x", 1, "candidate", 95, {
+                nodes: 99,
+                leafNodes: 44,
+                qsearchEntries: 44,
+                pv: ["e2-e4", "e7-e5"]
+            }),
+            sample("x", 2, "candidate", 96, {
+                nodes: 99,
+                leafNodes: 44,
+                qsearchEntries: 44,
+                pv: ["e2-e4", "e7-e5"]
+            }),
+            sample("x", 3, "baseline", 101)
+        ]);
+
+    const exact =
+        summarizeRun(positions, treeChanged);
+
+    assert.equal(exact.positions[0].identityMode, IDENTITY_MODE_EXACT);
+    assert.equal(exact.identityOk, false);
+
+    const stable =
+        summarizeRun(positions, treeChanged, {
+            identityMode: IDENTITY_MODE_SEARCH_STABLE
+        });
+
+    assert.equal(stable.positions[0].identityMode, IDENTITY_MODE_SEARCH_STABLE);
+    assert.equal(stable.identityOk, true);
+    assert.equal(stable.positions[0].treeShape.changed, true);
+
+    treeChanged.get("x")[1].score = "0.12";
+
+    const scoreMismatch =
+        summarizeRun(positions, treeChanged, {
+            identityMode: IDENTITY_MODE_SEARCH_STABLE,
+            scoreToleranceCp: 1
+        });
+
+    assert.equal(scoreMismatch.identityOk, false);
+
+    const nondeterministic =
+        samplesToMap([
+            sample("x", 0, "baseline", 100),
+            sample("x", 1, "candidate", 95),
+            sample("x", 2, "candidate", 96, { score: "0.11" }),
+            sample("x", 3, "baseline", 101)
+        ]);
+
+    assert.equal(
+        summarizeRun(positions, nondeterministic, {
+            identityMode: IDENTITY_MODE_SEARCH_STABLE
+        }).identityOk,
+        false
+    );
 
 });
 

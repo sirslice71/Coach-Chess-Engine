@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 export const DEFAULT_CONTROL_THRESHOLD = 0.005;
 export const DEFAULT_CANDIDATE_THRESHOLD = -0.01;
 export const DEFAULT_PROFILE = "full";
+export const IDENTITY_MODE_EXACT = "Exact";
+export const IDENTITY_MODE_SEARCH_STABLE = "SearchStable";
 export const STABILITY_SHORT_PROFILE = "stability-short";
 export const STABILITY_SHORT_POSITION_IDS = [
     "quiet-open",
@@ -294,7 +296,92 @@ export function summarizeSamples(samples) {
 
 }
 
-export function compareIdentity(baseline, candidate) {
+export function normalizeIdentityMode(mode = IDENTITY_MODE_EXACT) {
+
+    switch (String(mode).toLowerCase()) {
+        case "exact":
+            return IDENTITY_MODE_EXACT;
+
+        case "searchstable":
+        case "search-stable":
+        case "search_stable":
+            return IDENTITY_MODE_SEARCH_STABLE;
+
+        default:
+            throw new Error(
+                `Unknown identity mode "${mode}". Use Exact or SearchStable.`
+            );
+    }
+
+}
+
+function sameValue(left, right) {
+
+    return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+
+}
+
+function scoreToCentipawns(score) {
+
+    if (typeof score === "number" && Number.isFinite(score)) {
+        return score;
+    }
+
+    if (typeof score !== "string") {
+        return null;
+    }
+
+    const trimmed =
+        score.trim();
+
+    if (/mate/i.test(trimmed)) {
+        return null;
+    }
+
+    const value =
+        Number.parseFloat(trimmed);
+
+    return Number.isFinite(value)
+        ? Math.round(value * 100)
+        : null;
+
+}
+
+function mateStatus(score) {
+
+    return typeof score === "string" && /mate/i.test(score);
+
+}
+
+function moveLooksLegal(move) {
+
+    return typeof move === "string" &&
+        /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move.replace("-", ""));
+
+}
+
+function pvLooksLegal(pv) {
+
+    return Array.isArray(pv) &&
+        pv.every(move => moveLooksLegal(move));
+
+}
+
+function scoreDeltaCp(baseline, candidate) {
+
+    const left =
+        scoreToCentipawns(baseline.score);
+
+    const right =
+        scoreToCentipawns(candidate.score);
+
+    return Number.isFinite(left) && Number.isFinite(right)
+        ? right - left
+        : null;
+
+}
+
+export function compareExactIdentity(baseline, candidate) {
 
     const fields = [
         "bestMove",
@@ -309,8 +396,7 @@ export function compareIdentity(baseline, candidate) {
     const mismatches = [];
 
     for (const field of fields) {
-        if (JSON.stringify(baseline[field] ?? null) !==
-            JSON.stringify(candidate[field] ?? null)) {
+        if (!sameValue(baseline[field], candidate[field])) {
             mismatches.push({
                 field,
                 baseline: baseline[field] ?? null,
@@ -326,7 +412,282 @@ export function compareIdentity(baseline, candidate) {
 
 }
 
-export function summarizePosition(position, samples, exact = true) {
+export function compareSearchStableIdentity(
+    baseline,
+    candidate,
+    options = {}
+) {
+
+    const scoreToleranceCp =
+        options.scoreToleranceCp ?? 0;
+
+    const mismatches = [];
+    const expectedTreeDifferences = [];
+    const scoreDelta =
+        scoreDeltaCp(baseline, candidate);
+
+    if (!moveLooksLegal(candidate.bestMove)) {
+        mismatches.push({
+            field: "bestMove",
+            reason: "Candidate best move is missing or malformed.",
+            baseline: baseline.bestMove ?? null,
+            candidate: candidate.bestMove ?? null
+        });
+    }
+    else if (!sameValue(baseline.bestMove, candidate.bestMove)) {
+        mismatches.push({
+            field: "bestMove",
+            reason: "Best move differs.",
+            baseline: baseline.bestMove ?? null,
+            candidate: candidate.bestMove ?? null
+        });
+    }
+
+    if (mateStatus(baseline.score) !== mateStatus(candidate.score)) {
+        mismatches.push({
+            field: "mateStatus",
+            reason: "Mate status differs.",
+            baseline: baseline.score ?? null,
+            candidate: candidate.score ?? null
+        });
+    }
+    else if (mateStatus(baseline.score) && !sameValue(baseline.score, candidate.score)) {
+        mismatches.push({
+            field: "score",
+            reason: "Mate score differs.",
+            baseline: baseline.score ?? null,
+            candidate: candidate.score ?? null
+        });
+    }
+    else if (
+        scoreDelta === null ||
+        Math.abs(scoreDelta) > scoreToleranceCp
+    ) {
+        mismatches.push({
+            field: "score",
+            reason: `Score delta exceeds ${scoreToleranceCp} cp tolerance.`,
+            baseline: baseline.score ?? null,
+            candidate: candidate.score ?? null,
+            deltaCp: scoreDelta
+        });
+    }
+
+    if (!Number.isInteger(candidate.completedDepth) || candidate.completedDepth < 0) {
+        mismatches.push({
+            field: "completedDepth",
+            reason: "Candidate completed depth is invalid.",
+            baseline: baseline.completedDepth ?? null,
+            candidate: candidate.completedDepth ?? null
+        });
+    }
+    else if (!sameValue(baseline.completedDepth, candidate.completedDepth)) {
+        mismatches.push({
+            field: "completedDepth",
+            reason: "Completed depth differs.",
+            baseline: baseline.completedDepth ?? null,
+            candidate: candidate.completedDepth ?? null
+        });
+    }
+
+    if (!pvLooksLegal(candidate.pv || [])) {
+        mismatches.push({
+            field: "pv",
+            reason: "Candidate PV is malformed.",
+            baseline: baseline.pv ?? null,
+            candidate: candidate.pv ?? null
+        });
+    }
+
+    for (const field of ["nodes", "leafNodes", "qsearchEntries", "pv", "rootOrder"]) {
+        if (!sameValue(baseline[field], candidate[field])) {
+            expectedTreeDifferences.push({
+                field,
+                baseline: baseline[field] ?? null,
+                candidate: candidate[field] ?? null
+            });
+        }
+    }
+
+    return {
+        ok: mismatches.length === 0,
+        mode: IDENTITY_MODE_SEARCH_STABLE,
+        scoreDeltaCp: scoreDelta,
+        mismatches,
+        expectedTreeDifferences
+    };
+
+}
+
+export function compareIdentity(baseline, candidate, options = {}) {
+
+    const mode =
+        normalizeIdentityMode(options.identityMode);
+
+    if (mode === IDENTITY_MODE_SEARCH_STABLE) {
+        return compareSearchStableIdentity(baseline, candidate, options);
+    }
+
+    return {
+        ...compareExactIdentity(baseline, candidate),
+        mode
+    };
+
+}
+
+function deterministicChecks(samples, options = {}) {
+
+    const mode =
+        normalizeIdentityMode(options.identityMode);
+
+    if (mode !== IDENTITY_MODE_SEARCH_STABLE) {
+        return [];
+    }
+
+    const checks = [];
+
+    for (const label of ["baseline", "candidate"]) {
+        const runs =
+            samples.filter(sample => sample.label === label);
+
+        if (runs.length < 2) {
+            continue;
+        }
+
+        const reference =
+            runs[0];
+
+        for (let index = 1; index < runs.length; index += 1) {
+            const comparison =
+                compareSearchStableIdentity(reference, runs[index], options);
+
+            if (!comparison.ok) {
+                checks.push({
+                    label,
+                    run: index,
+                    mismatches: comparison.mismatches
+                });
+            }
+        }
+    }
+
+    return checks;
+
+}
+
+function summarizeTreeDifferences(identityChecks) {
+
+    const differences =
+        identityChecks.flatMap(check =>
+            check.expectedTreeDifferences || []
+        );
+
+    const metricFor = field => {
+        const values =
+            differences.filter(item =>
+                item.field === field &&
+                Number.isFinite(item.baseline) &&
+                Number.isFinite(item.candidate)
+            );
+
+        const baselineTotal =
+            values.reduce((sum, item) => sum + item.baseline, 0);
+
+        const candidateTotal =
+            values.reduce((sum, item) => sum + item.candidate, 0);
+
+        return {
+            changedPairs: values.length,
+            baselineTotal,
+            candidateTotal,
+            delta: candidateTotal - baselineTotal,
+            deltaPercent: baselineTotal
+                ? percentChangeFromRatio(candidateTotal / baselineTotal)
+                : null
+        };
+    };
+
+    return {
+        changed: differences.length > 0,
+        nodes: differences.filter(item => item.field === "nodes").length,
+        leafNodes: differences.filter(item => item.field === "leafNodes").length,
+        qsearchEntries: differences.filter(item => item.field === "qsearchEntries").length,
+        pv: differences.filter(item => item.field === "pv").length,
+        rootOrder: differences.filter(item => item.field === "rootOrder").length,
+        metrics: {
+            nodes: metricFor("nodes"),
+            leafNodes: metricFor("leafNodes"),
+            qsearchEntries: metricFor("qsearchEntries")
+        }
+    };
+
+}
+
+function aggregateTreeShape(positionsSummary) {
+
+    const metricFor = field => {
+        const metrics =
+            positionsSummary.map(position =>
+                position.treeShape?.metrics?.[field]
+            ).filter(Boolean);
+
+        const baselineTotal =
+            metrics.reduce((sum, metric) => sum + metric.baselineTotal, 0);
+
+        const candidateTotal =
+            metrics.reduce((sum, metric) => sum + metric.candidateTotal, 0);
+
+        return {
+            changedPairs: metrics.reduce(
+                (sum, metric) => sum + metric.changedPairs,
+                0
+            ),
+            baselineTotal,
+            candidateTotal,
+            delta: candidateTotal - baselineTotal,
+            deltaPercent: baselineTotal
+                ? percentChangeFromRatio(candidateTotal / baselineTotal)
+                : null
+        };
+    };
+
+    return {
+        changed:
+            positionsSummary.some(position =>
+                position.treeShape?.changed
+            ),
+        positionCount:
+            positionsSummary.filter(position =>
+                position.treeShape?.changed
+            ).length,
+        pvChanges:
+            positionsSummary.reduce(
+                (sum, position) => sum + (position.treeShape?.pv || 0),
+                0
+            ),
+        rootOrderChanges:
+            positionsSummary.reduce(
+                (sum, position) => sum + (position.treeShape?.rootOrder || 0),
+                0
+            ),
+        metrics: {
+            nodes: metricFor("nodes"),
+            leafNodes: metricFor("leafNodes"),
+            qsearchEntries: metricFor("qsearchEntries")
+        }
+    };
+
+}
+
+export function summarizePosition(position, samples, options = {}) {
+
+    const identityMode =
+        normalizeIdentityMode(options.identityMode);
+
+    const exact =
+        options.exact !== false;
+
+    const scoreToleranceCp =
+        options.scoreToleranceCp ?? 0;
 
     const baselineRuns =
         samples.filter(sample => sample.label === "baseline");
@@ -356,7 +717,14 @@ export function summarizePosition(position, samples, exact = true) {
 
     for (let index = 0; index < comparable; index += 1) {
         const comparison =
-            compareIdentity(baselineRuns[index], candidateRuns[index]);
+            compareIdentity(
+                baselineRuns[index],
+                candidateRuns[index],
+                {
+                    identityMode,
+                    scoreToleranceCp
+                }
+            );
 
         if (!comparison.ok) {
             identityChecks.push({
@@ -364,7 +732,30 @@ export function summarizePosition(position, samples, exact = true) {
                 mismatches: comparison.mismatches
             });
         }
+        else if (identityMode === IDENTITY_MODE_SEARCH_STABLE) {
+            identityChecks.push({
+                pair: index,
+                mismatches: [],
+                scoreDeltaCp: comparison.scoreDeltaCp,
+                expectedTreeDifferences: comparison.expectedTreeDifferences
+            });
+        }
     }
+
+    const repeatabilityChecks =
+        deterministicChecks(samples, {
+            identityMode,
+            scoreToleranceCp
+        });
+
+    const failedIdentityChecks =
+        identityChecks.filter(check => check.mismatches.length > 0);
+
+    const identityOk =
+        !exact
+            ? true
+            : failedIdentityChecks.length === 0 &&
+                repeatabilityChecks.length === 0;
 
     return {
         id: position.id,
@@ -375,8 +766,13 @@ export function summarizePosition(position, samples, exact = true) {
         candidate: candidateStats,
         ratio: sampleRatio,
         percentChange: percentChangeFromRatio(sampleRatio),
-        identityOk: !exact || identityChecks.length === 0,
+        identityMode,
+        scoreToleranceCp,
+        identityOk,
         identityChecks,
+        repeatabilityOk: repeatabilityChecks.length === 0,
+        repeatabilityChecks,
+        treeShape: summarizeTreeDifferences(identityChecks),
         expectedBestMove: position.expectedBestMove || null,
         observed: baselineRuns[0]
             ? {
@@ -402,11 +798,18 @@ export function summarizePositionWithProfile(
     const exact =
         options.exact !== false;
 
+    const identityMode =
+        normalizeIdentityMode(options.identityMode || IDENTITY_MODE_EXACT);
+
     const profile =
         options.profile || { aggregation: "median-ratio" };
 
     const summary =
-        summarizePosition(position, samples, exact);
+        summarizePosition(position, samples, {
+            exact,
+            identityMode,
+            scoreToleranceCp: options.scoreToleranceCp ?? 0
+        });
 
     if (profile.aggregation !== "paired-log-ratio") {
         return summary;
@@ -500,6 +903,9 @@ export function summarizeRun(positions, samplesByPosition, options = {}) {
     const exact =
         options.exact !== false;
 
+    const identityMode =
+        normalizeIdentityMode(options.identityMode || IDENTITY_MODE_EXACT);
+
     const positionsSummary =
         positions.map(position =>
             summarizePositionWithProfile(
@@ -507,6 +913,8 @@ export function summarizeRun(positions, samplesByPosition, options = {}) {
                 samplesByPosition.get(position.id) || [],
                 {
                     exact,
+                    identityMode,
+                    scoreToleranceCp: options.scoreToleranceCp ?? 0,
                     profile: options.profile
                 }
             )
@@ -549,6 +957,7 @@ export function summarizeRun(positions, samplesByPosition, options = {}) {
             primary: aggregateFor("primary"),
             diagnostic: aggregateFor("diagnostic")
         },
+        treeShape: aggregateTreeShape(positionsSummary),
         identityOk:
             positionsSummary.every(position => position.identityOk)
     };
@@ -684,6 +1093,8 @@ export function makeRunConfig(args, corpusPositions) {
         warmups: args.warmups,
         pairs: args.pairs,
         exact: args.exact,
+        identityMode: normalizeIdentityMode(args.identityMode),
+        scoreToleranceCp: args.scoreToleranceCp ?? 0,
         profile: args.profile || DEFAULT_PROFILE,
         groups: args.groups ?? null,
         positionIds: corpusPositions.map(position => position.id),
