@@ -28,6 +28,26 @@ function insertSquareSorted(list, square) {
 
 }
 
+function encodeCastlingRights(rights) {
+
+    return (
+        (rights.whiteKingSide ? 1 : 0) |
+        (rights.whiteQueenSide ? 2 : 0) |
+        (rights.blackKingSide ? 4 : 0) |
+        (rights.blackQueenSide ? 8 : 0)
+    );
+
+}
+
+function restoreCastlingRights(rights, mask) {
+
+    rights.whiteKingSide = (mask & 1) !== 0;
+    rights.whiteQueenSide = (mask & 2) !== 0;
+    rights.blackKingSide = (mask & 4) !== 0;
+    rights.blackQueenSide = (mask & 8) !== 0;
+
+}
+
 export default class Board {
 
     constructor(zobrist = null) {
@@ -1055,7 +1075,8 @@ export default class Board {
             whiteMaterial: this.whiteMaterial,
             blackMaterial: this.blackMaterial,
 
-            castlingRights: { ...this.castlingRights },
+            castlingRightsBefore:
+                encodeCastlingRights(this.castlingRights),
 
             enPassantSquare: this.enPassantSquare,
 
@@ -1699,7 +1720,10 @@ export default class Board {
         this.whiteMaterial = history.whiteMaterial;
         this.blackMaterial = history.blackMaterial;
 
-        this.castlingRights = { ...history.castlingRights };
+        restoreCastlingRights(
+            this.castlingRights,
+            history.castlingRightsBefore
+        );
 
         this.enPassantSquare = history.enPassantSquare;
 

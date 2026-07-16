@@ -263,6 +263,12 @@ export default class Zobrist {
 
     castlingIndex(position) {
 
+        if (Number.isInteger(position.castlingRightsBefore)) {
+
+            return position.castlingRightsBefore;
+
+        }
+
         const rights =
             position.castlingRights;
 
