@@ -514,41 +514,79 @@ export default class MoveOrdering {
 
     rayConnects(fromSquare, kingSquare, pieceType) {
 
-        const directions =
+        const direction =
+            this.rayDirectionToKing(
+                fromSquare,
+                kingSquare,
+                pieceType
+            );
 
-            pieceType === 4
+        if (direction === 0) {
 
-                ? Attack.ROOK
-
-                : pieceType === 3
-
-                    ? Attack.BISHOP
-
-                    : Attack.ROOK.concat(Attack.BISHOP);
-
-        for (const direction of directions) {
-
-            if (
-
-                this.rayHitsSquare(
-
-                    fromSquare,
-
-                    kingSquare,
-
-                    direction
-
-                )
-
-            ) {
-
-                return true;
-
-            }
+            return false;
 
         }
 
-        return false;
+        return this.rayHitsSquare(
+
+            fromSquare,
+
+            kingSquare,
+
+            direction
+
+        );
+
+    }
+
+    rayDirectionToKing(fromSquare, kingSquare, pieceType) {
+
+        const fromRank = fromSquare >> 3;
+        const fromFile = fromSquare & 7;
+
+        const kingRank = kingSquare >> 3;
+        const kingFile = kingSquare & 7;
+
+        const rankDelta = kingRank - fromRank;
+        const fileDelta = kingFile - fromFile;
+
+        if (
+            pieceType !== 3 &&
+            rankDelta === 0 &&
+            fileDelta !== 0
+        ) {
+
+            return fileDelta > 0 ? 1 : -1;
+
+        }
+
+        if (
+            pieceType !== 3 &&
+            fileDelta === 0 &&
+            rankDelta !== 0
+        ) {
+
+            return rankDelta > 0 ? 8 : -8;
+
+        }
+
+        if (
+            pieceType !== 4 &&
+            Math.abs(rankDelta) === Math.abs(fileDelta) &&
+            rankDelta !== 0
+        ) {
+
+            if (rankDelta > 0) {
+
+                return fileDelta > 0 ? 9 : 7;
+
+            }
+
+            return fileDelta > 0 ? -7 : -9;
+
+        }
+
+        return 0;
 
     }
 

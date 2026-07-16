@@ -429,6 +429,42 @@ const PGN_COLLAPSE_REGRESSIONS = [
     }
 ];
 
+test("move ordering direct-check rays use one aligned direction", () => {
+
+    const engine =
+        createEngine("4k3/8/8/8/8/8/4R3/4K3 w - - 0 1");
+
+    const ordering =
+        new MoveOrdering(engine.board);
+
+    assert.equal(ordering.rayDirectionToKing(52, 4, 4), -8);
+    assert.equal(ordering.rayDirectionToKing(32, 4, 3), -7);
+    assert.equal(ordering.rayDirectionToKing(48, 4, 4), 0);
+
+    const checkingRookMove =
+        engine.legalMoveGenerator
+            .generateMoves()
+            .find(move => moveToUci(move) === "e2e7");
+
+    assert.ok(checkingRookMove);
+    assert.equal(ordering.givesCheck(checkingRookMove), true);
+
+    const blocked =
+        createEngine("4k3/8/8/8/4p3/8/4R3/4K3 w - - 0 1");
+
+    const blockedOrdering =
+        new MoveOrdering(blocked.board);
+
+    const blockedMove =
+        blocked.legalMoveGenerator
+            .generateMoves()
+            .find(move => moveToUci(move) === "e2e3");
+
+    assert.ok(blockedMove);
+    assert.equal(blockedOrdering.givesCheck(blockedMove), false);
+
+});
+
 test("static evaluation stays White-relative regardless of side to move", () => {
 
     const whiteUpQueenWhiteToMove =
