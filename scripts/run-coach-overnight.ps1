@@ -217,6 +217,155 @@ function Test-CoachQuietMachine {
     }
 }
 
+function ConvertTo-CoachProcessArgument {
+    param([string]$Argument)
+
+    if ($null -eq $Argument) {
+        return '""'
+    }
+
+    if ($Argument -notmatch '[\s"]') {
+        return $Argument
+    }
+
+    $result = '"'
+    $backslashes = 0
+
+    foreach ($char in $Argument.ToCharArray()) {
+        if ($char -eq '\') {
+            $backslashes++
+        }
+        elseif ($char -eq '"') {
+            $result += ('\' * (($backslashes * 2) + 1))
+            $result += '"'
+            $backslashes = 0
+        }
+        else {
+            if ($backslashes -gt 0) {
+                $result += ('\' * $backslashes)
+                $backslashes = 0
+            }
+            $result += $char
+        }
+    }
+
+    if ($backslashes -gt 0) {
+        $result += ('\' * ($backslashes * 2))
+    }
+
+    $result += '"'
+    return $result
+}
+
+function Join-CoachProcessArguments {
+    param([string[]]$Arguments)
+
+    return ($Arguments | ForEach-Object { ConvertTo-CoachProcessArgument -Argument $_ }) -join " "
+}
+
+function New-CoachNormalizedEnvironment {
+    param(
+        [System.Collections.IDictionary]$BaseEnvironment = [System.Environment]::GetEnvironmentVariables(),
+        [hashtable]$Overrides = @{}
+    )
+
+    $canonicalByLower = @{}
+    $valuesByLower = @{}
+
+    foreach ($keyObject in $BaseEnvironment.Keys) {
+        $key = [string]$keyObject
+        $lower = $key.ToLowerInvariant()
+        $value = [string]$BaseEnvironment[$keyObject]
+
+        if (-not $canonicalByLower.ContainsKey($lower)) {
+            $canonicalByLower[$lower] = $key
+            $valuesByLower[$lower] = $value
+        }
+        elseif ($lower -eq "path" -and $key -eq "Path") {
+            $canonicalByLower[$lower] = "Path"
+            $valuesByLower[$lower] = $value
+        }
+    }
+
+    foreach ($keyObject in $Overrides.Keys) {
+        $key = [string]$keyObject
+        $lower = $key.ToLowerInvariant()
+        if (-not $canonicalByLower.ContainsKey($lower)) {
+            $canonicalByLower[$lower] = $key
+        }
+        $valuesByLower[$lower] = [string]$Overrides[$keyObject]
+    }
+
+    $normalized = @{}
+    foreach ($lower in $canonicalByLower.Keys) {
+        $normalized[$canonicalByLower[$lower]] = $valuesByLower[$lower]
+    }
+
+    return $normalized
+}
+
+function Copy-CoachEnvironmentToProcess {
+    param([System.Diagnostics.ProcessStartInfo]$StartInfo)
+
+    $environment =
+        New-CoachNormalizedEnvironment
+
+    $targetEnvironment = $StartInfo.EnvironmentVariables
+    if ($null -eq $targetEnvironment) {
+        $targetEnvironment = $StartInfo.Environment
+    }
+    if ($null -eq $targetEnvironment) {
+        throw "Process environment collection is unavailable."
+    }
+
+    $targetEnvironment.Clear()
+
+    foreach ($key in $environment.Keys) {
+        $targetEnvironment[$key] = $environment[$key]
+    }
+}
+
+function Invoke-CoachProcess {
+    param(
+        [string]$FilePath,
+        [string[]]$Arguments,
+        [string]$StandardOutputPath,
+        [string]$StandardErrorPath
+    )
+
+    $startInfo =
+        New-Object System.Diagnostics.ProcessStartInfo
+
+    $startInfo.FileName = $FilePath
+    $startInfo.Arguments = Join-CoachProcessArguments -Arguments $Arguments
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+
+    Copy-CoachEnvironmentToProcess -StartInfo $startInfo
+
+    $process =
+        New-Object System.Diagnostics.Process
+
+    $process.StartInfo = $startInfo
+
+    [void]$process.Start()
+
+    $stdoutTask =
+        $process.StandardOutput.ReadToEndAsync()
+
+    $stderrTask =
+        $process.StandardError.ReadToEndAsync()
+
+    $process.WaitForExit()
+
+    [System.IO.File]::WriteAllText($StandardOutputPath, $stdoutTask.Result, [System.Text.Encoding]::UTF8)
+    [System.IO.File]::WriteAllText($StandardErrorPath, $stderrTask.Result, [System.Text.Encoding]::UTF8)
+
+    return $process.ExitCode
+}
+
 function Invoke-CoachCommand {
     param(
         [string]$FilePath,
@@ -232,9 +381,11 @@ function Invoke-CoachCommand {
         "DRYRUN ${Name}: $FilePath $($Arguments -join ' ')"
         return
     }
-    $process = Start-Process -FilePath $FilePath -ArgumentList $Arguments -Wait -NoNewWindow -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
-    if ($process.ExitCode -ne 0) {
-        throw "$Name failed with exit code $($process.ExitCode)."
+    $exitCode =
+        Invoke-CoachProcess -FilePath $FilePath -Arguments $Arguments -StandardOutputPath $stdout -StandardErrorPath $stderr
+
+    if ($exitCode -ne 0) {
+        throw "$Name failed with exit code $exitCode."
     }
 }
 
@@ -346,6 +497,40 @@ function Invoke-CoachSelfTest {
             throw "Command construction self-test failed."
         }
 
+        $baseEnvironment =
+            New-Object System.Collections.Specialized.OrderedDictionary
+        $baseEnvironment.Add("Path", "C:\Windows\System32")
+        $baseEnvironment.Add("PATH", "C:\Wrong")
+        $baseEnvironment.Add("CoachFlag", "kept")
+        $normalizedEnvironment =
+            New-CoachNormalizedEnvironment -BaseEnvironment $baseEnvironment -Overrides @{ PATH = "C:\Tools" }
+        $pathKeys =
+            @($normalizedEnvironment.Keys | Where-Object { $_.ToLowerInvariant() -eq "path" })
+        if ($pathKeys.Count -ne 1 -or $normalizedEnvironment[$pathKeys[0]] -ne "C:\Tools") {
+            throw "Environment normalization self-test failed."
+        }
+        if ($normalizedEnvironment["CoachFlag"] -ne "kept") {
+            throw "Environment preservation self-test failed."
+        }
+
+        $environmentLaunchStdout =
+            Join-Path $tmp "environment-launch.stdout.txt"
+        $environmentLaunchStderr =
+            Join-Path $tmp "environment-launch.stderr.txt"
+        $environmentLaunchExitCode = Invoke-CoachProcess -FilePath "powershell" -Arguments @(
+            "-NoProfile",
+            "-Command",
+            "Write-Output coach-env-ok"
+        ) -StandardOutputPath $environmentLaunchStdout -StandardErrorPath $environmentLaunchStderr
+        if ($environmentLaunchExitCode -ne 0) {
+            throw "Environment launch self-test exited with $environmentLaunchExitCode."
+        }
+        $environmentLaunchOutput =
+            Get-Content -LiteralPath $environmentLaunchStdout -Raw -Encoding UTF8
+        if ($environmentLaunchOutput.Trim() -ne "coach-env-ok") {
+            throw "Environment launch self-test failed."
+        }
+
         $quiet = Test-CoachQuietMachine -Threshold 100.0 -CpuSampleCount 3
         if ($quiet.Samples.Count -ne 3 -or -not $quiet.Quiet) {
             throw "Quiet-machine self-test failed."
@@ -357,6 +542,10 @@ function Invoke-CoachSelfTest {
             ScorePercent = $summary.ScorePercent
             Warnings = $warnings
             CommandArgumentCount = $cmd.Arguments.Count
+            EnvironmentPathKeyCount = $pathKeys.Count
+            EnvironmentPathValue = $normalizedEnvironment[$pathKeys[0]]
+            EnvironmentCoachFlag = $normalizedEnvironment["CoachFlag"]
+            EnvironmentLaunch = $environmentLaunchOutput.Trim()
             QuietSampleCount = $quiet.Samples.Count
             QuietReason = $quiet.Reason
         } | ConvertTo-Json -Depth 4

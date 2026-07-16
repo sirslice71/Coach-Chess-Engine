@@ -35,6 +35,10 @@ test("overnight PowerShell self-test covers PGN, UTF-16 logs, and command constr
     assert.ok(summary.Warnings.includes("warning"));
     assert.ok(summary.Warnings.includes("timeout"));
     assert.ok(summary.CommandArgumentCount > 20);
+    assert.equal(summary.EnvironmentPathKeyCount, 1);
+    assert.equal(summary.EnvironmentPathValue, "C:\\Tools");
+    assert.equal(summary.EnvironmentCoachFlag, "kept");
+    assert.equal(summary.EnvironmentLaunch, "coach-env-ok");
     assert.equal(summary.QuietSampleCount, 3);
     assert.match(summary.QuietReason, /CPU samples:/);
 
@@ -76,6 +80,7 @@ test("overnight Benchmark dry-run prints commands without launching engines", as
         assert.match(result.stdout, /DRYRUN benchmark-candidate-1/);
         assert.match(result.stdout, /DRYRUN benchmark-candidate-2/);
         assert.match(result.stdout, /DRYRUN benchmark-summary/);
+        assert.doesNotMatch(result.stdout, /\bgit\b/i);
     }
     finally {
         await rm(dir, { recursive: true, force: true });
