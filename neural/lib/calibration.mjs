@@ -152,3 +152,87 @@ export const TRANSFORMS = {
     powerCompression: { fit: fitPowerCompression, apply: (cp, params, clipCp, phase) => applyPowerCompression(cp, params, clipCp) },
     piecewiseLinear: { fit: fitPiecewiseLinear, apply: (cp, params, clipCp, phase) => applyPiecewiseLinear(cp, params, clipCp) },
 };
+
+//======================================================
+// Narrow, constrained phase-affine variants (refinement study).
+// All of these start from an already-fitted unconstrained phaseAffine
+// params object and adjust ONLY the opening component (or the fitting
+// objective), never re-deriving the whole family from scratch. Applied
+// with the same applyPhaseAffine() as the original.
+//======================================================
+
+// ---- Candidate A: zero opening intercept, keep the originally-fitted slope ----
+export function zeroOpeningIntercept(phaseAffineParams) {
+    return { ...phaseAffineParams, opening: { a: phaseAffineParams.opening.a, b: 0 } };
+}
+
+// ---- Candidate B: bound the opening intercept to [lo,hi] via a coarse,
+// validation-selected grid search (slope held fixed at the original fit). ----
+export function fitBoundedOpeningIntercept(phaseAffineParams, openingRows, { lo = -25, hi = 25, step = 5 } = {}) {
+    const a = phaseAffineParams.opening.a;
+    let best = null;
+    for (let b = lo; b <= hi + 1e-9; b += step) {
+        let sse = 0;
+        for (const r of openingRows) { const err = a * r.cp + b - r.sf; sse += err * err; }
+        if (!best || sse < best.sse) best = { b: +b.toFixed(4), sse };
+    }
+    return { ...phaseAffineParams, opening: { a, b: best.b } };
+}
+
+// ---- Candidate C: shrink the opening intercept by a fixed factor (0 = A, 1 = original) ----
+export function shrinkOpeningIntercept(phaseAffineParams, factor) {
+    return { ...phaseAffineParams, opening: { a: phaseAffineParams.opening.a, b: phaseAffineParams.opening.b * factor } };
+}
+
+// ---- Candidate D: slope-only phase calibration (intercept forced to 0 in
+// EVERY phase; slope re-derived under that constraint, not reused from the
+// two-parameter fit -- removing the intercept changes the optimal slope). ----
+export function fitPhaseSlopeOnly(rows) {
+    const byPhase = { opening: [], middlegame: [], endgame: [] };
+    for (const r of rows) if (byPhase[r.phase]) byPhase[r.phase].push(r);
+    const out = {};
+    for (const phase of PHASES) {
+        const group = byPhase[phase] || [];
+        if (group.length < MIN_ROWS_PER_PHASE) { out[phase] = { a: 1, b: 0 }; continue; }
+        let num = 0, den = 0;
+        for (const r of group) { num += r.cp * r.sf; den += r.cp * r.cp; }
+        out[phase] = { a: den ? num / den : 1, b: 0 };
+    }
+    return out;
+}
+
+// ---- Candidate E: regularized phase affine -- ridge penalty pulling each
+// phase's {a,b} toward the identity {1,0}. Closed-form 2x2 normal-equations
+// solve per phase; lambda controls how strongly identity is preferred. ----
+function ridgeAffine(rows, lambda) {
+    let sxx = 0, sx = 0, sxy = 0, sy = 0;
+    const n = rows.length;
+    for (const r of rows) { sxx += r.cp * r.cp; sx += r.cp; sxy += r.cp * r.sf; sy += r.sf; }
+    // minimize sum((a*cp+b-sf)^2) + lambda*((a-1)^2 + b^2)
+    const A11 = sxx + lambda, A12 = sx, A21 = sx, A22 = n + lambda;
+    const B1 = sxy + lambda, B2 = sy;
+    const det = A11 * A22 - A12 * A21;
+    if (!det) return { a: 1, b: 0 };
+    const a = (B1 * A22 - A12 * B2) / det;
+    const b = (A11 * B2 - B1 * A21) / det;
+    return { a, b };
+}
+export function fitPhaseAffineRegularized(rows, lambda) {
+    const byPhase = { opening: [], middlegame: [], endgame: [] };
+    for (const r of rows) if (byPhase[r.phase]) byPhase[r.phase].push(r);
+    const out = {};
+    for (const phase of PHASES) {
+        const group = byPhase[phase] || [];
+        out[phase] = group.length >= MIN_ROWS_PER_PHASE ? ridgeAffine(group, lambda) : { a: 1, b: 0 };
+    }
+    return out;
+}
+
+// ---- Candidate F: blend raw and (fully) calibrated opening scores at
+// apply time. Middlegame/endgame are untouched (already passed criteria
+// 1-2 in the original study; the failure was opening-specific). ----
+export function applyPhaseAffineBlended(cp, phase, params, alpha, clipCp = DEFAULT_CLIP) {
+    const calibrated = applyPhaseAffine(cp, phase, params, clipCp);
+    if (phase !== "opening") return calibrated;
+    return clip(alpha * calibrated + (1 - alpha) * cp, clipCp);
+}

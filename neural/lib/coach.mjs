@@ -28,7 +28,8 @@ export async function loadCoach() {
     const FEN = (await import(url("js/core/fen.js"))).default;
     const { sanForMove } = await import(url("js/game/pgn.js"));
     const { MoveFlags } = await import(url("js/core/move.js"));
+    const { algebraic, fromAlgebraic } = await import(url("js/core/square.js"));
 
-    _cache = { root, createEngineCore, FEN, sanForMove, MoveFlags };
+    _cache = { root, createEngineCore, FEN, sanForMove, MoveFlags, algebraic, fromAlgebraic };
     return _cache;
 }

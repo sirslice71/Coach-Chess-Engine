@@ -12,7 +12,9 @@ import {
     fitPhaseAffine, applyPhaseAffine,
     fitPowerCompression, applyPowerCompression,
     fitPiecewiseLinear, applyPiecewiseLinear,
-    DEFAULT_KNOTS, TRANSFORMS,
+    DEFAULT_KNOTS, TRANSFORMS, PHASES,
+    zeroOpeningIntercept, fitBoundedOpeningIntercept, shrinkOpeningIntercept,
+    fitPhaseSlopeOnly, fitPhaseAffineRegularized, applyPhaseAffineBlended,
 } from "../lib/calibration.mjs";
 
 const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol;
@@ -127,4 +129,93 @@ test("all four transforms respect the clip bound for extreme inputs", () => {
         assert.ok(Math.abs(hi) <= 1000 + 1e-9, name + " must clip large positive input");
         assert.ok(Math.abs(lo) <= 1000 + 1e-9, name + " must clip large negative input");
     }
+});
+
+//======================================================
+// Narrow, constrained phase-affine variants (refinement study:
+// candidates A-F targeting the opening-intercept over-correction).
+//======================================================
+
+function mixedPhaseRows() {
+    return [
+        ...linearRows(0.15, 32, { n: 30, lo: -200, hi: 200, phase: () => "opening" }),
+        ...linearRows(1.0, -12, { n: 30, phase: () => "middlegame" }),
+        ...linearRows(1.2, 1, { n: 30, phase: () => "endgame" }),
+    ];
+}
+
+test("Candidate A (zero opening intercept): keeps the fitted opening slope, zeroes only the intercept", () => {
+    const rows = mixedPhaseRows();
+    const original = fitPhaseAffine(rows);
+    const a = zeroOpeningIntercept(original);
+    assert.equal(a.opening.a, original.opening.a);
+    assert.equal(a.opening.b, 0);
+    assert.deepEqual(a.middlegame, original.middlegame);
+    assert.deepEqual(a.endgame, original.endgame);
+});
+
+test("Candidate B (bounded opening intercept): grid search stays within [lo,hi] and keeps the original slope", () => {
+    const rows = mixedPhaseRows();
+    const original = fitPhaseAffine(rows);
+    const b = fitBoundedOpeningIntercept(original, rows.filter((r) => r.phase === "opening"), { lo: -25, hi: 25, step: 5 });
+    assert.equal(b.opening.a, original.opening.a);
+    assert.ok(b.opening.b >= -25 - 1e-9 && b.opening.b <= 25 + 1e-9, "intercept must respect the grid bound");
+    assert.deepEqual(b.middlegame, original.middlegame);
+});
+
+test("Candidate B: when the unconstrained intercept is within bounds, the grid recovers it (up to grid resolution)", () => {
+    const rows = linearRows(0.5, 10, { n: 30, phase: () => "opening" });
+    const original = { opening: fitGlobalAffine(rows), middlegame: { a: 1, b: 0 }, endgame: { a: 1, b: 0 } };
+    const b = fitBoundedOpeningIntercept(original, rows, { lo: -25, hi: 25, step: 1 });
+    assert.ok(Math.abs(b.opening.b - 10) <= 1, "grid should land within one step of the true intercept when it fits inside the bound");
+});
+
+test("Candidate C (shrink factor): 0 == candidate A, 1 == the original fit, intermediate values interpolate", () => {
+    const rows = mixedPhaseRows();
+    const original = fitPhaseAffine(rows);
+    const shrunk0 = shrinkOpeningIntercept(original, 0);
+    const shrunk1 = shrinkOpeningIntercept(original, 1);
+    const shrunkHalf = shrinkOpeningIntercept(original, 0.5);
+    assert.equal(shrunk0.opening.b, 0);
+    assert.equal(shrunk1.opening.b, original.opening.b);
+    assert.ok(near(shrunkHalf.opening.b, original.opening.b / 2));
+});
+
+test("Candidate D (slope-only): every phase intercept is exactly 0, slope re-derived under that constraint", () => {
+    const rows = mixedPhaseRows();
+    const d = fitPhaseSlopeOnly(rows);
+    for (const phase of PHASES) assert.equal(d[phase].b, 0);
+    assert.notEqual(d.opening.a, 0);
+});
+
+test("Candidate E (regularized): larger lambda pulls {a,b} toward {1,0}", () => {
+    const rows = mixedPhaseRows();
+    const weak = fitPhaseAffineRegularized(rows, 0.001);
+    const strong = fitPhaseAffineRegularized(rows, 1000);
+    // strong regularization should land much closer to the identity than weak
+    const distWeak = Math.abs(weak.opening.a - 1) + Math.abs(weak.opening.b);
+    const distStrong = Math.abs(strong.opening.a - 1) + Math.abs(strong.opening.b);
+    assert.ok(distStrong < distWeak, "stronger lambda must move closer to the {a:1,b:0} identity prior");
+});
+
+test("Candidate F (blended opening): alpha=0 is raw passthrough in opening, alpha=1 is the full calibration, other phases untouched", () => {
+    const rows = mixedPhaseRows();
+    const params = fitPhaseAffine(rows);
+    assert.ok(near(applyPhaseAffineBlended(50, "opening", params, 0, 100000), 50));
+    assert.ok(near(applyPhaseAffineBlended(50, "opening", params, 1, 100000), applyPhaseAffine(50, "opening", params, 100000)));
+    // middlegame/endgame are never blended -- always the full calibration regardless of alpha
+    assert.ok(near(applyPhaseAffineBlended(50, "middlegame", params, 0, 100000), applyPhaseAffine(50, "middlegame", params, 100000)));
+});
+
+test("all constrained variants remain monotonic (non-negative fitted slope) on well-behaved synthetic data", () => {
+    const rows = mixedPhaseRows();
+    const original = fitPhaseAffine(rows);
+    const variants = [
+        zeroOpeningIntercept(original),
+        fitBoundedOpeningIntercept(original, rows.filter((r) => r.phase === "opening")),
+        shrinkOpeningIntercept(original, 0.5),
+        fitPhaseSlopeOnly(rows),
+        fitPhaseAffineRegularized(rows, 0.1),
+    ];
+    for (const v of variants) for (const phase of PHASES) assert.ok(v[phase].a >= 0, phase + " slope must stay non-negative");
 });

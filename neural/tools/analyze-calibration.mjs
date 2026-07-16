@@ -326,4 +326,8 @@ async function main() {
 const invokedDirectly = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (invokedDirectly) main().catch((e) => { console.error(e); process.exit(1); });
 
-export { main, accuracyMetrics, distributionMetrics, selectTransform, candidateReport };
+export {
+    main, accuracyMetrics, distributionMetrics, selectTransform, candidateReport,
+    byPhase, bySourceFamily, cpFromModel, sfCpOf, loadModelFile, parentChildAudit, stridedSample,
+    MAX_CPMAE_REGRESSION_REL, MIN_VOLATILITY_REDUCTION_REL,
+};

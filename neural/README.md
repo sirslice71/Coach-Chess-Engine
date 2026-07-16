@@ -48,10 +48,11 @@ validate-dataset.mjs   inspect-dataset.mjs   features.mjs / features.py (+ parit
 | `tools/merge-corpus.mjs` | Safe incremental corpus merging (first input wins; splits preserved) |
 | `tools/analyze-pgn.mjs` | Read-only PGN triage: validity, exact-duplicate games, opening diversity, book verdict |
 | `tools/analyze-calibration.mjs` | Read-only offline score-recalibration study (see `CALIBRATION-REPORT.md`): fits 4 deterministic transforms on validation only, touches test once for the selected transform |
-| `lib/calibration.mjs` | Reusable calibration transforms (global/phase affine, power compression, bounded piecewise-linear) — pure `fit`/`apply`, no I/O |
+| `tools/refine-phase-calibration.mjs` | Follow-up refinement (see `CALIBRATION-REFINEMENT-REPORT.md`): narrowly-constrained opening-intercept variants, boundary-crossing + score-landscape audits, bootstrap CIs |
+| `lib/calibration.mjs` | Reusable calibration transforms (global/phase affine, power compression, bounded piecewise-linear, constrained phase-affine variants A-F) — pure `fit`/`apply`, no I/O |
 | `features.mjs` / `features.py` | Identical JS + Python feature encoders |
 | `fixtures/feature-parity.json` | ≥20 FEN → expected feature indices |
-| `lib/*.mjs` | prng, coach loader, position identity, pgn reader, replay, sampling, splits, features, jsonl, stockfish, moveutil, calibration |
+| `lib/*.mjs` | prng, coach loader (+ square algebraic helpers), position identity, pgn reader, replay, sampling, splits, features, jsonl, stockfish, moveutil, endgame, calibration |
 | `schemas/*.json` | JSON Schemas for both record types |
 | `tools/gen-selfplay-pgn.mjs` | **DEV/TEST ONLY** synthetic seeded games (not training data) |
 | `train/*.mjs` | Offline value-network proof: `dataset`, `model`, `metrics`, `train-value`, `infer` (JS) |
