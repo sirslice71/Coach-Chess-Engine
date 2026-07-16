@@ -37,6 +37,155 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $script:DryRunMode = $DryRun.IsPresent
+$script:CoachRunStartedAt = Get-Date
+$script:CoachStepStartedAt = $null
+$script:CoachCompletedSteps = 0
+$script:CoachTotalSteps = 0
+$script:CoachStepDurations = @()
+
+function Format-CoachDuration {
+    param([TimeSpan]$Duration)
+
+    return "{0:00}:{1:00}:{2:00}" -f [math]::Floor($Duration.TotalHours), $Duration.Minutes, $Duration.Seconds
+}
+
+function Format-CoachPercent {
+    param([Nullable[double]]$Value)
+
+    if ($null -eq $Value) {
+        return "n/a"
+    }
+
+    return "{0:+0.000;-0.000;0.000}%" -f $Value
+}
+
+function Format-CoachYesNo {
+    param([bool]$Value)
+
+    if ($Value) {
+        return "YES"
+    }
+
+    return "NO"
+}
+
+function Write-CoachConsoleRule {
+    param([string]$Char = "=")
+
+    Write-Host ($Char * 60)
+}
+
+function Write-CoachConsoleHeader {
+    param(
+        [string]$Title,
+        [string]$Rule = "="
+    )
+
+    Write-CoachConsoleRule -Char $Rule
+    Write-Host $Title
+    Write-CoachConsoleRule -Char $Rule
+}
+
+function Get-CoachEstimatedRemaining {
+    if ($script:CoachCompletedSteps -le 0 -or $script:CoachTotalSteps -le 0) {
+        return "unknown"
+    }
+
+    $averageSeconds =
+        ($script:CoachStepDurations | Measure-Object -Average).Average
+
+    if ($null -eq $averageSeconds) {
+        return "unknown"
+    }
+
+    $remainingSteps =
+        [math]::Max(0, $script:CoachTotalSteps - $script:CoachCompletedSteps)
+
+    $remaining =
+        [TimeSpan]::FromSeconds($averageSeconds * $remainingSteps)
+
+    return "about $(Format-CoachDuration -Duration $remaining)"
+}
+
+function Write-CoachRunOverview {
+    param(
+        [string]$ResultDirectory,
+        [int]$TotalSteps,
+        [int]$ControlSteps,
+        [int]$CandidateSteps,
+        [int]$SummarySteps
+    )
+
+    $script:CoachRunStartedAt = Get-Date
+    $script:CoachTotalSteps = $TotalSteps
+    $script:CoachCompletedSteps = 0
+    $script:CoachStepDurations = @()
+
+    Write-CoachConsoleHeader -Title "Coach Benchmark"
+    Write-Host "Mode: $Mode"
+    Write-Host "Profile: $BenchmarkProfile"
+    Write-Host "Baseline: $BaselinePath"
+    Write-Host "Candidate: $CandidatePath"
+    Write-Host "Results: $ResultDirectory"
+    Write-Host "Started: $($script:CoachRunStartedAt.ToString('T'))"
+    Write-Host ""
+    Write-Host "Overall steps: $TotalSteps"
+    Write-Host "  $ControlSteps control"
+    Write-Host "  $CandidateSteps candidate run$(if ($CandidateSteps -eq 1) { '' } else { 's' })"
+    Write-Host "  $SummarySteps summary"
+    Write-CoachConsoleRule -Char "-"
+}
+
+function Start-CoachProgressStep {
+    param(
+        [int]$Step,
+        [int]$TotalSteps,
+        [string]$Title,
+        [Nullable[int]]$Seed = $null
+    )
+
+    $script:CoachStepStartedAt = Get-Date
+    $elapsed =
+        (Get-Date) - $script:CoachRunStartedAt
+
+    Write-Host ""
+    Write-Host "[$Step/$TotalSteps] $Title"
+    if ($null -ne $Seed) {
+        Write-Host "Seed: $Seed"
+    }
+    Write-Host "Overall elapsed: $(Format-CoachDuration -Duration $elapsed)"
+    if ($script:CoachCompletedSteps -gt 0) {
+        Write-Host "Estimated remaining: $(Get-CoachEstimatedRemaining)"
+    }
+}
+
+function Complete-CoachProgressStep {
+    param(
+        [int]$Step,
+        [int]$TotalSteps,
+        [string]$Title
+    )
+
+    $endedAt =
+        Get-Date
+
+    $duration =
+        if ($null -ne $script:CoachStepStartedAt) {
+            $endedAt - $script:CoachStepStartedAt
+        }
+        else {
+            [TimeSpan]::Zero
+        }
+
+    $script:CoachCompletedSteps++
+    $script:CoachStepDurations += $duration.TotalSeconds
+
+    Write-Host ""
+    Write-Host "[$Step/$TotalSteps] $Title"
+    Write-Host "Duration: $(Format-CoachDuration -Duration $duration)"
+    Write-Host "Completed steps: $script:CoachCompletedSteps/$TotalSteps"
+    Write-Host "Overall elapsed: $(Format-CoachDuration -Duration ($endedAt - $script:CoachRunStartedAt))"
+}
 
 function New-CoachResultDirectory {
     param([string]$Requested)
@@ -407,12 +556,237 @@ function Test-CoachCompletedJson {
     }
 }
 
+function Read-CoachBenchmarkJson {
+    param([string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $null
+    }
+
+    try {
+        return Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+    }
+    catch {
+        return $null
+    }
+}
+
+function Get-CoachPrimaryAggregate {
+    param($Report)
+
+    if ($null -eq $Report -or $null -eq $Report.summary -or $null -eq $Report.summary.aggregates) {
+        return $null
+    }
+
+    return $Report.summary.aggregates.primary
+}
+
+function Get-CoachSpeedGain {
+    param($Report)
+
+    $aggregate =
+        Get-CoachPrimaryAggregate -Report $Report
+
+    if ($null -eq $aggregate -or $null -eq $aggregate.geomeanPercent) {
+        return $null
+    }
+
+    return -1.0 * [double]$aggregate.geomeanPercent
+}
+
+function Get-CoachMedianSpeedGain {
+    param($Report)
+
+    $aggregate =
+        Get-CoachPrimaryAggregate -Report $Report
+
+    if ($null -eq $aggregate -or $null -eq $aggregate.medianPercent) {
+        return $null
+    }
+
+    return -1.0 * [double]$aggregate.medianPercent
+}
+
+function Get-CoachIdentityText {
+    param($Report)
+
+    if ($null -eq $Report -or $null -eq $Report.summary) {
+        return "unknown"
+    }
+
+    if ($Report.summary.identityOk) {
+        return "OK"
+    }
+
+    return "MISMATCH"
+}
+
+function Get-CoachPositivePositionText {
+    param($Report)
+
+    if ($null -eq $Report -or $null -eq $Report.summary -or $null -eq $Report.summary.positions) {
+        return "n/a"
+    }
+
+    $positions =
+        @($Report.summary.positions)
+
+    $positive =
+        @($positions | Where-Object {
+            $null -ne $_.percentChange -and [double]$_.percentChange -lt 0
+        }).Count
+
+    return "$positive/$($positions.Count)"
+}
+
+function Get-CoachBenchmarkSummaryText {
+    param([string]$ResultDirectory)
+
+    $path =
+        Join-Path $ResultDirectory "benchmark-summary.stdout.txt"
+
+    if (-not (Test-Path -LiteralPath $path)) {
+        return $null
+    }
+
+    return Get-Content -LiteralPath $path -Raw -Encoding UTF8
+}
+
+function Get-CoachSummaryValue {
+    param(
+        [string]$SummaryText,
+        [string]$Pattern
+    )
+
+    if ([string]::IsNullOrWhiteSpace($SummaryText)) {
+        return $null
+    }
+
+    $match =
+        [regex]::Match($SummaryText, $Pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+
+    if (-not $match.Success) {
+        return $null
+    }
+
+    return $match.Groups[1].Value
+}
+
+function Write-CoachControlResult {
+    param(
+        [string]$JsonPath,
+        [double]$Threshold
+    )
+
+    $report =
+        Read-CoachBenchmarkJson -Path $JsonPath
+
+    $gain =
+        Get-CoachSpeedGain -Report $report
+
+    Write-Host "Control speed gain: $(Format-CoachPercent -Value $gain)"
+    if ($null -ne $gain) {
+        Write-Host "Stable within +/-$([math]::Round($Threshold * 100, 3))%: $(Format-CoachYesNo -Value ([math]::Abs($gain) -le ($Threshold * 100.0)))"
+    }
+    else {
+        Write-Host "Stable within threshold: unknown"
+    }
+    Write-Host "Identity: $(Get-CoachIdentityText -Report $report)"
+}
+
+function Write-CoachCandidateResult {
+    param(
+        [string]$JsonPath,
+        [Nullable[double]]$ControlGain = $null
+    )
+
+    $report =
+        Read-CoachBenchmarkJson -Path $JsonPath
+
+    $gain =
+        Get-CoachSpeedGain -Report $report
+
+    $medianGain =
+        Get-CoachMedianSpeedGain -Report $report
+
+    Write-Host "Raw speed gain: $(Format-CoachPercent -Value $gain)"
+    Write-Host "Median speed gain: $(Format-CoachPercent -Value $medianGain)"
+
+    if ($null -ne $gain -and $null -ne $ControlGain) {
+        Write-Host "Adjusted speed gain: $(Format-CoachPercent -Value ($gain - $ControlGain))"
+    }
+    else {
+        Write-Host "Adjusted speed gain: n/a"
+    }
+
+    Write-Host "Identity: $(Get-CoachIdentityText -Report $report)"
+    Write-Host "Positive positions: $(Get-CoachPositivePositionText -Report $report)"
+}
+
+function Write-CoachFinalBenchmarkSummary {
+    param(
+        [string]$ResultDirectory,
+        [string[]]$CandidateJsons,
+        [Nullable[double]]$ControlGain = $null
+    )
+
+    $summaryText =
+        Get-CoachBenchmarkSummaryText -ResultDirectory $ResultDirectory
+
+    $verdict =
+        Get-CoachSummaryValue -SummaryText $summaryText -Pattern 'verdict:\s*([^\r\n]+)'
+
+    $adjustedLine =
+        Get-CoachSummaryValue -SummaryText $summaryText -Pattern 'adjusted speed gain mean/median/sd:\s*([^\r\n]+)'
+
+    $positiveRuns =
+        Get-CoachSummaryValue -SummaryText $summaryText -Pattern 'positive candidate runs:\s*([^\r\n]+)'
+
+    $identityOk =
+        $true
+    $identityKnown =
+        $CandidateJsons.Count -gt 0
+
+    foreach ($json in $CandidateJsons) {
+        $report =
+            Read-CoachBenchmarkJson -Path $json
+        if ($null -eq $report) {
+            $identityKnown = $false
+        }
+        elseif (-not $report.summary.identityOk) {
+            $identityOk = $false
+        }
+    }
+
+    Write-CoachConsoleHeader -Title "Coach Benchmark Complete"
+    Write-Host "Verdict: $(if ($verdict) { $verdict.ToUpperInvariant() } else { 'UNKNOWN' })"
+    Write-Host "Adjusted mean/median/sd: $(if ($adjustedLine) { $adjustedLine } else { 'n/a' })"
+    Write-Host "Candidate runs positive: $(if ($positiveRuns) { $positiveRuns } else { 'n/a' })"
+    Write-Host "Identity: $(if (-not $identityKnown) { 'unknown' } elseif ($identityOk) { 'OK' } else { 'MISMATCH' })"
+    Write-Host "Total elapsed: $(Format-CoachDuration -Duration ((Get-Date) - $script:CoachRunStartedAt))"
+    Write-Host "Results: $ResultDirectory"
+    Write-CoachConsoleRule
+}
+
 function Invoke-CoachBenchmarkPipeline {
     param([string]$ResultDirectory)
 
     if ([string]::IsNullOrWhiteSpace($CandidatePath)) {
         throw "-CandidatePath is required for Benchmark mode."
     }
+
+    $totalSteps =
+        1 + $CandidateRuns + 1
+
+    Write-CoachRunOverview `
+        -ResultDirectory $ResultDirectory `
+        -TotalSteps $totalSteps `
+        -ControlSteps 1 `
+        -CandidateSteps $CandidateRuns `
+        -SummarySteps 1
+
+    $stepNumber = 1
+    $controlGain = $null
 
     $controlJson = Join-Path $ResultDirectory "control.json"
     $controlCsv = Join-Path $ResultDirectory "control.csv"
@@ -429,14 +803,26 @@ function Invoke-CoachBenchmarkPipeline {
         $controlArgs += @("--profile", $BenchmarkProfile)
     }
     if ($Resume -and (Test-CoachCompletedJson -Path $controlJson)) {
+        Start-CoachProgressStep -Step $stepNumber -TotalSteps $totalSteps -Title "Reusing completed identical-build control" -Seed $ControlSeed
         Write-CoachLog -ResultDirectory $ResultDirectory -Message "RESUME benchmark-control: reusing $controlJson"
+        Complete-CoachProgressStep -Step $stepNumber -TotalSteps $totalSteps -Title "Control reused"
+        Write-CoachControlResult -JsonPath $controlJson -Threshold 0.005
     }
     else {
+        Start-CoachProgressStep -Step $stepNumber -TotalSteps $totalSteps -Title "Running identical-build control" -Seed $ControlSeed
         Invoke-CoachCommand -FilePath "node" -ResultDirectory $ResultDirectory -Name "benchmark-control" -Arguments $controlArgs
+        Complete-CoachProgressStep -Step $stepNumber -TotalSteps $totalSteps -Title "Control complete"
+        Write-CoachControlResult -JsonPath $controlJson -Threshold 0.005
     }
+
+    $controlReport =
+        Read-CoachBenchmarkJson -Path $controlJson
+    $controlGain =
+        Get-CoachSpeedGain -Report $controlReport
 
     $candidateJsons = @()
     for ($i = 0; $i -lt $CandidateRuns; $i++) {
+        $stepNumber++
         $seedValue = if ($i -lt $CandidateSeeds.Count) { $CandidateSeeds[$i] } else { $CandidateSeeds[-1] + $i + 1 }
         $json = Join-Path $ResultDirectory "candidate-$($i + 1).json"
         $csv = Join-Path $ResultDirectory "candidate-$($i + 1).csv"
@@ -453,18 +839,28 @@ function Invoke-CoachBenchmarkPipeline {
             $candidateArgs += @("--profile", $BenchmarkProfile)
         }
         if ($Resume -and (Test-CoachCompletedJson -Path $json)) {
+            Start-CoachProgressStep -Step $stepNumber -TotalSteps $totalSteps -Title "Reusing candidate comparison $($i + 1) of $CandidateRuns" -Seed $seedValue
             Write-CoachLog -ResultDirectory $ResultDirectory -Message "RESUME benchmark-candidate-$($i + 1): reusing $json"
+            Complete-CoachProgressStep -Step $stepNumber -TotalSteps $totalSteps -Title "Candidate comparison $($i + 1) reused"
+            Write-CoachCandidateResult -JsonPath $json -ControlGain $controlGain
         }
         else {
+            Start-CoachProgressStep -Step $stepNumber -TotalSteps $totalSteps -Title "Running candidate comparison $($i + 1) of $CandidateRuns" -Seed $seedValue
             Invoke-CoachCommand -FilePath "node" -ResultDirectory $ResultDirectory -Name "benchmark-candidate-$($i + 1)" -Arguments $candidateArgs
+            Complete-CoachProgressStep -Step $stepNumber -TotalSteps $totalSteps -Title "Candidate comparison $($i + 1) complete"
+            Write-CoachCandidateResult -JsonPath $json -ControlGain $controlGain
         }
     }
 
+    $stepNumber++
     $summaryArgs = @((Join-Path $BaselinePath "scripts/benchmark-search-summary.mjs"), "--control", $controlJson)
     foreach ($json in $candidateJsons) {
         $summaryArgs += @("--candidate", $json)
     }
+    Start-CoachProgressStep -Step $stepNumber -TotalSteps $totalSteps -Title "Running benchmark summary"
     Invoke-CoachCommand -FilePath "node" -ResultDirectory $ResultDirectory -Name "benchmark-summary" -Arguments $summaryArgs
+    Complete-CoachProgressStep -Step $stepNumber -TotalSteps $totalSteps -Title "Summary complete"
+    Write-CoachFinalBenchmarkSummary -ResultDirectory $ResultDirectory -CandidateJsons $candidateJsons -ControlGain $controlGain
 }
 
 function Invoke-CoachSelfTest {
