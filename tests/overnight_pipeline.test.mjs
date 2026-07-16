@@ -35,6 +35,8 @@ test("overnight PowerShell self-test covers PGN, UTF-16 logs, and command constr
     assert.ok(summary.Warnings.includes("warning"));
     assert.ok(summary.Warnings.includes("timeout"));
     assert.ok(summary.CommandArgumentCount > 20);
+    assert.equal(summary.QuietSampleCount, 3);
+    assert.match(summary.QuietReason, /CPU samples:/);
 
 });
 

@@ -190,7 +190,7 @@ function New-CoachCuteChessCommand {
 function Test-CoachQuietMachine {
     param(
         [double]$Threshold,
-        [int]$Samples
+        [int]$CpuSampleCount
     )
 
     $busyNames = Get-Process -ErrorAction SilentlyContinue |
@@ -203,17 +203,17 @@ function Test-CoachQuietMachine {
         return [pscustomobject]@{ Quiet = $false; Reason = "CuteChess or Stockfish is still running."; Samples = @() }
     }
 
-    $samples = @()
-    for ($i = 0; $i -lt $Samples; $i++) {
-        $sample = (Get-Counter '\Processor(_Total)\% Processor Time').CounterSamples.CookedValue
-        $samples += [math]::Round($sample, 2)
+    $cpuReadings = @()
+    for ($i = 0; $i -lt $CpuSampleCount; $i++) {
+        $cpuReading = (Get-Counter '\Processor(_Total)\% Processor Time').CounterSamples.CookedValue
+        $cpuReadings += [math]::Round($cpuReading, 2)
         Start-Sleep -Seconds 1
     }
 
     return [pscustomobject]@{
-        Quiet = (($samples | Measure-Object -Maximum).Maximum -le $Threshold)
-        Reason = "CPU samples: $($samples -join ', ')"
-        Samples = $samples
+        Quiet = (($cpuReadings | Measure-Object -Maximum).Maximum -le $Threshold)
+        Reason = "CPU samples: $($cpuReadings -join ', ')"
+        Samples = $cpuReadings
     }
 }
 
@@ -346,12 +346,19 @@ function Invoke-CoachSelfTest {
             throw "Command construction self-test failed."
         }
 
+        $quiet = Test-CoachQuietMachine -Threshold 100.0 -CpuSampleCount 3
+        if ($quiet.Samples.Count -ne 3 -or -not $quiet.Quiet) {
+            throw "Quiet-machine self-test failed."
+        }
+
         [pscustomobject]@{
             Ok = $true
             PgnGames = $summary.Games
             ScorePercent = $summary.ScorePercent
             Warnings = $warnings
             CommandArgumentCount = $cmd.Arguments.Count
+            QuietSampleCount = $quiet.Samples.Count
+            QuietReason = $quiet.Reason
         } | ConvertTo-Json -Depth 4
     }
     finally {
@@ -418,7 +425,7 @@ if ($Mode -eq "Benchmark" -or $Mode -eq "MatchThenBenchmark") {
         "DRYRUN quiet-machine: threshold=$QuietCpuThreshold samples=$QuietSamples cooldownSeconds=$CooldownSeconds"
     }
     else {
-        $quiet = Test-CoachQuietMachine -Threshold $QuietCpuThreshold -Samples $QuietSamples
+        $quiet = Test-CoachQuietMachine -Threshold $QuietCpuThreshold -CpuSampleCount $QuietSamples
         $quiet | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $Results "quiet-machine.json") -Encoding UTF8
         if (-not $quiet.Quiet) {
             throw "Machine is not quiet enough for benchmarking: $($quiet.Reason)"
