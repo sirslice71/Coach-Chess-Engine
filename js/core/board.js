@@ -11,6 +11,38 @@ import Attack from "../engine/attack.js";
 import EngineDebug from "../dev/enginedebug.js";
 import FEN from "./fen.js";
 
+//----------------------------------
+// PROTOTYPE (architecture-foundation experiment): shadow incremental
+// piece-square-table state. King excluded on purpose -- its table
+// contribution is phase-interpolated (see evaluation.js
+// evaluatePieceSquares()), so it depends on the game phase, not just
+// the king's own square, and is deliberately left out of this narrow
+// prototype's scope. Mirrors exactly the sign/orientation convention
+// already used by evaluatePieceSquares() for the five non-king piece
+// types -- this is NOT a redesign of the table values, only a
+// mechanism to maintain their running sum incrementally instead of
+// rescanning every piece list on every evaluate() call.
+//----------------------------------
+import {
+    PawnTable, KnightTable, BishopTable, RookTable, QueenTable, mirror
+} from "../engine/pst.js";
+
+function pstDeltaForPiece(square, piece) {
+    switch (piece) {
+        case Piece.WP: return PawnTable[square];
+        case Piece.BP: return -PawnTable[mirror(square)];
+        case Piece.WN: return KnightTable[mirror(square)];
+        case Piece.BN: return -KnightTable[square];
+        case Piece.WB: return BishopTable[mirror(square)];
+        case Piece.BB: return -BishopTable[square];
+        case Piece.WR: return RookTable[mirror(square)];
+        case Piece.BR: return -RookTable[square];
+        case Piece.WQ: return QueenTable[mirror(square)];
+        case Piece.BQ: return -QueenTable[square];
+        default: return 0; // king (and EMPTY) intentionally excluded
+    }
+}
+
 function insertSquareSorted(list, square) {
 
     let index = list.length;
@@ -61,6 +93,12 @@ export default class Board {
 
         this.whiteMaterial = 0;
         this.blackMaterial = 0;
+
+        // PROTOTYPE: incremental non-king PST running total, White-relative
+        // sign (see pstDeltaForPiece() above). Maintained in addPiece()/
+        // removePiece(), so make/undo repair it automatically the same way
+        // piece lists already are -- no separate snapshot/restore needed.
+        this.pstScore = 0;
 
         this.whitePieces = {};
         this.blackPieces = {};
@@ -208,6 +246,8 @@ export default class Board {
         this.whiteMaterial = 0;
         this.blackMaterial = 0;
 
+        this.pstScore = 0;
+
         this.whitePieces = {};
         this.blackPieces = {};
 
@@ -251,9 +291,13 @@ export default class Board {
         this.whiteMaterial = 0;
         this.blackMaterial = 0;
 
+        this.pstScore = 0;
+
         for (let square = 0; square < 64; square++) {
 
             const piece = this.squares[square];
+
+            this.pstScore += pstDeltaForPiece(square, piece);
 
             switch (piece) {
 
@@ -331,6 +375,8 @@ export default class Board {
 
         // Place piece on board
         this.squares[square] = piece;
+
+        this.pstScore += pstDeltaForPiece(square, piece);
 
         const list = piece > 0 ? this.whitePieces : this.blackPieces;
 
@@ -468,6 +514,8 @@ export default class Board {
 
         }
 
+        this.pstScore -= pstDeltaForPiece(square, piece);
+
         const list = piece > 0
             ? this.whitePieces
             : this.blackPieces;
@@ -586,8 +634,10 @@ export default class Board {
         this.whiteMaterial = 0;
         this.blackMaterial = 0;
 
-    }   
-    
+        this.pstScore = 0;
+
+    }
+
     resetGameState() {
 
         this.castlingRights = {
@@ -1818,8 +1868,30 @@ export default class Board {
 
         );
 
-    }  
-    
+    }
+
+    //----------------------------------
+    // PROTOTYPE: shadow-state parity check for the incremental
+    // non-king PST total. Recomputes the same sum from scratch (a
+    // fresh scan, using the identical sign/mirror convention as
+    // evaluatePieceSquares()'s non-king terms) and compares it to
+    // this.pstScore. Returns the recomputed value; callers compare
+    // against this.pstScore themselves so a mismatch can be reported
+    // with full context (used by the differential test harness, not
+    // by the engine itself).
+    //----------------------------------
+    recomputeNonKingPstScore() {
+
+        let score = 0;
+
+        for (let square = 0; square < 64; square++) {
+            score += pstDeltaForPiece(square, this.squares[square]);
+        }
+
+        return score;
+
+    }
+
     verify() {
 
         const counts = {

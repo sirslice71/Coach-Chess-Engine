@@ -49,6 +49,15 @@ const BISHOP_MOBILITY_DIRECTIONS = [
 
 export default class Evaluation {
 
+    // PROTOTYPE (architecture-foundation experiment): when true,
+    // evaluatePieceSquares() consumes the incrementally-maintained
+    // board.pstScore for the five non-king piece types instead of
+    // rescanning every piece list. Default false -- identical to the
+    // unmodified engine. The king's phase-interpolated term is always
+    // computed exactly as before (it is out of scope for this
+    // prototype; see board.js's pstDeltaForPiece()).
+    static USE_INCREMENTAL_PST = false;
+
     constructor(board) {
 
         this.board = board;
@@ -916,6 +925,10 @@ export default class Evaluation {
 
     evaluatePieceSquares() {
 
+        if (Evaluation.USE_INCREMENTAL_PST) {
+            return this.evaluatePieceSquaresIncremental();
+        }
+
         let score = 0;
 
         //----------------------------------
@@ -1062,6 +1075,53 @@ export default class Evaluation {
 
             / 24
 
+        );
+
+        return score;
+
+    }
+
+    //----------------------------------
+    // PROTOTYPE (architecture-foundation experiment): identical output
+    // to evaluatePieceSquares() above, but the five non-king piece
+    // types come from the incrementally-maintained board.pstScore
+    // (see core/board.js) instead of a fresh scan of every piece list.
+    // The king's phase-interpolated term is computed exactly as in the
+    // original method -- byte-for-byte the same lines, since the king
+    // is out of scope for this narrow prototype.
+    //----------------------------------
+    evaluatePieceSquaresIncremental() {
+
+        let score = this.board.pstScore;
+
+        const phase = this.gamePhase();
+
+        const whiteMG =
+            KingMiddleGameTable[
+                mirror(this.board.whiteKing)
+            ];
+
+        const blackMG =
+            KingMiddleGameTable[
+                this.board.blackKing
+            ];
+
+        const whiteEG =
+            KingEndGameTable[
+                mirror(this.board.whiteKing)
+            ];
+
+        const blackEG =
+            KingEndGameTable[
+                this.board.blackKing
+            ];
+
+        score += Math.round(
+            (whiteMG * phase + whiteEG * (24 - phase)) / 24
+        );
+
+        score -= Math.round(
+            (blackMG * phase + blackEG * (24 - phase)) / 24
         );
 
         return score;
