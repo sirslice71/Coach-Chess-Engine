@@ -87,3 +87,46 @@ test("overnight Benchmark dry-run prints commands without launching engines", as
     }
 
 });
+
+test("overnight Benchmark dry-run passes explicit short profile", async () => {
+
+    const dir =
+        await mkdtemp(join(tmpdir(), "coach-overnight-profile-dryrun-"));
+
+    try {
+        const result =
+            spawnSync(
+                "powershell",
+                [
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    "scripts/run-coach-overnight.ps1",
+                    "-Mode",
+                    "Benchmark",
+                    "-CandidatePath",
+                    "C:\\Candidate",
+                    "-ResultDirectory",
+                    dir,
+                    "-BenchmarkProfile",
+                    "stability-short",
+                    "-Force",
+                    "-DryRun"
+                ],
+                {
+                    cwd: new URL("..", import.meta.url),
+                    encoding: "utf8"
+                }
+            );
+
+        assert.equal(result.status, 0, result.stderr || result.stdout);
+        assert.match(result.stdout, /DRYRUN benchmark-control: .*--profile stability-short/);
+        assert.match(result.stdout, /DRYRUN benchmark-candidate-1: .*--profile stability-short/);
+        assert.match(result.stdout, /DRYRUN benchmark-candidate-2: .*--profile stability-short/);
+    }
+    finally {
+        await rm(dir, { recursive: true, force: true });
+    }
+
+});

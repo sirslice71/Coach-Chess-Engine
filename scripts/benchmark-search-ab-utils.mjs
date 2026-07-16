@@ -2,6 +2,14 @@ import { readFile } from "node:fs/promises";
 
 export const DEFAULT_CONTROL_THRESHOLD = 0.005;
 export const DEFAULT_CANDIDATE_THRESHOLD = -0.01;
+export const DEFAULT_PROFILE = "full";
+export const STABILITY_SHORT_PROFILE = "stability-short";
+export const STABILITY_SHORT_POSITION_IDS = [
+    "quiet-open",
+    "tactical-capture",
+    "high-branching",
+    "promotion-race"
+];
 
 export function createPrng(seed) {
 
@@ -80,6 +88,96 @@ export function generatePairedOrder(pairs, seed = 1) {
     }
 
     return order;
+
+}
+
+export function generateAbbaOrder(groups, seed = 1, positionIndex = 0) {
+
+    if (!Number.isInteger(groups) || groups < 1) {
+        throw new Error("--groups must be a positive integer.");
+    }
+
+    const random =
+        createPrng((Number(seed) + positionIndex) >>> 0);
+
+    const baselineFirst =
+        (random() < 0.5) !== (positionIndex % 2 === 1);
+
+    const first =
+        baselineFirst
+            ? ["baseline", "candidate", "candidate", "baseline"]
+            : ["candidate", "baseline", "baseline", "candidate"];
+
+    const second =
+        baselineFirst
+            ? ["candidate", "baseline", "baseline", "candidate"]
+            : ["baseline", "candidate", "candidate", "baseline"];
+
+    const order = [];
+
+    for (let index = 0; index < groups; index += 1) {
+        order.push(...(index % 2 === 0 ? first : second));
+    }
+
+    return order;
+
+}
+
+export function resolveBenchmarkProfile(args = {}) {
+
+    const profile =
+        args.profile || DEFAULT_PROFILE;
+
+    switch (profile) {
+        case DEFAULT_PROFILE:
+            return {
+                name: DEFAULT_PROFILE,
+                warmups: args.warmups ?? 5,
+                pairs: args.pairs ?? 10,
+                groups: null,
+                positionIds: null,
+                aggregation: "median-ratio",
+                order: "abba-pairs"
+            };
+
+        case STABILITY_SHORT_PROFILE:
+            return {
+                name: STABILITY_SHORT_PROFILE,
+                warmups: args.warmups ?? 2,
+                pairs: null,
+                groups: args.groups ?? 16,
+                positionIds: STABILITY_SHORT_POSITION_IDS,
+                aggregation: "paired-log-ratio",
+                order: "abba-groups"
+            };
+
+        default:
+            throw new Error(
+                `Unknown benchmark profile "${profile}". Use full or stability-short.`
+            );
+    }
+
+}
+
+export function selectProfilePositions(positions, profile) {
+
+    if (!profile.positionIds) {
+        return positions;
+    }
+
+    const byId =
+        new Map(positions.map(position => [position.id, position]));
+
+    return profile.positionIds.map(id => {
+        const position =
+            byId.get(id);
+
+        if (!position) {
+            throw new Error(`Profile ${profile.name} requires missing position "${id}".`);
+        }
+
+        return position;
+    });
 
 }
 
@@ -295,6 +393,108 @@ export function summarizePosition(position, samples, exact = true) {
 
 }
 
+export function summarizePositionWithProfile(
+    position,
+    samples,
+    options = {}
+) {
+
+    const exact =
+        options.exact !== false;
+
+    const profile =
+        options.profile || { aggregation: "median-ratio" };
+
+    const summary =
+        summarizePosition(position, samples, exact);
+
+    if (profile.aggregation !== "paired-log-ratio") {
+        return summary;
+    }
+
+    const groups =
+        pairedLogRatioGroups(samples);
+
+    if (groups.length > 0) {
+        const medianLogRatio =
+            median(groups.map(group => group.logRatio));
+
+        summary.paired = {
+            groups,
+            medianLogRatio,
+            ratio: Math.exp(medianLogRatio),
+            percentChange: percentChangeFromRatio(Math.exp(medianLogRatio))
+        };
+        summary.ratio = summary.paired.ratio;
+        summary.percentChange = summary.paired.percentChange;
+    }
+
+    return summary;
+
+}
+
+export function pairedLogRatioGroups(samples) {
+
+    const byGroup =
+        new Map();
+
+    for (const sample of samples) {
+        const groupIndex =
+            sample.groupIndex ?? sample.pairIndex;
+
+        if (groupIndex === null || groupIndex === undefined) {
+            continue;
+        }
+
+        if (!byGroup.has(groupIndex)) {
+            byGroup.set(groupIndex, []);
+        }
+
+        byGroup.get(groupIndex).push(sample);
+    }
+
+    const groups = [];
+
+    for (const [groupIndex, groupSamples] of byGroup) {
+        const baseline =
+            groupSamples
+                .filter(sample => sample.label === "baseline")
+                .map(sample => sample.elapsedMs);
+
+        const candidate =
+            groupSamples
+                .filter(sample => sample.label === "candidate")
+                .map(sample => sample.elapsedMs);
+
+        if (baseline.length < 1 || candidate.length < 1) {
+            continue;
+        }
+
+        const baselineLogMean =
+            arithmeticMean(baseline.map(value => Math.log(value)));
+
+        const candidateLogMean =
+            arithmeticMean(candidate.map(value => Math.log(value)));
+
+        const logRatio =
+            candidateLogMean - baselineLogMean;
+
+        groups.push({
+            groupIndex,
+            baselineCount: baseline.length,
+            candidateCount: candidate.length,
+            baselineGeomeanMs: Math.exp(baselineLogMean),
+            candidateGeomeanMs: Math.exp(candidateLogMean),
+            logRatio,
+            ratio: Math.exp(logRatio),
+            percentChange: percentChangeFromRatio(Math.exp(logRatio))
+        });
+    }
+
+    return groups.sort((left, right) => left.groupIndex - right.groupIndex);
+
+}
+
 export function summarizeRun(positions, samplesByPosition, options = {}) {
 
     const exact =
@@ -302,10 +502,13 @@ export function summarizeRun(positions, samplesByPosition, options = {}) {
 
     const positionsSummary =
         positions.map(position =>
-            summarizePosition(
+            summarizePositionWithProfile(
                 position,
                 samplesByPosition.get(position.id) || [],
-                exact
+                {
+                    exact,
+                    profile: options.profile
+                }
             )
         );
 
@@ -423,6 +626,9 @@ export function serializeSummaryCsv(summary) {
         "candidateMedianMs",
         "ratio",
         "percentChange",
+        "aggregation",
+        "pairedGroups",
+        "pairedMedianLogRatio",
         "baselineCv",
         "candidateCv",
         "identityOk"
@@ -437,6 +643,9 @@ export function serializeSummaryCsv(summary) {
             position.candidate.median,
             position.ratio,
             position.percentChange,
+            position.paired ? "paired-log-ratio" : "median-ratio",
+            position.paired?.groups?.length ?? "",
+            position.paired?.medianLogRatio ?? "",
             position.baseline.coefficientOfVariation,
             position.candidate.coefficientOfVariation,
             position.identityOk
@@ -475,6 +684,8 @@ export function makeRunConfig(args, corpusPositions) {
         warmups: args.warmups,
         pairs: args.pairs,
         exact: args.exact,
+        profile: args.profile || DEFAULT_PROFILE,
+        groups: args.groups ?? null,
         positionIds: corpusPositions.map(position => position.id),
         corpusFingerprint: corpusFingerprint(corpusPositions),
         buildIdentity: args.buildIdentity || null

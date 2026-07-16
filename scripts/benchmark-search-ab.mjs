@@ -20,12 +20,16 @@ import {
     checkResumeCompatibility,
     classifyCandidate,
     classifyControl,
+    DEFAULT_PROFILE,
+    generateAbbaOrder,
     generatePairedOrder,
     hasSample,
     loadCorpus,
     makeRunConfig,
     mapToSamples,
+    resolveBenchmarkProfile,
     samplesToMap,
+    selectProfilePositions,
     selectCorpus,
     serializeSummaryCsv,
     summarizeRun
@@ -37,11 +41,14 @@ const DEFAULT_CORPUS_PATH =
 function parseArgs(argv) {
 
     const args = {
-        warmups: 5,
-        pairs: 10,
+        profile: DEFAULT_PROFILE,
+        warmups: null,
+        pairs: null,
+        groups: null,
         corpus: "primary",
         seed: 0x51ab2026,
         timeoutMs: 0,
+        maxRunMs: 45 * 60 * 1000,
         exact: true,
         control: false
     };
@@ -63,11 +70,17 @@ function parseArgs(argv) {
             case "--corpus":
                 args.corpus = value();
                 break;
+            case "--profile":
+                args.profile = value();
+                break;
             case "--warmups":
                 args.warmups = parseInteger(value(), "--warmups");
                 break;
             case "--pairs":
                 args.pairs = parseInteger(value(), "--pairs");
+                break;
+            case "--groups":
+                args.groups = parseInteger(value(), "--groups");
                 break;
             case "--seed":
                 args.seed = parseSeed(value());
@@ -75,6 +88,9 @@ function parseArgs(argv) {
             case "--timeout":
             case "--timeout-ms":
                 args.timeoutMs = parseInteger(value(), "--timeout");
+                break;
+            case "--max-run-ms":
+                args.maxRunMs = parseInteger(value(), "--max-run-ms");
                 break;
             case "--json":
                 args.json = resolve(value());
@@ -146,9 +162,11 @@ function printHelp() {
 
 Options:
   --control                  Mark this as an identical-build control.
+  --profile full|stability-short
   --corpus primary|diagnostic|all
   --warmups <n>              Position-specific warmups per label (default 5).
   --pairs <n>                Measured AB/BA pairs per position (default 10).
+  --groups <n>               ABBA groups for stability-short (default 16).
   --seed <n|0x...>           Deterministic pairing seed.
   --json <path>              Write full JSON report.
   --csv <path>               Write per-position CSV summary.
@@ -157,6 +175,7 @@ Options:
   --non-exact                Report identity mismatches but exit zero for them.
   --priority above-normal|normal
   --affinity <hex mask>      Best-effort temporary affinity for this Node process.
+  --max-run-ms <n>           Stop after this wall-clock budget and preserve partial JSON.
 `);
 
 }
@@ -382,6 +401,14 @@ async function main() {
     const positions =
         selectCorpus(corpus, args.corpus);
 
+    const profile =
+        resolveBenchmarkProfile(args);
+
+    args.profile = profile.name;
+    args.warmups = profile.warmups;
+    args.pairs = profile.pairs;
+    args.groups = profile.groups;
+
     const buildIdentity = {
         baseline: await gitMetadata(args.baseline),
         candidate: await gitMetadata(args.candidate)
@@ -390,7 +417,7 @@ async function main() {
     args.buildIdentity = buildIdentity;
 
     const config =
-        makeRunConfig(args, positions);
+        makeRunConfig(args, selectProfilePositions(positions, profile));
 
     const checkpoint =
         await readCheckpoint(args.checkpoint);
@@ -421,15 +448,27 @@ async function main() {
         candidate
     };
 
-    const order =
-        generatePairedOrder(args.pairs, args.seed);
+    const benchmarkPositions =
+        selectProfilePositions(positions, profile);
+
+    const startedAt =
+        performance.now();
+
+    let timedOut =
+        false;
 
     console.log("Coach search A/B benchmark");
     console.log(`baseline:  ${args.baseline}`);
     console.log(`candidate: ${args.candidate}`);
-    console.log(`corpus:    ${args.corpus} (${positions.length} position(s))`);
+    console.log(`corpus:    ${args.corpus} (${benchmarkPositions.length} position(s))`);
+    console.log(`profile:   ${profile.name}`);
     console.log(`warmups:   ${args.warmups}`);
-    console.log(`pairs:     ${args.pairs}`);
+    if (profile.groups) {
+        console.log(`groups:    ${profile.groups}`);
+    }
+    else {
+        console.log(`pairs:     ${args.pairs}`);
+    }
     console.log(`seed:      ${args.seed}`);
 
     if (args.control) {
@@ -444,7 +483,10 @@ async function main() {
         console.log(`${item.option}: ${item.requested} -> ${item.result}`);
     }
 
-    for (const position of positions) {
+    for (let positionIndex = 0; positionIndex < benchmarkPositions.length; positionIndex += 1) {
+        const position =
+            benchmarkPositions[positionIndex];
+
         if (!samplesByPosition.has(position.id)) {
             samplesByPosition.set(position.id, []);
         }
@@ -459,9 +501,19 @@ async function main() {
             }
         }
 
+        const order =
+            profile.order === "abba-groups"
+                ? generateAbbaOrder(profile.groups, args.seed, positionIndex)
+                : generatePairedOrder(args.pairs, args.seed);
+
         for (let index = 0; index < order.length; index += 1) {
             if (hasSample(samplesByPosition, position.id, index)) {
                 continue;
+            }
+
+            if (args.maxRunMs > 0 && performance.now() - startedAt > args.maxRunMs) {
+                timedOut = true;
+                break;
             }
 
             const label =
@@ -484,6 +536,13 @@ async function main() {
                 positionId: position.id,
                 sampleIndex: index,
                 pairIndex: Math.floor(index / 2),
+                groupIndex: profile.order === "abba-groups"
+                    ? Math.floor(index / 4)
+                    : Math.floor(index / 2),
+                orderWithinGroup: profile.order === "abba-groups"
+                    ? index % 4
+                    : index % 2,
+                profile: profile.name,
                 label,
                 heapBefore,
                 heapAfter,
@@ -502,7 +561,10 @@ async function main() {
         }
 
         const partial =
-            summarizeRun([position], samplesByPosition, { exact: args.exact });
+            summarizeRun([position], samplesByPosition, {
+                exact: args.exact,
+                profile
+            });
 
         const row =
             partial.positions[0];
@@ -513,10 +575,17 @@ async function main() {
             `${formatTimingDifference(row.percentChange)} ` +
             `identity=${row.identityOk ? "ok" : "mismatch"}`
         );
+
+        if (timedOut) {
+            break;
+        }
     }
 
     const summary =
-        summarizeRun(positions, samplesByPosition, { exact: args.exact });
+        summarizeRun(benchmarkPositions, samplesByPosition, {
+            exact: args.exact,
+            profile
+        });
 
     const environment =
         await environmentMetadata(args);
@@ -535,6 +604,12 @@ async function main() {
         },
         environment,
         tuning,
+        profile,
+        timeout: {
+            maxRunMs: args.maxRunMs,
+            timedOut,
+            elapsedMs: performance.now() - startedAt
+        },
         summary,
         samples: mapToSamples(samplesByPosition)
     };
@@ -571,6 +646,10 @@ async function main() {
 
     if (args.csv) {
         await writeCsv(args.csv, serializeSummaryCsv(summary));
+    }
+
+    if (timedOut) {
+        return 4;
     }
 
     if (args.exact && !summary.identityOk) {

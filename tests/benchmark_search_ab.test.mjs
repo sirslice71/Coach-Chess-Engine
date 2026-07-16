@@ -1,6 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import {
+    mkdtemp,
+    readFile,
+    rm,
+    writeFile
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import {
     checkResumeCompatibility,
@@ -8,18 +16,23 @@ import {
     classifyControl,
     coefficientOfVariation,
     compareIdentity,
+    generateAbbaOrder,
     generatePairedOrder,
     geometricMean,
     hasSample,
     loadCorpus,
     makeRunConfig,
     median,
+    pairedLogRatioGroups,
     percentChangeFromRatio,
     ratio,
+    resolveBenchmarkProfile,
     samplesToMap,
+    selectProfilePositions,
     selectCorpus,
     serializeSummaryCsv,
     standardDeviation,
+    STABILITY_SHORT_POSITION_IDS,
     summarizeRun
 } from "../scripts/benchmark-search-ab-utils.mjs";
 
@@ -110,6 +123,74 @@ test("AB/BA order generation is paired and seeded", () => {
     );
 
     assert.throws(() => generatePairedOrder(0), /positive integer/);
+
+});
+
+test("stability-short profile is explicit and deterministic", () => {
+
+    const full =
+        resolveBenchmarkProfile({});
+
+    assert.equal(full.name, "full");
+    assert.equal(full.warmups, 5);
+    assert.equal(full.pairs, 10);
+
+    const short =
+        resolveBenchmarkProfile({ profile: "stability-short" });
+
+    assert.equal(short.name, "stability-short");
+    assert.equal(short.warmups, 2);
+    assert.equal(short.groups, 16);
+    assert.deepEqual(short.positionIds, STABILITY_SHORT_POSITION_IDS);
+
+    const positions =
+        selectProfilePositions(selectCorpus(corpus, "primary"), short);
+
+    assert.deepEqual(
+        positions.map(position => position.id),
+        [
+            "quiet-open",
+            "tactical-capture",
+            "high-branching",
+            "promotion-race"
+        ]
+    );
+
+    assert.throws(
+        () => resolveBenchmarkProfile({ profile: "mystery" }),
+        /Unknown benchmark profile/
+    );
+
+});
+
+test("ABBA order rotates deterministically across positions", () => {
+
+    const first =
+        generateAbbaOrder(3, 260716, 0);
+
+    const second =
+        generateAbbaOrder(3, 260716, 0);
+
+    const rotated =
+        generateAbbaOrder(3, 260716, 1);
+
+    assert.deepEqual(first, second);
+    assert.equal(first.length, 12);
+
+    for (let index = 0; index < first.length; index += 4) {
+        assert.deepEqual(
+            new Set(first.slice(index, index + 4)),
+            new Set(["baseline", "candidate"])
+        );
+        assert.equal(
+            first.slice(index, index + 4).filter(label => label === "baseline").length,
+            2
+        );
+    }
+
+    assert.notDeepEqual(first.slice(0, 4), first.slice(4, 8));
+    assert.notDeepEqual(first, rotated);
+    assert.throws(() => generateAbbaOrder(0), /positive integer/);
 
 });
 
@@ -205,6 +286,46 @@ test("summarizeRun computes ratios and mismatch state from mocked samples", () =
 
 });
 
+test("paired log-ratio aggregation preserves raw timing sign", () => {
+
+    const positions = [
+        {
+            id: "x",
+            description: "mock",
+            classification: "primary",
+            depth: 4
+        }
+    ];
+
+    const samples =
+        samplesToMap([
+            sample("x", 0, "baseline", 100, { groupIndex: 0 }),
+            sample("x", 1, "candidate", 90, { groupIndex: 0 }),
+            sample("x", 2, "candidate", 90, { groupIndex: 0 }),
+            sample("x", 3, "baseline", 100, { groupIndex: 0 }),
+            sample("x", 4, "candidate", 110, { groupIndex: 1 }),
+            sample("x", 5, "baseline", 100, { groupIndex: 1 }),
+            sample("x", 6, "baseline", 100, { groupIndex: 1 }),
+            sample("x", 7, "candidate", 110, { groupIndex: 1 })
+        ]);
+
+    const groups =
+        pairedLogRatioGroups(samples.get("x"));
+
+    assert.equal(groups.length, 2);
+    assert.ok(groups[0].percentChange < 0);
+    assert.ok(groups[1].percentChange > 0);
+
+    const summary =
+        summarizeRun(positions, samples, {
+            profile: { aggregation: "paired-log-ratio" }
+        });
+
+    assert.ok(Math.abs(summary.positions[0].paired.medianLogRatio) < 0.006);
+    assert.ok(Math.abs(summary.aggregates.primary.geomeanPercent) < 0.6);
+
+});
+
 test("control and candidate threshold classification are explicit", () => {
 
     assert.equal(
@@ -250,7 +371,8 @@ test("CSV serialization includes per-position summary rows", () => {
         serializeSummaryCsv(summary);
 
     assert.match(csv, /id,classification,depth/);
-    assert.match(csv, /x,primary,4,100,99,0.99,-1,0.1,0.2,true/);
+    assert.match(csv, /aggregation,pairedGroups,pairedMedianLogRatio/);
+    assert.match(csv, /x,primary,4,100,99,0.99,-1,median-ratio,,,0.1,0.2,true/);
 
 });
 
@@ -333,5 +455,76 @@ test("malformed command-line input exits non-zero without running searches", () 
 
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /Unknown argument/);
+
+});
+
+test("benchmark timeout preserves partial JSON output", async () => {
+
+    const dir =
+        await mkdtemp(join(tmpdir(), "coach-benchmark-timeout-"));
+
+    try {
+        const corpusPath =
+            join(dir, "corpus.json");
+
+        const jsonPath =
+            join(dir, "partial.json");
+
+        await writeFile(
+            corpusPath,
+            JSON.stringify({
+                schemaVersion: 1,
+                positions: [
+                    {
+                        id: "tiny",
+                        description: "tiny timeout fixture",
+                        classification: "primary",
+                        fen: "8/8/8/8/8/8/4K3/4k3 w - - 0 1",
+                        depth: 1
+                    }
+                ]
+            })
+        );
+
+        const result =
+            spawnSync(
+                process.execPath,
+                [
+                    "scripts/benchmark-search-ab.mjs",
+                    "--baseline",
+                    ".",
+                    "--candidate",
+                    ".",
+                    "--control",
+                    "--corpus-file",
+                    corpusPath,
+                    "--warmups",
+                    "0",
+                    "--pairs",
+                    "20",
+                    "--max-run-ms",
+                    "1",
+                    "--json",
+                    jsonPath
+                ],
+                {
+                    cwd: new URL("..", import.meta.url),
+                    encoding: "utf8"
+                }
+            );
+
+        assert.equal(result.status, 4, result.stderr || result.stdout);
+
+        const report =
+            JSON.parse(await readFile(jsonPath, "utf8"));
+
+        assert.equal(report.timeout.timedOut, true);
+        assert.equal(report.timeout.maxRunMs, 1);
+        assert.equal(report.profile.name, "full");
+        assert.ok(report.samples.length < 40);
+    }
+    finally {
+        await rm(dir, { recursive: true, force: true });
+    }
 
 });

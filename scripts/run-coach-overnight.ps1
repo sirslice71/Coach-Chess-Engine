@@ -19,6 +19,8 @@ param(
     [string]$BaselinePath = (Resolve-Path ".").Path,
     [string]$CandidatePath = "",
     [string]$ResultDirectory = "",
+    [ValidateSet("full", "stability-short")]
+    [string]$BenchmarkProfile = "full",
     [int]$ControlSeed = 26071521,
     [int[]]$CandidateSeeds = @(26071522, 26071523),
     [int]$CandidateRuns = 2,
@@ -423,6 +425,9 @@ function Invoke-CoachBenchmarkPipeline {
         "--json", $controlJson,
         "--csv", $controlCsv
     )
+    if ($BenchmarkProfile -ne "full") {
+        $controlArgs += @("--profile", $BenchmarkProfile)
+    }
     if ($Resume -and (Test-CoachCompletedJson -Path $controlJson)) {
         Write-CoachLog -ResultDirectory $ResultDirectory -Message "RESUME benchmark-control: reusing $controlJson"
     }
@@ -444,6 +449,9 @@ function Invoke-CoachBenchmarkPipeline {
             "--json", $json,
             "--csv", $csv
         )
+        if ($BenchmarkProfile -ne "full") {
+            $candidateArgs += @("--profile", $BenchmarkProfile)
+        }
         if ($Resume -and (Test-CoachCompletedJson -Path $json)) {
             Write-CoachLog -ResultDirectory $ResultDirectory -Message "RESUME benchmark-candidate-$($i + 1): reusing $json"
         }

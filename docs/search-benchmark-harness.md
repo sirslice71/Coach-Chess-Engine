@@ -41,6 +41,27 @@ Defaults:
 - candidate/baseline ratio per position
 - primary-subset geomean across position ratios
 
+The default profile is named `full`. A shorter opt-in profile is available for
+control-stability studies:
+
+```powershell
+node .\scripts\benchmark-search-ab.mjs `
+    --baseline "C:\path\baseline" `
+    --candidate "C:\path\baseline" `
+    --control `
+    --profile stability-short
+```
+
+`stability-short` uses four representative primary positions
+(`quiet-open`, `tactical-capture`, `high-branching`, and `promotion-race`), two
+warmups per label, and 16 ABBA/BAAB measured groups per position. The seed
+chooses the first group orientation and the profile rotates orientation by
+position. Aggregation uses per-group paired log-ratios, each position's median
+paired result, and then the usual primary geomean. Raw timing and speed-gain
+sign conventions are unchanged. The profile is intended to validate whether the
+machine/session is stable enough for timing work without silently replacing the
+full protocol.
+
 Ratios are `candidate median / baseline median`. The raw timing difference is
 `(candidate time / baseline time - 1) * 100`. Negative raw timing differences
 mean the candidate was faster; positive raw timing differences mean it was
