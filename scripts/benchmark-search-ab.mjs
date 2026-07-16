@@ -509,7 +509,8 @@ async function main() {
 
         console.log(
             `${position.id.padEnd(20)} ` +
-            `${row.percentChange.toFixed(3).padStart(8)}% ` +
+            `${args.control ? "control" : "candidate"} ` +
+            `${formatTimingDifference(row.percentChange)} ` +
             `identity=${row.identityOk ? "ok" : "mismatch"}`
         );
     }
@@ -544,11 +545,17 @@ async function main() {
             : { candidate: classifyCandidate(summary.aggregates.primary) };
 
     console.log("");
+    const label =
+        args.control ? "control" : "candidate";
+
     console.log(
-        `primary geomean: ${formatPercent(summary.aggregates.primary.geomeanPercent)}`
+        `${label} timing difference: ${formatTimingDifference(summary.aggregates.primary.geomeanPercent)}`
     );
     console.log(
-        `primary median:  ${formatPercent(summary.aggregates.primary.medianPercent)}`
+        `${label} median timing difference: ${formatTimingDifference(summary.aggregates.primary.medianPercent)}`
+    );
+    console.log(
+        `${label} speed gain: ${formatSpeedGain(summary.aggregates.primary.geomeanPercent)}`
     );
 
     if (args.control) {
@@ -583,6 +590,37 @@ function formatPercent(value) {
     return Number.isFinite(value)
         ? `${value.toFixed(3)}%`
         : "unavailable";
+
+}
+
+function formatTimingDifference(value) {
+
+    if (!Number.isFinite(value)) {
+        return "unavailable";
+    }
+
+    if (value < 0) {
+        return `${Math.abs(value).toFixed(3)}% faster`;
+    }
+
+    if (value > 0) {
+        return `${value.toFixed(3)}% slower`;
+    }
+
+    return "0.000% neutral";
+
+}
+
+function formatSpeedGain(timingDifferencePercent) {
+
+    if (!Number.isFinite(timingDifferencePercent)) {
+        return "unavailable";
+    }
+
+    const speedGain =
+        -timingDifferencePercent;
+
+    return `${speedGain >= 0 ? "+" : ""}${speedGain.toFixed(3)}%`;
 
 }
 

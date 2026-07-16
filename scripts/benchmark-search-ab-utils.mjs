@@ -398,11 +398,17 @@ export function classifyCandidate(
 
     return {
         ok: percent <= threshold * 100,
-        status: percent <= threshold * 100 ? "candidate-faster" : "insufficient",
+        status: percent <= threshold * 100
+            ? "candidate run: promising; confirmation required"
+            : percent < 0
+                ? "candidate run: inconclusive"
+                : "candidate run: negative",
         threshold,
         message: percent <= threshold * 100
-            ? "Candidate exceeds the configured improvement threshold."
-            : "Candidate does not exceed the configured improvement threshold."
+            ? "Single run exceeds the configured improvement threshold, but protocol acceptance requires independent confirmation."
+            : percent < 0
+                ? "Single run is faster but does not meet the configured single-run improvement threshold."
+                : "Single run is not faster than the baseline."
     };
 
 }

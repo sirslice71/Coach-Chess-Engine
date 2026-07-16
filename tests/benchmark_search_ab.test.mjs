@@ -224,7 +224,7 @@ test("control and candidate threshold classification are explicit", () => {
 
     assert.equal(
         classifyCandidate({ geomeanPercent: -0.4 }).status,
-        "insufficient"
+        "candidate run: inconclusive"
     );
 
 });
