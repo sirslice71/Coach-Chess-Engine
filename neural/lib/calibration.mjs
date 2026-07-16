@@ -179,9 +179,27 @@ export function fitBoundedOpeningIntercept(phaseAffineParams, openingRows, { lo 
     return { ...phaseAffineParams, opening: { a, b: best.b } };
 }
 
-// ---- Candidate C: shrink the opening intercept by a fixed factor (0 = A, 1 = original) ----
+// ---- Candidate C variant: shrink the opening intercept by a fixed factor (0 = A, 1 = original) ----
 export function shrinkOpeningIntercept(phaseAffineParams, factor) {
     return { ...phaseAffineParams, opening: { a: phaseAffineParams.opening.a, b: phaseAffineParams.opening.b * factor } };
+}
+
+// ---- Candidate C: clamp the opening intercept to a fixed +/-bound (a
+// direct clamp of the already-fitted value, NOT a validation-selected grid
+// search -- distinct from fitBoundedOpeningIntercept above). ----
+export function clampOpeningIntercept(phaseAffineParams, bound) {
+    const b = Math.max(-bound, Math.min(bound, phaseAffineParams.opening.b));
+    return { ...phaseAffineParams, opening: { a: phaseAffineParams.opening.a, b } };
+}
+
+// ---- Candidate D: opening-only slope fit, intercept forced to 0, while
+// middlegame/endgame keep their ORIGINAL two-parameter fit unchanged
+// (distinct from fitPhaseSlopeOnly below, which zeroes every phase). ----
+export function fitOpeningSlopeOnlyKeepOthers(phaseAffineParams, openingRows) {
+    let num = 0, den = 0;
+    for (const r of openingRows) { num += r.cp * r.sf; den += r.cp * r.cp; }
+    const a = den ? num / den : 1;
+    return { ...phaseAffineParams, opening: { a, b: 0 } };
 }
 
 // ---- Candidate D: slope-only phase calibration (intercept forced to 0 in

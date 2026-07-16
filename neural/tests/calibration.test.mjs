@@ -15,6 +15,7 @@ import {
     DEFAULT_KNOTS, TRANSFORMS, PHASES,
     zeroOpeningIntercept, fitBoundedOpeningIntercept, shrinkOpeningIntercept,
     fitPhaseSlopeOnly, fitPhaseAffineRegularized, applyPhaseAffineBlended,
+    clampOpeningIntercept, fitOpeningSlopeOnlyKeepOthers,
 } from "../lib/calibration.mjs";
 
 const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol;
@@ -218,4 +219,47 @@ test("all constrained variants remain monotonic (non-negative fitted slope) on w
         fitPhaseAffineRegularized(rows, 0.1),
     ];
     for (const v of variants) for (const phase of PHASES) assert.ok(v[phase].a >= 0, phase + " slope must stay non-negative");
+});
+
+//======================================================
+// Candidate C (fixed clamp) and Candidate D (opening-only slope, other
+// phases untouched) -- the two additional constrained variants used by
+// the "constrain opening-phase calibration" follow-up study.
+//======================================================
+
+test("Candidate C (clamp): a fitted intercept inside the bound passes through unchanged", () => {
+    const rows = mixedPhaseRows();
+    const original = fitPhaseAffine(rows);
+    const c = clampOpeningIntercept(original, 1000); // bound far larger than any fitted intercept
+    assert.equal(c.opening.b, original.opening.b);
+    assert.equal(c.opening.a, original.opening.a);
+});
+
+test("Candidate C (clamp): an out-of-range intercept is clamped to the nearer bound, slope untouched", () => {
+    const original = { opening: { a: 0.14, b: 32 }, middlegame: { a: 1, b: -10 }, endgame: { a: 1.2, b: 1 } };
+    const clamped25 = clampOpeningIntercept(original, 25);
+    assert.equal(clamped25.opening.b, 25);
+    assert.equal(clamped25.opening.a, 0.14);
+    const clampedNeg = clampOpeningIntercept({ ...original, opening: { a: 0.14, b: -40 } }, 25);
+    assert.equal(clampedNeg.opening.b, -25);
+    assert.deepEqual(clamped25.middlegame, original.middlegame);
+    assert.deepEqual(clamped25.endgame, original.endgame);
+});
+
+test("Candidate D (opening-only slope): intercept forced to 0 in opening only; middlegame/endgame kept verbatim from the input params", () => {
+    const rows = mixedPhaseRows();
+    const original = fitPhaseAffine(rows);
+    const openingRows = rows.filter((r) => r.phase === "opening");
+    const d = fitOpeningSlopeOnlyKeepOthers(original, openingRows);
+    assert.equal(d.opening.b, 0);
+    assert.notEqual(d.opening.a, 0);
+    assert.deepEqual(d.middlegame, original.middlegame);
+    assert.deepEqual(d.endgame, original.endgame);
+});
+
+test("Candidate D: recovers the exact slope-only least-squares solution on noiseless data", () => {
+    const openingRows = linearRows(0.7, 0, { n: 30, phase: () => "opening" }); // intercept already 0
+    const original = { opening: { a: 999, b: 999 }, middlegame: { a: 1, b: 0 }, endgame: { a: 1, b: 0 } };
+    const d = fitOpeningSlopeOnlyKeepOthers(original, openingRows);
+    assert.ok(near(d.opening.a, 0.7, 1e-6));
 });
