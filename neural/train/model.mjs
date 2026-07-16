@@ -135,7 +135,10 @@ export function exportModel(model, extra = {}) {
 
 export function importModel(obj) {
     if (!obj || typeof obj !== "object") throw new Error("model: not an object");
-    if (obj.featureDim !== 781) throw new Error("model: featureDim must be 781, got " + obj.featureDim);
+    // featureDim is declared by the model (781 baseline, or larger when endgame
+    // feature groups are enabled). Layer shapes are validated against it below,
+    // and featureGroups records the exact encoding for inference.
+    if (!Number.isInteger(obj.featureDim) || obj.featureDim < 781) throw new Error("model: featureDim must be an integer >= 781, got " + obj.featureDim);
     if (!obj.layers) throw new Error("model: missing layers");
     const outputActivation = obj.outputActivation || "tanh";
     if (obj.kind === "linear") {

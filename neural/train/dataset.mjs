@@ -6,7 +6,7 @@
 //======================================================
 
 import fs from "node:fs";
-import { encodeFen, FEATURE_DIM } from "../lib/features.mjs";
+import { encodeFen, encodeFenExtended, featureLayout, FEATURE_DIM } from "../lib/features.mjs";
 
 export const DEFAULT_TARGET = { kind: "tanh", scale: 400, clipCp: 1000, mateValue: 0.999 };
 
@@ -48,14 +48,16 @@ export function targetToCp(value, cfg = DEFAULT_TARGET) {
     return value;
 }
 
-export function loadDataset(path, cfg = DEFAULT_TARGET) {
+// `groups` selects optional endgame feature groups; [] = the 781 baseline.
+export function loadDataset(path, cfg = DEFAULT_TARGET, groups = []) {
     const recs = fs.readFileSync(path, "utf8").split("\n").filter(Boolean).map(JSON.parse);
     const splits = { train: [], val: [], test: [] };
+    const layout = featureLayout(groups);
     let skipped = 0;
     for (const r of recs) {
         if (!r.stockfish) { skipped++; continue; }
         const item = {
-            idx: encodeFen(r.fen),               // sorted sparse active indices (only the FEN)
+            idx: groups.length ? encodeFenExtended(r.fen, groups) : encodeFen(r.fen),  // only the FEN
             target: makeTarget(r.stockfish, cfg),
             meta: {
                 split: r.split, phase: r.gamePhase, stm: r.sideToMove, inCheck: !!r.inCheck,
@@ -69,5 +71,5 @@ export function loadDataset(path, cfg = DEFAULT_TARGET) {
         };
         (splits[r.split] || (splits[r.split] = [])).push(item);
     }
-    return { splits, featureDim: FEATURE_DIM, skipped, targetCfg: cfg };
+    return { splits, featureDim: layout.dim, featureGroups: layout.groups, skipped, targetCfg: cfg };
 }

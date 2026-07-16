@@ -57,6 +57,60 @@ validate-dataset.mjs   inspect-dataset.mjs   features.mjs / features.py (+ parit
 | `train/fixtures/*.json` | Tiny parity fixture model + FEN→output cases (**not** a trained model) |
 | `tests/*.test.mjs` | `node --test` suites (`neural`, `provenance-and-tools`, `train`) |
 
+## Feature encoding: 781 baseline + optional endgame groups
+
+The **baseline is 781 binary features and is unchanged** (`encodeFen`): 768
+piece-square bits (12 planes × 64 squares), side-to-move, 4 castling bits, 8
+en-passant *file* bits. Note what is **not** there: no halfmove/fifty-move
+information, no check flag, no mobility/attack information, and no source or
+label metadata (so there is nothing to leak).
+
+**Why the baseline has an endgame ceiling.** A linear model over piece-square
+bits computes `Σ wᵢxᵢ + b` — a sum of *independent per-piece* terms, i.e. a
+piece-square table. "White king on e4" contributes a constant regardless of
+everything else. Endgame concepts are **relational**: king-to-pawn distance is
+`d(a,b) = max(|fₐ−f_b|, |rₐ−r_b|)`, a function of the *joint* squares. If it
+were additively separable then `d(a,b) − d(a,b′) = h(b) − h(b′)` would not
+depend on `a` — but it obviously does (moving the king changes which pawn is
+nearer). So **no PST weighting can express it**; you need a term indexed by the
+*pair* of squares. The same holds for passed pawns (a conjunction/negation over
+enemy-pawn squares), opposition, the rule of the square, and rook-behind-passer.
+An MLP *can* represent these in principle but must learn a 64×64 relation from a
+few thousand endgame rows — learnable, but sample-inefficient.
+
+`encodeFenExtended(fen, groups)` therefore appends compact, **bucketed one-hot**
+groups after index 780 (never a dense pair explosion, so the sparse binary
+representation is preserved):
+
+| group | bits | supplies |
+|-------|-----:|----------|
+| `endgame-material-class` | 13 | ending class one-hot, opposite/same-coloured bishops, non-pawn-material buckets |
+| `passed-pawns` | 38 | per side: count, most-advanced rank, protected/connected/outside/mobile, distance-to-promotion |
+| `king-distance` | 34 | per side: king↔best-passer, enemy-king↔promotion square, centralization, king↔nearest pawn, rule-of-the-square (+ explicit side-to-move interaction) |
+| `king-pawn-geometry` | 11 | direct/distant opposition and holder, king alignment, king-king distance |
+| `rook-ending` | 16 | per side: rook behind own/enemy passer, rooks on the 7th, open/semi-open file, enemy king cut off |
+| `interactions` | 8 | a few justified conjunctions only (advanced passer × outside-square, rook class × rook-behind-passer, low material × king closer, protected × advanced) |
+
+Rules that keep this safe:
+
+- **The baseline is never altered in place** — `encodeFenExtended(fen, [])` is
+  bit-identical to `encodeFen(fen)`, and extended vectors keep indices `<781`
+  unchanged. Groups can be enabled independently for ablation.
+- Offsets are assigned in the canonical `GROUP_ORDER` over the **enabled** groups
+  only, so a model **must** record its `featureGroups` (exported models do, along
+  with `featureSchema`). Inference re-encodes from that list — otherwise the
+  weights are meaningless.
+- Everything derives from the FEN alone: no Stockfish, no Coach evaluation, no
+  search, no metadata. Clocks are deliberately ignored (a test pins this).
+- Python (`features.py` + `endgame.py`) mirrors JS exactly; parity fixtures cover
+  both the baseline and the extended encoding.
+
+```powershell
+# train with feature groups (comma-separated); omit --features for the baseline
+node train\train-value.mjs --in "C:\...\labelled.jsonl" --model linear `
+     --features passed-pawns,king-distance --out-model "C:\...\model.json"
+```
+
 ## Position identity (dedup key)
 
 `positionKey = "<placement> <stm> <castling> <ep> <halfmoveBucket>"` where:

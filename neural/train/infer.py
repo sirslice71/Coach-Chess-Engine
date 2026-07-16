@@ -11,7 +11,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-from features import encode_fen  # noqa: E402
+from features import encode_fen, encode_fen_extended  # noqa: E402
 
 
 def load_model(path):
@@ -20,8 +20,9 @@ def load_model(path):
 
 
 def forward(model, idx):
-    if model.get("featureDim") != 781:
-        raise ValueError("model featureDim must be 781")
+    dim = model.get("featureDim")
+    if not isinstance(dim, int) or dim < 781:
+        raise ValueError("model featureDim must be an integer >= 781")
     layers = model["layers"]
     out_act = model.get("outputActivation", "tanh")
     if model["kind"] == "linear":
@@ -51,7 +52,9 @@ def forward(model, idx):
 
 
 def eval_fen(model, fen):
-    return forward(model, encode_fen(fen))
+    groups = model.get("featureGroups") or []
+    idx = encode_fen_extended(fen, groups) if groups else encode_fen(fen)
+    return forward(model, idx)
 
 
 if __name__ == "__main__":

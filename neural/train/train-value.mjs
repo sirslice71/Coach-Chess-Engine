@@ -20,13 +20,14 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { mulberry32 } from "../lib/prng.mjs";
 import { loadDataset, targetToCp, DEFAULT_TARGET } from "./dataset.mjs";
+import { FEATURE_SCHEMA_VERSION } from "../lib/features.mjs";
 import { initModel, makeAdam, forward, exportModel } from "./model.mjs";
 import { mse, mae, pearson, mean, round } from "./metrics.mjs";
 
 function parseArgs(argv) {
     const a = { in: null, model: "mlp", hidden: 32, target: "tanh", scale: 400, clipCp: 1000,
         epochs: 60, lr: 0.01, batch: 256, seed: 1, patience: 8, shuffleLabels: false, subset: null,
-        excludeFamily: null, outModel: null, report: null, quiet: false };
+        excludeFamily: null, features: [], outModel: null, report: null, quiet: false };
     for (let i = 0; i < argv.length; i++) {
         const t = argv[i];
         const n = () => argv[++i];
@@ -43,6 +44,7 @@ function parseArgs(argv) {
         else if (t === "--patience") a.patience = +n();
         else if (t === "--shuffle-labels") a.shuffleLabels = true;
         else if (t === "--exclude-family") (a.excludeFamily = a.excludeFamily || []).push(n());
+        else if (t === "--features") a.features = n().split(",").map((s) => s.trim()).filter(Boolean);
         else if (t === "--subset") a.subset = +n();
         else if (t === "--out-model") a.outModel = n();
         else if (t === "--report") a.report = n();
@@ -126,7 +128,7 @@ async function main() {
     const args = parseArgs(process.argv.slice(2));
     const cfg = { kind: args.target, scale: args.scale, clipCp: args.clipCp, mateValue: DEFAULT_TARGET.mateValue };
     const t0 = Date.now();
-    const { splits, featureDim, skipped } = loadDataset(args.in, cfg);
+    const { splits, featureDim, featureGroups, skipped } = loadDataset(args.in, cfg, args.features);
     let train = splits.train, val = splits.val, test = splits.test;
 
     // Source-family holdout: drop matching sources from TRAIN only (val/test are
@@ -152,7 +154,7 @@ async function main() {
     const constPredict = () => constant;
 
     const report = {
-        config: { ...args, featureDim }, dataset: { train: train.length, val: val.length, test: test.length, skipped },
+        config: { ...args, featureDim, featureGroups }, dataset: { train: train.length, val: val.length, test: test.length, skipped },
         excludedFamilies: excluded,
         target: cfg, constant: round(constant),
         baselines: { constant: { val: evalSet(val, constPredict, cfg), test: evalSet(test, constPredict, cfg) } },
@@ -190,11 +192,18 @@ async function main() {
         report.metrics = { train: evalSet(train, predict, cfg), val: evalSet(val, predict, cfg), test: evalSet(test, predict, cfg) };
         report.breakdownTest = breakdowns(test, predict, cfg);
         report.bySourceFamilyTest = bySourceFamily(test, predict, cfg);
+        // Endgame cpMAE on VALIDATION as well as test: feature-group selection
+        // must be driven by validation only (see README), never by the test set.
+        const egVal = evalSet(val.filter((it) => it.meta.phase === "endgame"), predict, cfg);
+        const egTest = evalSet(test.filter((it) => it.meta.phase === "endgame"), predict, cfg);
+        report.endgame = { val: egVal ? egVal.cpMAE : null, valN: egVal ? egVal.n : 0,
+            test: egTest ? egTest.cpMAE : null, testN: egTest ? egTest.n : 0 };
         report.headToHeadTest = headToHead(test, predict, cfg);
         if (args.outModel) {
             const dir = path.dirname(path.resolve(args.outModel));
             if (!fs.existsSync(dir)) throw new Error("out-model dir does not exist: " + dir);
             fs.writeFileSync(args.outModel, JSON.stringify(exportModel(model, { targetTransform: cfg,
+                featureSchema: FEATURE_SCHEMA_VERSION, featureGroups,   // inference must re-encode identically
                 training: { seed: args.seed, bestEpoch, bestValMSE: round(bestVal, 6), lr: args.lr, batch: args.batch } })));
         }
     }

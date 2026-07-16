@@ -13,15 +13,19 @@
 
 import fs from "node:fs";
 import { pathToFileURL } from "node:url";
-import { encodeFen } from "../lib/features.mjs";
+import { encodeFen, encodeFenExtended } from "../lib/features.mjs";
 import { importModel, forward } from "./model.mjs";
 
 export function loadModel(pathOrObj) {
     const obj = typeof pathOrObj === "string" ? JSON.parse(fs.readFileSync(pathOrObj, "utf8")) : pathOrObj;
-    return { model: importModel(obj), meta: obj };
+    // The model declares which feature groups it was trained with; inference
+    // must re-encode identically or the weights are meaningless.
+    const groups = Array.isArray(obj.featureGroups) ? obj.featureGroups : [];
+    const encode = groups.length ? (fen) => encodeFenExtended(fen, groups) : encodeFen;
+    return { model: importModel(obj), meta: obj, groups, encode };
 }
 // White-relative value in the model's target space.
-export function evalFen(loaded, fen) { return forward(loaded.model, encodeFen(fen)).o; }
+export function evalFen(loaded, fen) { return forward(loaded.model, loaded.encode(fen)).o; }
 
 function arg(name) { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : undefined; }
 
@@ -35,12 +39,12 @@ function bench() {
 
     const recs = fs.readFileSync(inPath, "utf8").split("\n").filter(Boolean).slice(0, n).map((l) => JSON.parse(l).fen);
     // warmup
-    for (let i = 0; i < Math.min(1000, recs.length); i++) forward(loaded.model, encodeFen(recs[i]));
+    for (let i = 0; i < Math.min(1000, recs.length); i++) forward(loaded.model, loaded.encode(recs[i]));
 
     // encoding only
     let tmp = 0;
     const e0 = process.hrtime.bigint();
-    const encoded = recs.map((f) => encodeFen(f));
+    const encoded = recs.map((f) => loaded.encode(f));
     const encMs = Number(process.hrtime.bigint() - e0) / 1e6;
 
     // inference only (pre-encoded)
@@ -50,7 +54,7 @@ function bench() {
 
     // combined encode+infer
     const c0 = process.hrtime.bigint();
-    for (const f of recs) tmp += forward(loaded.model, encodeFen(f)).o;
+    for (const f of recs) tmp += forward(loaded.model, loaded.encode(f)).o;
     const combMs = Number(process.hrtime.bigint() - c0) / 1e6;
 
     const mem = process.memoryUsage();
