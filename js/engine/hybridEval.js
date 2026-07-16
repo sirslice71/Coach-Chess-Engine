@@ -55,8 +55,53 @@ export function phaseScore(placement) {
 export function isEndgamePhase(placement) { return phaseScore(placement) <= 6; }
 
 // Deterministic, label-independent routing decision for a placement string.
+// UNCHANGED by calibration below: routing still depends only on the binary
+// endgame/non-endgame split (isEndgamePhase) and material class.
 export function shouldRouteToClassical(placement) {
     return isEndgamePhase(placement) && WEAK_ENDGAME_CLASSES.has(materialClass(placement));
+}
+
+//======================================================
+// Constrained phase-affine calibration (post-processing only).
+//
+// Selected by an offline, validation-only study in the neural-eval
+// worktree (neural/CALIBRATION-CONSTRAINED-OPENING-REPORT.md,
+// tools/constrain-opening-calibration.mjs, candidate "C_clamp_25"),
+// fit on combined-005-sf2000-rodent-300games against models/linear-s1.json.
+// Vendored here as plain constants -- no file reads, no re-fitting, no
+// dependency on the analysis pipeline. `output = slope * rawCp + intercept`
+// per phase; opening's fitted intercept (+32.12) is clamped to +25 (the
+// accepted candidate), the other two phases use their unconstrained fit
+// verbatim.
+//======================================================
+const CALIBRATION = Object.freeze({
+    opening: Object.freeze({ a: 0.14171033426246749, b: 25 }),
+    middlegame: Object.freeze({ a: 1.0213814890315187, b: -11.690688475647447 }),
+    endgame: Object.freeze({ a: 1.2395102995466445, b: 0.6780419486463245 }),
+});
+
+// Three-way opening/middlegame/endgame split for the CALIBRATION LOOKUP
+// ONLY -- byte-for-byte match to neural/lib/position.mjs gamePhase().
+// Deliberately separate from isEndgamePhase()/shouldRouteToClassical()
+// above: routing keeps its existing binary endgame/non-endgame split
+// unchanged; only the neural score's post-processing gains this
+// three-way distinction.
+export function calibrationPhase(placement, fullmove) {
+    const ps = phaseScore(placement);
+    if (ps <= 6) return "endgame";
+    if (ps >= 22 && fullmove <= 10) return "opening";
+    return "middlegame";
+}
+
+// Applies the vendored per-phase affine, then re-clamps to the model's
+// own +/-clipCp bound (same double-clamp convention as the offline study:
+// the raw neural cp is already clipped once before calibration; a second
+// clamp after the affine transform keeps the calibrated output inside the
+// same documented range, since a large slope/intercept combination could
+// otherwise push a boundary value slightly outside +/-clipCp).
+export function applyCalibration(cp, phase, clipCp) {
+    const p = CALIBRATION[phase];
+    return Math.max(-clipCp, Math.min(clipCp, p.a * cp + p.b));
 }
 
 // ---- model loading: ONE-TIME, at module import, never per-evaluation ----
@@ -128,10 +173,12 @@ export class HybridEvaluator {
         if (!this.enabled) return evaluation.evaluate().total;
 
         const fen = FEN.export(board);
-        const [placement, stm, castling, ep] = fen.trim().split(/\s+/);
+        const fields = fen.trim().split(/\s+/);
+        const [placement, stm, castling, ep] = fields;
+        const fullmove = fields[5] !== undefined ? Number(fields[5]) : 1;
         const routeToClassical = shouldRouteToClassical(placement);
 
-        let out, classicalRaw = null, neuralRaw = null;
+        let out, classicalRaw = null, neuralRaw = null, neuralCalibrated = null;
         if (routeToClassical) {
             this.classicalRouteCalls++;
             classicalRaw = evaluation.evaluate().total;
@@ -144,11 +191,14 @@ export class HybridEvaluator {
             // to the routing rule itself. Clamping ONLY the value used by
             // this experimental wrapper -- evaluation.js itself, and its
             // return value everywhere else in the engine, are untouched.
+            // Calibration does not apply to the classical route at all.
             out = Math.max(-MODEL.clipCp, Math.min(MODEL.clipCp, classicalRaw));
         } else {
             this.neuralRouteCalls++;
             neuralRaw = neuralForwardCp(placement, stm, castling || "-", ep || "-");
-            out = neuralRaw;
+            const phase = calibrationPhase(placement, fullmove);
+            neuralCalibrated = applyCalibration(neuralRaw, phase, MODEL.clipCp);
+            out = neuralCalibrated;
         }
 
         if (this.diagnosticsEnabled) {
@@ -156,7 +206,8 @@ export class HybridEvaluator {
                 route: routeToClassical ? "classical" : "neural",
                 materialClass: materialClass(placement),
                 phase: isEndgamePhase(placement) ? "endgame" : "non-endgame",
-                neuralRaw, classicalRaw, hybridOutput: out,
+                calibrationPhase: routeToClassical ? null : calibrationPhase(placement, fullmove),
+                neuralRaw, neuralCalibrated, classicalRaw, hybridOutput: out,
                 modelLoaded: this.enabled,
             };
         }
