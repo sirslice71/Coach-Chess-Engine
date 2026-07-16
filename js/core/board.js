@@ -338,8 +338,7 @@ export default class Board {
 
             case 6:
 
-                list.king.length = 0;
-                list.king[0] = square;
+                list.king = [square];
 
                 if (piece > 0)
                     this.whiteKing = square;
@@ -479,7 +478,7 @@ export default class Board {
 
             case 6:
 
-                list.king.length = 0;
+                list.king = [];
 
                 if (piece > 0)
                     this.whiteKing = -1;
