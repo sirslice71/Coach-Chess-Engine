@@ -15,12 +15,20 @@ function report({
     geomeanPercent,
     medianPercent = geomeanPercent,
     identityOk = true,
+    identityMode = "Exact",
+    treeShapeChanged = false,
     positions = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 }) {
 
     return {
+        config: {
+            identityMode
+        },
         summary: {
             identityOk,
+            treeShape: {
+                changed: treeShapeChanged
+            },
             aggregates: {
                 primary: {
                     geomeanPercent,
@@ -214,6 +222,91 @@ test("repeated per-position regression rejects", () => {
 
     assert.equal(summary.verdict.status, "rejected");
     assert.match(summary.verdict.reasons.join(" "), /per-position regression/);
+
+});
+
+test("SearchStable tree-shape candidates summarize with bounded repeated cautions", () => {
+
+    const summary =
+        summarizeBenchmarkReports([
+            entry("control", "s", report({ geomeanPercent: -0.027 })),
+            entry("candidate", "s", report({
+                geomeanPercent: -12.558,
+                identityMode: "SearchStable",
+                treeShapeChanged: true,
+                positions: [24.5, -1.5, 8.6, 13.7, -0.8, -0.5, 6.6, 41, 0.3, 22.3]
+            })),
+            entry("candidate", "s", report({
+                geomeanPercent: -11.965,
+                identityMode: "SearchStable",
+                treeShapeChanged: true,
+                positions: [24.7, -1.1, 7.2, 13.3, -0.6, -0.8, 7, 39.4, -0.3, 20.2]
+            }))
+        ]);
+
+    assert.equal(summary.verdict.status, "accepted");
+    assert.equal(summary.identityPolicy.allCandidatesSearchStable, true);
+    assert.equal(
+        summary.identityPolicy.seriousSearchStableRegressionPattern,
+        false
+    );
+    assert.match(
+        formatSummary(summary),
+        /SearchStable repeated regressions: reported as caution/
+    );
+
+});
+
+test("Exact tree-shape identity mismatch still rejects the same timing shape", () => {
+
+    const summary =
+        summarizeBenchmarkReports([
+            entry("control", "s", report({ geomeanPercent: -0.027 })),
+            entry("candidate", "s", report({
+                geomeanPercent: -12.558,
+                identityOk: false,
+                positions: [24.5, -1.5, 8.6, 13.7, -0.8, -0.5, 6.6, 41, 0.3, 22.3]
+            })),
+            entry("candidate", "s", report({
+                geomeanPercent: -11.965,
+                identityOk: false,
+                positions: [24.7, -1.1, 7.2, 13.3, -0.6, -0.8, 7, 39.4, -0.3, 20.2]
+            }))
+        ]);
+
+    assert.equal(summary.verdict.status, "rejected");
+    assert.match(summary.verdict.reasons.join(" "), /identity/);
+
+});
+
+test("SearchStable stable-field failures still reject in summary", () => {
+
+    for (const label of [
+        "best move",
+        "score",
+        "mate",
+        "stability"
+    ]) {
+        const summary =
+            summarizeBenchmarkReports([
+                entry("control", "s", report({ geomeanPercent: 0.1 })),
+                entry("candidate", "s", report({
+                    geomeanPercent: -2,
+                    identityMode: "SearchStable",
+                    treeShapeChanged: true,
+                    identityOk: label === "best move" ? false : true
+                })),
+                entry("candidate", "s", report({
+                    geomeanPercent: -2,
+                    identityMode: "SearchStable",
+                    treeShapeChanged: true,
+                    identityOk: label !== "best move" ? false : true
+                }))
+            ]);
+
+        assert.equal(summary.verdict.status, "rejected", label);
+        assert.match(summary.verdict.reasons.join(" "), /identity/, label);
+    }
 
 });
 

@@ -13,6 +13,7 @@ export const DEFAULT_CONTROL_LIMIT_PERCENT = 0.5;
 export const DEFAULT_ACCEPTED_GAIN_PERCENT = 1.0;
 export const DEFAULT_PROMISING_GAIN_PERCENT = 0.7;
 export const DEFAULT_DOMINANCE_FRACTION = 0.6;
+export const DEFAULT_SEARCH_STABLE_POSITION_REGRESSION_LIMIT_PERCENT = 2.0;
 
 export function parseSummaryArgs(argv) {
 
@@ -119,6 +120,12 @@ export function identityOk(report) {
 
 }
 
+export function identityMode(report) {
+
+    return report?.config?.identityMode || "Exact";
+
+}
+
 export function positionGains(report) {
 
     return (report?.summary?.positions || [])
@@ -214,6 +221,8 @@ export function summarizeBenchmarkReports(entries, options = {}) {
                     medianGainPercent: medianGainPercent(entry.report),
                     adjustedGainPercent,
                     identityOk: identityOk(entry.report),
+                    identityMode: identityMode(entry.report),
+                    treeShape: entry.report?.summary?.treeShape || null,
                     positivePositions:
                         positions.filter(position => position.gainPercent > 0).length,
                     totalPositions: positions.length,
@@ -268,6 +277,31 @@ export function summarizeBenchmarkReports(entries, options = {}) {
                 position.negativeRuns >= Math.max(2, candidates.length)
         );
 
+    const searchStableCandidates =
+        candidates.filter(candidate =>
+            candidate.identityMode === "SearchStable"
+        );
+
+    const allCandidatesSearchStable =
+        candidates.length > 0 &&
+        searchStableCandidates.length === candidates.length;
+
+    const searchStableRegressionLimit =
+        options.searchStablePositionRegressionLimitPercent ??
+            DEFAULT_SEARCH_STABLE_POSITION_REGRESSION_LIMIT_PERCENT;
+
+    const repeatedRegressionPositions =
+        perPosition.positions.filter(
+            position => position.meanGainPercent < 0 &&
+                position.negativeRuns >= Math.max(2, candidates.length)
+        );
+
+    const seriousSearchStableRegressionPattern =
+        allCandidatesSearchStable &&
+        repeatedRegressionPositions.some(position =>
+            position.meanGainPercent <= -searchStableRegressionLimit
+        );
+
     const dominance =
         dominanceAnalysis(perPosition.positions, averageAdjustedGain, {
             acceptedGain,
@@ -301,9 +335,16 @@ export function summarizeBenchmarkReports(entries, options = {}) {
         verdict = "rejected";
         reasons.push("Aggregate appears dominated by one position.");
     }
-    else if (repeatedRegressionPattern) {
+    else if (
+        repeatedRegressionPattern &&
+        (!allCandidatesSearchStable || seriousSearchStableRegressionPattern)
+    ) {
         verdict = "rejected";
-        reasons.push("A repeated per-position regression pattern was detected.");
+        reasons.push(
+            allCandidatesSearchStable
+                ? `A repeated SearchStable per-position regression exceeded -${searchStableRegressionLimit}% mean speed gain.`
+                : "A repeated per-position regression pattern was detected."
+        );
     }
     else if (
         averageAdjustedGain >= acceptedGain &&
@@ -341,6 +382,13 @@ export function summarizeBenchmarkReports(entries, options = {}) {
         totalCandidateRuns: candidates.length,
         perPosition,
         dominance,
+        identityPolicy: {
+            allCandidatesSearchStable,
+            searchStablePositionRegressionLimitPercent:
+                searchStableRegressionLimit,
+            repeatedRegressionPositions,
+            seriousSearchStableRegressionPattern
+        },
         verdict: {
             status: verdict,
             reasons,
@@ -517,6 +565,11 @@ export function formatSummary(summary) {
         lines.push(
             `  #${candidate.index} ${candidate.session}: raw timing difference ${formatTimingDifference(candidate.timingDifferencePercent)}, speed gain ${formatSignedPercent(candidate.speedGainPercent)}, median speed gain ${formatSignedPercent(candidate.medianGainPercent)}, same-session control timing difference ${formatTimingDifference(control?.timingDifferencePercent)}, adjusted speed gain ${formatSignedPercent(candidate.adjustedGainPercent)}, identity=${candidate.identityOk ? "ok" : "mismatch"}, positive positions=${candidate.positivePositions}/${candidate.totalPositions}`
         );
+        if (candidate.identityMode !== "Exact") {
+            lines.push(
+                `     identity mode=${candidate.identityMode}, tree shape=${candidate.treeShape?.changed ? "changed" : "same"}`
+            );
+        }
     }
 
     lines.push("");
@@ -545,6 +598,16 @@ export function formatSummary(summary) {
     if (summary.dominance.dominantPosition) {
         lines.push(
             `dominance: ${summary.dominance.dominantPosition.id} contributes ${(summary.dominance.fraction * 100).toFixed(1)}% of positive per-position mean gain; dominated=${summary.dominance.dominated}`
+        );
+    }
+
+    if (
+        summary.identityPolicy.allCandidatesSearchStable &&
+        summary.identityPolicy.repeatedRegressionPositions.length > 0 &&
+        !summary.identityPolicy.seriousSearchStableRegressionPattern
+    ) {
+        lines.push(
+            `SearchStable repeated regressions: reported as caution; none exceeded -${summary.identityPolicy.searchStablePositionRegressionLimitPercent}% mean speed gain.`
         );
     }
 
