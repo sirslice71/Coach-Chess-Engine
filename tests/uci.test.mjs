@@ -445,7 +445,11 @@ test("time allocation uses the correct side clock and increment", () => {
         });
 
     assert.equal(whiteBudget, 11495);
-    assert.equal(blackBudget, 30);
+
+    // 30 before the low-clock reserve (btime=1000ms is inside the
+    // <=5s tier, which now carves out an extra 20% of remainingTime
+    // before the usual clamps apply).
+    assert.equal(blackBudget, 25);
 
 });
 
@@ -478,7 +482,10 @@ test("time allocation is capped and stays safe in low time", () => {
             binc: 0
         });
 
-    assert.equal(cappedBudget, 90);
+    // 90 before the low-clock reserve (wtime=1000ms is inside the
+    // <=5s tier, which now carves out an extra 20% of remainingTime
+    // before the usual clamps apply).
+    assert.equal(cappedBudget, 70);
     assert.equal(lowTimeBudget, 1);
     assert.equal(severeLowTimeBudget, 10);
 

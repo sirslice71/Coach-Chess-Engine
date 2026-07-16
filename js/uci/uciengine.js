@@ -70,6 +70,34 @@ const MOVES_TO_GO_BY_PHASE = {
     endgame: 15
 };
 
+//----------------------------------
+// Minimum moves-to-go floor (no-movestogo fallback only).
+//
+// estimateMovesToGo() is a static, phase-only estimate with no
+// notion of how many moves have actually been played within a
+// phase -- material dropping into "endgame" always assumed only 15
+// moves remained, even in a long king-and-pawn race that runs
+// 40-80+ more plies. Two Arena 5+0 losses showed the resulting
+// pattern directly: Coach spent 87-89% of its clock by move 55,
+// then reported ~0 seconds per move (and degraded search depth) for
+// every remaining move of both games.
+//
+// The floor is set to 24 -- the existing MIDDLEGAME_MATERIAL
+// estimate -- deliberately, so it changes nothing for the opening
+// or middlegame (where the phase estimate is already >= 24) and
+// only ever raises the lateMiddlegame (19) and endgame (15)
+// estimates. Simulation across 7 time controls x 4 game lengths x 2
+// material profiles x 4 spending scenarios (4,928 simulated games)
+// confirmed a floor of 24 costs zero early/middlegame allocation in
+// every control tested while roughly doubling clock remaining at
+// move 55 in long-endgame scenarios; floors of 30/36/40 trade
+// increasingly large early-game reductions (up to -30%) for
+// diminishing further late-game gains, so 24 was preferred as the
+// smallest change that fixes the observed failure mode.
+//----------------------------------
+
+const MIN_MOVES_TO_GO_FLOOR = 24;
+
 const OPENING_FULLMOVE_FLOOR = 10;
 
 export function gamePhase(
@@ -101,9 +129,12 @@ export function estimateMovesToGo({
     fullMoveNumber = 1
 } = {}) {
 
-    return MOVES_TO_GO_BY_PHASE[
-        gamePhase(totalMaterial, fullMoveNumber)
-    ];
+    return Math.max(
+        MIN_MOVES_TO_GO_FLOOR,
+        MOVES_TO_GO_BY_PHASE[
+            gamePhase(totalMaterial, fullMoveNumber)
+        ]
+    );
 
 }
 
@@ -529,6 +560,45 @@ export function applyUciMove(engine, uciString) {
 
 }
 
+//----------------------------------
+// Extra low-clock reserve, on top of the existing safety buffer and
+// move overhead. Absolute-ms thresholds, consistent with the
+// existing safetyBuffer/minimumFloor/complexityMultiplier tiers
+// below (none of which track a game's original starting time --
+// only the current wtime/btime the GUI reports on each "go" -- so
+// this stays stateless like them).
+//
+// The moves-to-go floor above already removes most of the observed
+// failure mode by itself; this adds a modest additional margin for
+// the adversarial tail the simulation still found with the floor
+// alone (occasional per-move overruns past the soft allocation,
+// e.g. an aspiration re-search): reserving a further 20% of
+// remaining time once it drops to 5s or under, and 8% once it drops
+// to 15s or under. Simulation showed this never reduces final clock
+// remaining relative to the floor alone, and roughly halved the
+// fraction of adversarial simulated games ending with under 2
+// seconds left (15/448 -> 6/448).
+//----------------------------------
+
+const LOW_CLOCK_RESERVE_TIER1_MS = 5000;
+const LOW_CLOCK_RESERVE_TIER1_FRACTION = 0.20;
+const LOW_CLOCK_RESERVE_TIER2_MS = 15000;
+const LOW_CLOCK_RESERVE_TIER2_FRACTION = 0.08;
+
+function lowClockReserve(remainingTime) {
+
+    if (remainingTime <= LOW_CLOCK_RESERVE_TIER1_MS) {
+        return remainingTime * LOW_CLOCK_RESERVE_TIER1_FRACTION;
+    }
+
+    if (remainingTime <= LOW_CLOCK_RESERVE_TIER2_MS) {
+        return remainingTime * LOW_CLOCK_RESERVE_TIER2_FRACTION;
+    }
+
+    return 0;
+
+}
+
 export function allocateMoveTime({
     sideToMove,
     wtime = 0,
@@ -577,7 +647,7 @@ export function allocateMoveTime({
         remainingTime > 1000 ? 100 : 50;
 
     const reservedTime =
-        safetyBuffer + overhead;
+        safetyBuffer + overhead + lowClockReserve(remainingTime);
 
     const usableTime =
         Math.max(1, remainingTime - reservedTime);
