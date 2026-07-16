@@ -1,0 +1,1135 @@
+{
+ "modelPath": "external, see COACH_HYBRID_MODEL_PATH",
+ "fixtures": [
+  {
+   "tag": "SB-500ms/opening/w",
+   "fen": "r1bqk2r/pppp1ppp/1bn5/1P6/2Bpn3/2P2N2/P4PPP/RNBQK2R w KQkq - 0 8",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": -305,
+   "expectedHybridOutput": 27.820285409388774,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SB-500ms/opening/b",
+   "fen": "r2qkb1r/2p2ppp/p1n2n2/1p2p3/4N3/PP1P1N2/1P3PPP/R1BQK2R b KQkq - 0 10",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": -54,
+   "expectedHybridOutput": 26.078416112043318,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SB-500ms/middlegame/w",
+   "fen": "r4k1r/1bp3pp/p4p2/2q1p1N1/1p1nP3/8/PPP1N1PP/R2Q1RK1 w - - 0 17",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": -51,
+   "expectedHybridOutput": -226.6267372646425,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SB-500ms/middlegame/b",
+   "fen": "r3kb1r/2p2ppp/p1n5/1p2p3/4P3/PP3N2/1P3PPP/R1BK3R b kq - 0 12",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": -75,
+   "expectedHybridOutput": -51.04355579640154,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SB-500ms/endgame/w",
+   "fen": "8/kb4p1/p6p/2p5/3rp3/2N4P/PP2RKP1/8 w - - 0 35",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 0,
+   "expectedHybridOutput": 0,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "SB-500ms/endgame/b",
+   "fen": "8/8/1kr4p/2b1P1p1/R5P1/3K1PB1/8/8 b - - 0 58",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 159,
+   "expectedHybridOutput": 159,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "SB-1s/opening/w",
+   "fen": "r1bq1rk1/pp1nbpp1/2p1pn1p/3p4/2PP3B/2N1PN2/PP3PPP/2RQKB1R w K - 4 9",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": -37,
+   "expectedHybridOutput": 85.73243997370179,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SB-1s/opening/b",
+   "fen": "rnbqkb1r/pp3ppp/2p1pn2/3p2B1/2PP4/2N2N2/PP2PPPP/R2QKB1R b KQkq - 1 5",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 70,
+   "expectedHybridOutput": 65.75195305519902,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SB-1s/middlegame/w",
+   "fen": "r1bq1rk1/1p1nbpp1/p1p1pn1p/8/2BP3B/2N1PN2/PP3PPP/2RQK2R w K - 0 11",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 69,
+   "expectedHybridOutput": 104.69077117039065,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SB-1s/middlegame/b",
+   "fen": "r1bq1rk1/1p1nbpp1/p1p1pn1p/8/2BP4/2N1PNB1/PP3PPP/2RQK2R b K - 1 11",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 93,
+   "expectedHybridOutput": 29.696687462615067,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SB-1s/endgame/w",
+   "fen": "8/8/4pk1p/5p2/1p6/4q3/1P2K1P1/8 w - - 0 57",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queen",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -1131,
+   "expectedHybridOutput": -792.842439060301,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SB-1s/endgame/b",
+   "fen": "4QK2/8/2k3P1/3b4/p7/8/8/8 b - - 4 85",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 618,
+   "expectedHybridOutput": 531.1239201717336,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SF1700/opening/w",
+   "fen": "r1bqk2r/pp1nbpp1/2p1pn1p/8/2pP3B/2NBPN2/PP3PPP/R2QK2R w KQkq - 0 9",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 7,
+   "expectedHybridOutput": 52.6202228871423,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SF1700/opening/b",
+   "fen": "rn1qkb1r/pp2pppb/2p2n1p/4N3/3P3P/3B2N1/PPP2PP1/R1BQK2R b KQkq - 5 9",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 153,
+   "expectedHybridOutput": 29.892660198004574,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SF1700/middlegame/w",
+   "fen": "r4rk1/pp1bbpp1/1q2pn1p/8/2BP4/2NQ1N2/PP3PPP/R2R2K1 w - - 3 15",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 39,
+   "expectedHybridOutput": 38.40779033716815,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SF1700/middlegame/b",
+   "fen": "r2q1rk1/3bbpp1/2p1pn1p/pp2P3/3P4/2NB1N2/PPQ2PPP/R4RK1 b - - 0 14",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 125,
+   "expectedHybridOutput": -6.047069646538461,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SF1700/endgame/w",
+   "fen": "6k1/pp3pp1/2b4p/8/P7/5P1P/2q2KP1/8 w - - 2 37",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -1368,
+   "expectedHybridOutput": -809.0210364963766,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SF1700/endgame/b",
+   "fen": "4Q3/4N3/3k4/3p1P2/1P1P4/8/b5PP/6K1 b - - 0 58",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 1457,
+   "expectedHybridOutput": 864.2320268192238,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SF2000/opening/w",
+   "fen": "r2qkb1r/pp1b1ppp/2n2n2/3p4/3P4/2NB1N2/PP3PPP/R1BQK2R w KQkq - 0 9",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 13,
+   "expectedHybridOutput": 123.18282542752215,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SF2000/opening/b",
+   "fen": "r1bqkb1r/pp2pppp/2n2n2/3p4/2PP4/2N2N2/PP3PPP/R1BQKB1R b KQkq - 4 6",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 35,
+   "expectedHybridOutput": 3.7755690386326144,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SF2000/middlegame/w",
+   "fen": "r3kb1r/pp3ppp/2n2q2/3p4/3P2b1/2NB1N2/PP3PPP/R2QK2R w KQkq - 0 11",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 56,
+   "expectedHybridOutput": -27.88594352652669,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SF2000/middlegame/b",
+   "fen": "r2q1rk1/pp1b1ppp/2n1pn2/8/2BP4/2P2N2/PB3PPP/R2QR1K1 b - - 4 12",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 21,
+   "expectedHybridOutput": 86.57149257040906,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "SF2000/endgame/w",
+   "fen": "8/8/4pk2/6pp/1r1Pb2P/4N3/5PP1/2KR4 w - - 0 33",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 99,
+   "expectedHybridOutput": 99,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "SF2000/endgame/b",
+   "fen": "8/r6k/7p/8/1b4P1/1r6/4N3/5K2 b - - 1 64",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -1031,
+   "expectedHybridOutput": -1000,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "inCheck-1",
+   "fen": "5r2/8/8/2k2K2/2p5/8/8/2R5 w - - 22 81",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -112,
+   "expectedHybridOutput": -112,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "inCheck-2",
+   "fen": "8/4r3/4r2p/2b1P1p1/R1k3P1/1R3PB1/2K5/8 b - - 11 52",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": -40,
+   "expectedHybridOutput": 171.06873743802993,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "queenless-1",
+   "fen": "r6r/1bpk2p1/p6p/4pN2/1p6/8/PPP3PP/R4RK1 w - - 2 23",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": -47,
+   "expectedHybridOutput": -45.12223341264307,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "castling-1",
+   "fen": "r1bqk2r/ppp2ppp/2n2P2/2bp4/2Bp4/2P2N2/PP3PPP/RNBQK2R b KQkq - 0 7",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 87,
+   "expectedHybridOutput": 209.808818302649,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "castling-2",
+   "fen": "r1bqkb1r/pppp1ppp/2n2n2/8/3NP3/8/PPP2PPP/RNBQKB1R w KQkq - 1 5",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 10,
+   "expectedHybridOutput": 78.35024514891418,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "enpassant-1",
+   "fen": "r3k1nr/p5pp/1q2p3/1pppPpN1/4bQP1/2P5/PP2BP1P/R4RK1 w kq f6 0 18",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": -14,
+   "expectedHybridOutput": 141.32928091455287,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "mate-white",
+   "fen": "8/2R5/8/2k5/3NKB2/8/8/8 b - - 8 86",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 1286,
+   "expectedHybridOutput": 1000,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "mate-black",
+   "fen": "8/8/7K/2p4P/8/8/3k2r1/1q6 b - - 1 67",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -1393,
+   "expectedHybridOutput": -1000,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonmate-1",
+   "fen": "8/8/pk6/2p4p/4R1pP/P5K1/1r6/8 w - - 0 47",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -268,
+   "expectedHybridOutput": -268,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/8/p3R3/2p4p/k5pP/6K1/1r6/8 w - - 0 49",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -354,
+   "expectedHybridOutput": -354,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/8/8/1kp2K1R/r6P/6p1/8/8 w - - 0 55",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -190,
+   "expectedHybridOutput": -190,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/8/3K4/2p4r/6R1/3k4/8/8 w - - 13 63",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -120,
+   "expectedHybridOutput": -120,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/8/3K4/2p4r/6R1/2k5/8/8 w - - 17 65",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -111,
+   "expectedHybridOutput": -111,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "3r4/8/2K5/8/2p5/2k5/8/1R6 w - - 2 71",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -235,
+   "expectedHybridOutput": -235,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/8/8/5k2/2p4r/5K2/2R5/8 w - - 34 87",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -101,
+   "expectedHybridOutput": -101,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/8/8/4k3/2R5/4K3/8/3r4 w - - 5 95",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -8,
+   "expectedHybridOutput": -8,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/2R5/8/1r2k3/8/4K3/8/8 w - - 9 97",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 2,
+   "expectedHybridOutput": 2,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/6R1/3k4/8/8/1r2K3/8/8 w - - 13 99",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 10,
+   "expectedHybridOutput": 10,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/6R1/3k4/1r3K2/8/8/8/8 w - - 17 101",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 13,
+   "expectedHybridOutput": 13,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/6R1/8/8/2k1K3/8/8/4r3 w - - 25 105",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 15,
+   "expectedHybridOutput": 15,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/3R4/4k3/8/5K2/8/8/4r3 w - - 29 107",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -5,
+   "expectedHybridOutput": -5,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/8/4k3/8/4K3/8/3R4/r7 w - - 41 113",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 8,
+   "expectedHybridOutput": 8,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "2k5/6R1/8/3K4/8/8/8/1r6 w - - 57 121",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 72,
+   "expectedHybridOutput": 72,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/6R1/k7/3K4/8/8/8/1r6 w - - 61 123",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 67,
+   "expectedHybridOutput": 67,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "2kr1r2/2p2ppp/p7/1pb1N3/3nP3/P6P/RP3PP1/1KB2R2 b - - 0 18",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": -185,
+   "expectedHybridOutput": 25.264691129726053,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "2kr1r2/2p3pp/p4p2/1pb5/4P3/Pn1N3P/RP3PP1/1KBR4 b - - 3 20",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": -143,
+   "expectedHybridOutput": -85.99451511271687,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "2k1r3/2p3pp/p3r3/2b1Pp2/R4B2/1n3P1P/1P4P1/1KNR4 b - - 2 26",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": -231,
+   "expectedHybridOutput": 42.07192779133305,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "8/1kp1r3/1b2r2p/4P1p1/R5P1/5PB1/1P1R4/1K6 b - - 3 34",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 5,
+   "expectedHybridOutput": 202.06520099635003,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "8/1kp1r3/1b2r2p/4P1p1/RP4P1/5PB1/2KR4/8 b - - 2 36",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 13,
+   "expectedHybridOutput": 146.89948674083803,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "4r3/1k6/1b2r2p/2P1P1p1/6P1/R4PB1/8/1K1R4 b - - 0 46",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 14,
+   "expectedHybridOutput": 200.920326479949,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "8/1k2r3/4r2p/2b1P1p1/6P1/5PB1/2K5/R2R4 b - - 3 48",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 18,
+   "expectedHybridOutput": 75.11819115546126,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "8/4r3/2k1r2p/2b1P1p1/6P1/3R1PB1/2K5/R7 b - - 7 50",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": -25,
+   "expectedHybridOutput": 93.81650973306247,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "8/4r3/1kr4p/2bKP1p1/R5P1/3R1PB1/8/8 b - - 19 56",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 78,
+   "expectedHybridOutput": 178.94663255841897,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/8/1bk1r2p/3RP1p1/2K3P1/5PB1/8/8 b - - 12 64",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 100,
+   "expectedHybridOutput": 100,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/8/1bk1r2p/4P1p1/2K3P1/5P2/7B/3R4 b - - 16 66",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 83,
+   "expectedHybridOutput": 83,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/8/1bk1r2p/4P1p1/4K1P1/5P2/7B/3R4 b - - 20 68",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 88,
+   "expectedHybridOutput": 88,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "1b6/3k4/4r2p/4P3/4KBP1/8/8/7R b - - 0 72",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 115,
+   "expectedHybridOutput": 115,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/2bkr3/7R/4P1P1/4KB2/8/8/8 b - - 0 74",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 320,
+   "expectedHybridOutput": 320,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "3br3/3k2P1/7R/4P3/4KB2/8/8/8 b - - 0 76",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 385,
+   "expectedHybridOutput": 385,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "r1bqk1r1/ppp2pPp/2n5/2b5/2pP4/5N2/PP3PPP/RNBQK2R b KQq - 0 9",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 150,
+   "expectedHybridOutput": 119.34799264243611,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "r1bqk1r1/ppp2pPp/8/2b5/2p5/4BQ2/PP3PPP/RN2K2R b KQq - 0 11",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 57,
+   "expectedHybridOutput": 114.3439794838501,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "r1b5/ppp1kprp/8/8/2p5/8/PP1N1PPP/R4RK1 b - - 1 15",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 77,
+   "expectedHybridOutput": -65.0230883334602,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "r7/ppp1kprp/4b3/2N5/2p5/6P1/PP3P1P/R3R1K1 b - - 4 19",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 18,
+   "expectedHybridOutput": 27.345262183368163,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "r7/p1p1k1rp/1p2p3/8/2p1R3/6P1/PP3P1P/R5K1 b - - 1 21",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 16,
+   "expectedHybridOutput": 20.06446589471902,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "r7/p1p1k2p/4p1r1/1p6/2p4R/6P1/PP3P1P/4R1K1 b - - 3 23",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 19,
+   "expectedHybridOutput": -87.6677180067059,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "r7/2p1k3/p3p1rp/1pR5/2p5/6P1/PP3P1P/4R1K1 b - - 1 25",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 20,
+   "expectedHybridOutput": -41.29638355572034,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "5r2/2p5/p2kp1rp/1p6/2p1R3/6P1/PP3P1P/4R1K1 b - - 5 27",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 37,
+   "expectedHybridOutput": -29.35964406425881,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "5r2/8/p2kpr1p/1pp1R3/2p5/4R1P1/PP3P1P/6K1 b - - 7 31",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 15,
+   "expectedHybridOutput": 6.420952923524497,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "5r2/8/3kp1rp/ppp5/2p1RP2/4R1P1/PP5P/6K1 b - - 2 33",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 25,
+   "expectedHybridOutput": -32.139399218384845,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "8/8/3kp1rp/1pp5/p1p1RP2/6P1/PP1rRK1P/8 b - - 7 37",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": -59,
+   "expectedHybridOutput": -216.81176310299168,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "8/8/3kp1rp/1pp5/2p1RPP1/P2r4/P3RK1P/8 b - - 0 39",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": -112,
+   "expectedHybridOutput": -225.84856404689586,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/8/7p/1ppk1P2/2p5/7r/P3R1KP/8 b - - 4 45",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -188,
+   "expectedHybridOutput": -188,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/8/7p/1ppk1Pr1/2p5/7K/P4R1P/8 b - - 8 47",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -217,
+   "expectedHybridOutput": -217,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "5r2/5P2/3k1R1p/2p4K/1p6/8/P1p4P/8 b - - 1 53",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -224,
+   "expectedHybridOutput": -224,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/8/7p/2p4K/1p1k4/7P/P1p2r2/2R5 b - - 0 57",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -529,
+   "expectedHybridOutput": -529,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/8/7K/2p5/1p6/7P/P4r2/2k5 b - - 0 61",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -565,
+   "expectedHybridOutput": -565,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/8/7K/2p4P/8/1p6/r7/2k5 b - - 0 63",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -737,
+   "expectedHybridOutput": -737,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "r2q1rk1/pbpp1ppp/8/8/2B5/3Q1N2/P1p2KPP/RNB5 w - - 0 14",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": -302,
+   "expectedHybridOutput": 120.95655128242495,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "r4rk1/p1pp1pp1/6p1/8/2B5/2N3K1/P1p3PP/R1B5 w - - 0 18",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": -172,
+   "expectedHybridOutput": 181.39783069667138,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "4rrk1/p2p1pp1/2p3p1/8/8/2N3K1/P1B3PP/R1B5 w - - 0 20",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": -12,
+   "expectedHybridOutput": 321.55231788044586,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "5rk1/p2p1pp1/2p3p1/8/8/2N4P/P1B1K1Pr/1RB5 w - - 1 24",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": -4,
+   "expectedHybridOutput": 225.98281179539993,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "5rk1/p2p1pp1/2p3p1/8/8/2N2K1P/P5P1/1RBB1r2 w - - 5 26",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 11,
+   "expectedHybridOutput": 369.74728728172863,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "4r1k1/p2p1pp1/2p2rp1/8/8/2N1B2P/P3K1P1/1R1B4 w - - 9 28",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 64,
+   "expectedHybridOutput": 383.6572789728482,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "4r1k1/5pp1/p1p2rp1/3p4/8/1BNKB2P/P5P1/1R6 w - - 0 30",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 21,
+   "expectedHybridOutput": 402.1064298480817,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "4r1k1/5pp1/2p1r1p1/p2p4/P7/1BNKB2P/6P1/4R3 w - - 0 32",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 4,
+   "expectedHybridOutput": 423.0635572287143,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "2r3k1/5pp1/6p1/2pp2r1/P5P1/1B1K2BP/2R1N3/8 w - - 0 42",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 112,
+   "expectedHybridOutput": 283.72374138906173,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "4r1k1/5pp1/6p1/3p2r1/P1pK1BP1/1B5P/2R1N3/8 w - - 2 44",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 254,
+   "expectedHybridOutput": 352.17214312614254,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "6k1/5pp1/6p1/2K3r1/P1pprBP1/7P/B1R1N3/8 w - - 0 46",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 215,
+   "expectedHybridOutput": 389.18042246052045,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "6k1/5pp1/6p1/2K1r1B1/P1p3P1/3p2NP/B1R5/8 w - - 2 48",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "non-endgame",
+   "standaloneClassical": 691,
+   "expectedHybridOutput": 673.9609138485137,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "5k2/6p1/3K2p1/6p1/P1B3P1/6NP/2p5/8 w - - 1 52",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "minor-piece",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 444,
+   "expectedHybridOutput": 316.21081603794556,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "3k4/6p1/3K2p1/P5p1/2B3P1/7P/2p1N3/8 w - - 1 54",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "minor-piece",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 511,
+   "expectedHybridOutput": 362.6580354551893,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "1k6/6p1/3K2p1/P5N1/6P1/3B3P/8/8 w - - 1 60",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "minor-piece",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 932,
+   "expectedHybridOutput": 575.4679607056282,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "8/1k4N1/3K2p1/P7/6P1/3B3P/8/8 w - - 1 62",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "minor-piece",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 966,
+   "expectedHybridOutput": 730.9743048708402,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "8/k7/3K2p1/P1N3P1/7P/3B4/8/8 w - - 3 66",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "minor-piece",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 1002,
+   "expectedHybridOutput": 683.2954673265077,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "8/k5P1/3K4/P1N5/4B2P/8/8/8 w - - 1 70",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "minor-piece",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 1378,
+   "expectedHybridOutput": 991.6932260741623,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "nonrouted-fill",
+   "fen": "6Q1/k7/3K4/P1N4P/4B3/8/8/8 w - - 1 72",
+   "expectedRoute": "neural",
+   "expectedMaterialClass": "mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 2067,
+   "expectedHybridOutput": 1000,
+   "actualRouteFromDiagnostics": "neural"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "4r3/p1pk3p/b2p1p2/2p1p3/2P3PP/3B4/P1P5/2K2R2 w - - 0 28",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -305,
+   "expectedHybridOutput": -305,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/pbpkr2p/3p1R2/2p1p3/2P3PP/8/P1P1B3/2K5 w - - 7 32",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -229,
+   "expectedHybridOutput": -229,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/p1p1r2p/2kp1R2/2p1p1P1/2P1b1BP/8/P1P5/2K5 w - - 3 34",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -240,
+   "expectedHybridOutput": -240,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "4r3/p1p2R1p/1k1p4/2p1p1P1/2P1b1BP/8/P1PK4/8 w - - 7 36",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -193,
+   "expectedHybridOutput": -193,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "6r1/p1p4p/2kp2b1/2p1p1P1/2P3BP/2P1K3/PR6/8 w - - 7 40",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -215,
+   "expectedHybridOutput": -215,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "5k2/p1R3rp/3p2b1/2p1p1P1/2P3BP/2P1K3/P7/8 w - - 1 46",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -98,
+   "expectedHybridOutput": -98,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "R7/4k1rp/p2p2b1/2p1p1P1/2P3BP/2P1K3/P7/8 w - - 0 48",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -112,
+   "expectedHybridOutput": -112,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/4k1rp/R2p2b1/2p1p1P1/2P3BP/2P1K3/P7/8 w - - 1 50",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -5,
+   "expectedHybridOutput": -5,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "7r/5kpp/2b5/p1P5/3PP3/1pP2P2/6PP/4R1K1 w - - 0 50",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 129,
+   "expectedHybridOutput": 129,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "2r5/5kpp/2b5/2PP4/p3P3/1pP2P2/6PP/1R4K1 w - - 1 52",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "queenless-mixed",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 8,
+   "expectedHybridOutput": 8,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/5kpp/8/2r5/p3P3/1pP2P2/5KPP/1R6 w - - 0 54",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": 80,
+   "expectedHybridOutput": 80,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "8/5kpp/8/8/p3P3/2r2PK1/1p4PP/3R4 w - - 0 56",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -162,
+   "expectedHybridOutput": -162,
+   "actualRouteFromDiagnostics": "classical"
+  },
+  {
+   "tag": "routed-fill",
+   "fen": "3r4/1p4p1/p2p1k1p/P3p3/4P3/6RP/1P3PP1/6K1 w - - 3 34",
+   "expectedRoute": "classical",
+   "expectedMaterialClass": "rook",
+   "expectedPhase": "endgame",
+   "standaloneClassical": -71,
+   "expectedHybridOutput": -71,
+   "actualRouteFromDiagnostics": "classical"
+  }
+ ]
+}

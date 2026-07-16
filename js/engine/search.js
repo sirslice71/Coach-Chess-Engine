@@ -290,7 +290,7 @@ export class SearchTimeout extends Error {}
 
 export default class Search {
 
-    constructor(board, legalMoveGenerator, evaluation) {
+    constructor(board, legalMoveGenerator, evaluation, hybridEvaluator = null) {
 
         this.board = board;
 
@@ -299,6 +299,12 @@ export default class Search {
 
         this.evaluation =
             evaluation;
+
+        // EXPERIMENTAL, isolated hybrid evaluator (see hybridEval.js).
+        // null by default -- production behavior is completely unchanged
+        // unless a caller explicitly constructs and passes one in.
+        this.hybridEvaluator =
+            hybridEvaluator;
 
         this.nodes = 0;
         this.leafNodes = 0;
@@ -391,6 +397,15 @@ export default class Search {
     }
 
     whiteRelativeEval() {
+
+        if (this.hybridEvaluator) {
+
+            return this.hybridEvaluator.evaluate(
+                this.board,
+                this.evaluation
+            );
+
+        }
 
         return this.evaluation.evaluate().total;
 

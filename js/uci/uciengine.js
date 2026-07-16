@@ -4,6 +4,7 @@ import MoveGenerator from "../engine/movegen.js";
 import LegalMoveGenerator from "../engine/legalmovegen.js";
 import Evaluation from "../engine/evaluation.js";
 import Search, { SearchTimeout } from "../engine/search.js";
+import { HybridEvaluator } from "../engine/hybridEval.js";
 import TranspositionTable from "../engine/transpositiontable.js";
 import { SearchConstants } from "../engine/searchconstants.js";
 import { Piece } from "../core/piece.js";
@@ -419,6 +420,12 @@ function withMutedConsole(fn) {
 export function createEngineCore(fen = null) {
 
     const board = new Board();
+    // EXPERIMENTAL: constructed only when COACH_HYBRID_MODEL_PATH is set;
+    // otherwise null and Search behaves exactly as in production (see
+    // Search.whiteRelativeEval() and hybridEval.js).
+    const hybridEvaluator = process.env.COACH_HYBRID_MODEL_PATH
+        ? new HybridEvaluator({ diagnostics: process.env.COACH_HYBRID_DIAGNOSTICS === "1" })
+        : null;
     const search =
         new Search(
             board,
@@ -426,7 +433,8 @@ export function createEngineCore(fen = null) {
                 board,
                 new MoveGenerator(board)
             ),
-            new Evaluation(board)
+            new Evaluation(board),
+            hybridEvaluator
         );
 
     const moveGenerator =
