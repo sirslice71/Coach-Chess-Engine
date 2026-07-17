@@ -2589,3 +2589,173 @@ test("PV reconstruction preserves the exact underpromotion suffix from TT", () =
     );
 
 });
+
+test("reverse futility helper accepts only shallow non-PV heavy-material nodes", () => {
+
+    const { search } =
+        createEngine(
+            "q3k3/8/8/8/8/8/4QR2/4K3 w - - 0 1"
+        );
+
+    assert.equal(
+        search.canReverseFutilityPrune(1, 99, 100, false, false),
+        true
+    );
+
+    assert.equal(
+        search.canReverseFutilityPrune(2, 99, 100, false, false),
+        false
+    );
+
+    assert.equal(
+        search.canReverseFutilityPrune(1, 98, 100, false, false),
+        false
+    );
+
+    assert.equal(
+        search.canReverseFutilityPrune(1, 99, 100, true, false),
+        false
+    );
+
+});
+
+test("reverse futility helper rejects mate-like bounds and unsafe material", () => {
+
+    const heavy = createEngine(
+        "q3k3/8/8/8/8/8/4QR2/4K3 w - - 0 1"
+    ).search;
+
+    assert.equal(
+        heavy.canReverseFutilityPrune(
+            1,
+            SearchConstants.MATE_THRESHOLD,
+            SearchConstants.MATE_THRESHOLD + 1,
+            false,
+            false
+        ),
+        false
+    );
+
+    const lowMaterial = createEngine(
+        "4k3/8/8/8/8/8/4N3/4K3 w - - 0 1"
+    ).search;
+
+    assert.equal(
+        lowMaterial.canReverseFutilityPrune(1, 99, 100, false, false),
+        false
+    );
+
+    const noHeavyPiece = createEngine(
+        "4k3/8/8/8/8/2n2b2/5N2/4K1B1 w - - 0 1"
+    ).search;
+
+    assert.equal(
+        noHeavyPiece.canReverseFutilityPrune(1, 99, 100, false, false),
+        false
+    );
+
+});
+
+test("reverse futility margin boundary returns a bounded beta cutoff", () => {
+
+    const below = createEngine(
+        "q3k3/8/8/8/8/8/4QR2/4K3 w - - 0 1"
+    );
+
+    const belowScore =
+        below.search.negamax(1, 231, 232, 1, false);
+
+    assert.equal(
+        below.search.reverseFutilityCutoffs,
+        0
+    );
+
+    assert.equal(typeof belowScore, "number");
+
+    const atBoundary = createEngine(
+        "q3k3/8/8/8/8/8/4QR2/4K3 w - - 0 1"
+    );
+
+    const score =
+        atBoundary.search.negamax(1, 230, 231, 1, false);
+
+    assert.equal(score, 231);
+    assert.equal(atBoundary.search.reverseFutilityCutoffs, 1);
+
+});
+
+test("reverse futility does not trigger at PV nodes or while in check", () => {
+
+    const pv = createEngine(
+        "q3k3/8/8/8/8/8/4QR2/4K3 w - - 0 1"
+    );
+
+    pv.search.negamax(1, 230, 231, 1, true);
+
+    assert.equal(pv.search.reverseFutilityCutoffs, 0);
+
+    const inCheck = createEngine(
+        "4k3/8/8/8/8/8/4r3/4K1R1 w - - 0 1"
+    );
+
+    inCheck.search.negamax(1, 99, 100, 1, false);
+
+    assert.equal(inCheck.search.reverseFutilityCutoffs, 0);
+
+});
+
+test("reverse futility coexists with null move without changing null eligibility depth", () => {
+
+    const { search } =
+        createEngine(
+            "q3k3/8/8/8/8/8/4QR2/4K3 w - - 0 1"
+        );
+
+    const score =
+        search.negamax(3, 230, 231, 1, false);
+
+    assert.equal(score, 231);
+    assert.equal(search.nullAttempts > 0, true);
+
+});
+
+test("reverse futility cutoff returns before writing a transposition entry", () => {
+
+    const { board, search } =
+        createEngine(
+            "q3k3/8/8/8/8/8/4QR2/4K3 w - - 0 1"
+        );
+
+    const score =
+        search.negamax(1, 230, 231, 1, false);
+
+    assert.equal(score, 231);
+    assert.equal(search.reverseFutilityCutoffs, 1);
+    assert.equal(search.tt.probe(board.hashKey), null);
+
+});
+
+test("reverse futility cutoff count resets between root searches", () => {
+
+    const { search } =
+        createEngine(
+            "q3k3/8/8/8/8/8/4QR2/4K3 w - - 0 1"
+        );
+
+    search.reverseFutilityCutoffs = 7;
+
+    withMutedConsole(
+        () => search.bestMove(1, { quiet: true })
+    );
+
+    assert.equal(search.reverseFutilityCutoffs, 0);
+
+    search.reverseFutilityCutoffs = 11;
+
+    withMutedConsole(
+        () => search.bestMove(1, { quiet: true })
+    );
+
+    assert.equal(search.reverseFutilityCutoffs, 0);
+
+});

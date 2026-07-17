@@ -263,6 +263,10 @@ const NULL_MOVE_REDUCTION = 2;
 
 const NULL_MOVE_DECISIVE_MARGIN = 500;
 
+const REVERSE_FUTILITY_DEPTH = 1;
+
+const REVERSE_FUTILITY_MARGIN = 300;
+
 //----------------------------------
 // Check Extension (near-horizon only, budget-capped v2)
 //
@@ -371,6 +375,7 @@ export default class Search {
         this.lmrResearches = 0;
         this.nullAttempts = 0;
         this.nullCutoffs = 0;
+        this.reverseFutilityCutoffs = 0;
 
         //----------------------------------
         // History Heuristic
@@ -428,6 +433,54 @@ export default class Search {
     hasRepetitionHistory() {
 
         return this.board.repetitionCount() > 1;
+
+    }
+
+    hasReverseFutilityMaterial() {
+
+        const sidePieces =
+            this.board.sideToMove > 0
+                ? this.board.whitePieces
+                : this.board.blackPieces;
+
+        return (
+            sidePieces.rooks.length +
+            sidePieces.queens.length
+        ) > 0;
+
+    }
+
+    isLowMaterialEnding() {
+
+        const whitePieces = this.board.whitePieces;
+        const blackPieces = this.board.blackPieces;
+
+        const nonPawnMaterial =
+            whitePieces.knights.length +
+            whitePieces.bishops.length +
+            whitePieces.rooks.length +
+            whitePieces.queens.length +
+            blackPieces.knights.length +
+            blackPieces.bishops.length +
+            blackPieces.rooks.length +
+            blackPieces.queens.length;
+
+        return nonPawnMaterial <= 2;
+
+    }
+
+    canReverseFutilityPrune(depth, alpha, beta, isRoot, inCheck) {
+
+        return (
+            !isRoot &&
+            depth === REVERSE_FUTILITY_DEPTH &&
+            beta === alpha + 1 &&
+            !inCheck &&
+            Math.abs(alpha) < SearchConstants.MATE_THRESHOLD &&
+            Math.abs(beta) < SearchConstants.MATE_THRESHOLD &&
+            this.hasReverseFutilityMaterial() &&
+            !this.isLowMaterialEnding()
+        );
 
     }
 
@@ -1254,6 +1307,40 @@ export default class Search {
 
         const inCheck = this.board.isInCheck();
 
+        let staticEval = null;
+
+        const getStaticEval = () => {
+
+            if (staticEval === null) {
+
+                staticEval =
+                    this.toSideToMoveScore(
+                        this.whiteRelativeEval()
+                    );
+
+            }
+
+            return staticEval;
+
+        };
+
+        if (
+            this.canReverseFutilityPrune(
+                depth,
+                alpha,
+                beta,
+                isRoot,
+                inCheck
+            ) &&
+            getStaticEval() - REVERSE_FUTILITY_MARGIN >= beta
+        ) {
+
+            this.reverseFutilityCutoffs++;
+
+            return beta;
+
+        }
+
         if (
             !isRoot &&
             nullAllowed &&
@@ -1287,14 +1374,9 @@ export default class Search {
                 // queen/rook mate sentinel during screening).
                 //----------------------------------
 
-                const nullStaticEval =
-                    this.toSideToMoveScore(
-                        this.whiteRelativeEval()
-                    );
-
                 if (
                     hasHeavyPiece &&
-                    nullStaticEval >= beta
+                    getStaticEval() >= beta
                 ) {
 
                     this.nullAttempts++;
@@ -2253,6 +2335,7 @@ export default class Search {
         this.pvsResearches = 0;
         this.lmrReductions = 0;
         this.lmrResearches = 0;
+        this.reverseFutilityCutoffs = 0;
 
         this.board.profileMakeMove = 0;
         this.board.profileUndoMove = 0;
