@@ -6,7 +6,7 @@ tournament conditions used to produce them.
 These ratings are local engine-pool estimates. They are not directly
 equivalent to FIDE, USCF, CCRL, or CEGT ratings.
 
-## 2026-07-17 â€” Coach RF Production Clean Gauntlet
+## 2026-07-17 Coach RF Production Clean Gauntlet
 
 ### Assigned reference ratings
 
@@ -47,7 +47,7 @@ Approximate 95% range: 1488 to 1563
 
 Working rating for future testing:
 
-> **Coach RF Production â€” 1525 Elo**
+> **Coach RF Production 1525 Elo**
 
 The four individual performance estimates ranged from 1518 to 1530, providing
 strong internal consistency across the opponent ladder.
