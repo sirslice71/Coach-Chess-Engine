@@ -114,6 +114,28 @@ export default class EnginePanel {
 
     }
 
+    showStaticEvaluation(evaluation) {
+
+        if (!this.element)
+            return;
+
+        this.status.textContent = "Review";
+
+        this.bestMove.textContent = "-";
+
+        this.eval.textContent =
+            Number(evaluation).toFixed(2);
+
+        this.depth.textContent = "-";
+
+        this.nodes.textContent = "-";
+
+        this.nps.textContent = "-";
+
+        this.time.textContent = "-";
+
+    }
+
     clear() {
 
         this.setStatus("Ready");

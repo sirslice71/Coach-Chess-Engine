@@ -40,11 +40,18 @@ export default class GameController {
 
         this.gameMoves = [];
 
+        this.positionCursor = 0;
+
         this.humanSide = 1;
 
         this.interval = null;
 
         this.coachMovePending = false;
+
+        this.manualResult = null;
+
+        this.infiniteAnalysisTimer = null;
+        this.infiniteAnalysisDepth = 1;
 
     }
 
@@ -61,6 +68,10 @@ export default class GameController {
 
     isHumanTurn() {
 
+        if (this.isGameOver()) {
+            return false;
+        }
+
         return this.board.sideToMove ===
             this.humanSide;
 
@@ -70,6 +81,7 @@ export default class GameController {
 
         return (
             this.autoCoach &&
+            !this.isGameOver() &&
             !this.isHumanTurn()
         );
 
@@ -89,6 +101,8 @@ export default class GameController {
         setTimeout(() => {
 
             this.coachMovePending = false;
+
+            this.goToCurrentPosition();
 
             if (this.shouldCoachPlay()) {
                 this.coachMove(depth);
@@ -295,13 +309,19 @@ export default class GameController {
         this.board.initializePosition();
 
         this.gameMoves = [];
+        this.positionCursor = 0;
 
         this.coachMovePending = false;
+        this.manualResult = null;
+        this.stopInfiniteAnalysis();
 
         this.ui.selectedSquare = -1;
         this.ui.flipped = this.humanSide < 0;
         this.ui.draw();
-        this.ui.updateMoveHistory(this.gameMoves);
+        this.ui.updateMoveHistory(
+            this.gameMoves,
+            this.positionCursor
+        );
         this.ui.enginePanel.setStatus("Ready");
 
         this.scheduleCoachMove(depth);
@@ -313,6 +333,9 @@ export default class GameController {
     //----------------------------------
 
     coachMove(depth = 5) {
+
+        this.stopInfiniteAnalysis();
+        this.goToCurrentPosition();
 
         console.time("Coach TOTAL");
 
@@ -450,6 +473,14 @@ export default class GameController {
 
     playMove(move, coachMeta = null) {
 
+        this.stopInfiniteAnalysis();
+
+        if (this.isGameOver()) {
+            return false;
+        }
+
+        this.trimFutureMoves();
+
         //----------------------------------
         // SAN (Pre-Move Legal Position)
         //----------------------------------
@@ -484,7 +515,11 @@ export default class GameController {
         //----------------------------------
 
         this.recordMove(move, san, coachMeta);
-        this.ui.updateMoveHistory(this.gameMoves);
+        this.positionCursor = this.gameMoves.length;
+        this.ui.updateMoveHistory(
+            this.gameMoves,
+            this.positionCursor
+        );
 
         //----------------------------------
         // Redraw
@@ -503,7 +538,7 @@ export default class GameController {
         //----------------------------------
 
         const game =
-            this.gameState.getResult();
+            this.currentResult();
 
         if (game.gameOver) {
 
@@ -610,6 +645,117 @@ export default class GameController {
 
     }
 
+    startInfiniteAnalysis() {
+
+        if (!this.canUseReviewAnalysis()) {
+
+            return {
+                result: "NOT_READY",
+                message:
+                    "Use analysis while reviewing a past position or after the game ends."
+            };
+
+        }
+
+        this.stopInfiniteAnalysis();
+
+        this.infiniteAnalysisDepth = 1;
+        this.ui.enginePanel.setStatus("Analyzing...");
+
+        const analyzeNextDepth = () => {
+
+            const depth =
+                this.infiniteAnalysisDepth;
+
+            const result =
+                this.search.bestMove(
+                    depth,
+                    {
+                        quiet: true,
+                        deadlineMs:
+                            performance.now() + 1500
+                    }
+                );
+
+            this.ui.enginePanel.update(result);
+            this.ui.enginePanel.setStatus(
+                `Analyzing depth ${depth}`
+            );
+
+            this.infiniteAnalysisDepth++;
+
+            this.infiniteAnalysisTimer =
+                setTimeout(analyzeNextDepth, 50);
+
+        };
+
+        analyzeNextDepth();
+
+        return {
+            result: "PASS"
+        };
+
+    }
+
+    stopInfiniteAnalysis() {
+
+        if (this.infiniteAnalysisTimer !== null) {
+
+            clearTimeout(this.infiniteAnalysisTimer);
+            this.infiniteAnalysisTimer = null;
+
+        }
+
+        this.ui.enginePanel.setStatus("Ready");
+
+    }
+
+    canUseReviewAnalysis() {
+
+        return (
+            this.currentResult().gameOver ||
+            this.positionCursor < this.gameMoves.length
+        );
+
+    }
+
+    goToPly(ply) {
+
+        const target =
+            Math.max(
+                0,
+                Math.min(ply, this.gameMoves.length)
+            );
+
+        while (this.positionCursor > target) {
+
+            this.board.undoMove();
+            this.positionCursor--;
+
+        }
+
+        while (this.positionCursor < target) {
+
+            const entry =
+                this.gameMoves[this.positionCursor];
+
+            if (!entry || !entry.rawMove) {
+                break;
+            }
+
+            this.board.makeMove(entry.rawMove);
+            this.positionCursor++;
+
+        }
+
+        this.ui.updateMoveHistory(
+            this.gameMoves,
+            this.positionCursor
+        );
+        this.ui.draw();
+
+    }
+
     //----------------------------------
     // Check Game Over
     //----------------------------------
@@ -617,7 +763,7 @@ export default class GameController {
     checkGameOver() {
 
         const result =
-            this.gameState.getResult();
+            this.currentResult();
 
         if (!result.gameOver) {
 
@@ -676,6 +822,8 @@ export default class GameController {
 
         this.gameMoves.push({
 
+            rawMove: move,
+
             move: move.toString(),
 
             piece: move.piece,
@@ -713,6 +861,312 @@ export default class GameController {
             note: coachMeta ? (coachMeta.note || "") : ""
 
         });
+
+    }
+
+    isGameOver() {
+
+        return !!(
+            this.manualResult &&
+            this.manualResult.gameOver
+        );
+
+    }
+
+    currentResult() {
+
+        return this.manualResult ||
+            this.gameState.getResult();
+
+    }
+
+    resignHuman() {
+
+        if (this.isGameOver()) {
+            return false;
+        }
+
+        this.goToCurrentPosition();
+        this.coachMovePending = false;
+
+        const coachWinsAsWhite =
+            this.humanSide < 0;
+
+        this.manualResult = {
+
+            gameOver: true,
+            winner: -this.humanSide,
+            result: coachWinsAsWhite
+                ? "1-0"
+                : "0-1",
+            reason: "Human resigned"
+
+        };
+
+        this.ui.clearSelection();
+        this.ui.updateMoveHistory(
+            this.gameMoves,
+            this.positionCursor
+        );
+        this.ui.enginePanel.setStatus("Game Over");
+        this.ui.showGameOver(this.manualResult);
+
+        return true;
+
+    }
+
+    trimFutureMoves() {
+
+        if (this.positionCursor >= this.gameMoves.length) {
+            return;
+        }
+
+        this.gameMoves =
+            this.gameMoves.slice(0, this.positionCursor);
+
+    }
+
+    goToCurrentPosition() {
+
+        while (this.positionCursor < this.gameMoves.length) {
+
+            const entry =
+                this.gameMoves[this.positionCursor];
+
+            if (!entry || !entry.rawMove) {
+                break;
+            }
+
+            this.board.makeMove(entry.rawMove);
+            this.positionCursor++;
+
+        }
+
+        this.ui.updateMoveHistory(
+            this.gameMoves,
+            this.positionCursor
+        );
+
+        this.ui.draw();
+
+    }
+
+    reviewPreviousMove() {
+
+        this.stopInfiniteAnalysis();
+
+        if (
+            !this.canReviewMoveHistory() ||
+            this.positionCursor <= 0
+        ) {
+            return false;
+        }
+
+        this.board.undoMove();
+        this.positionCursor--;
+
+        this.ui.updateMoveHistory(
+            this.gameMoves,
+            this.positionCursor
+        );
+
+        this.ui.draw();
+        this.showReviewEvaluation();
+
+        return true;
+
+    }
+
+    reviewNextMove() {
+
+        this.stopInfiniteAnalysis();
+
+        if (
+            !this.canReviewMoveHistory() ||
+            this.positionCursor >= this.gameMoves.length
+        ) {
+            return false;
+        }
+
+        const entry =
+            this.gameMoves[this.positionCursor];
+
+        if (!entry || !entry.rawMove) {
+            return false;
+        }
+
+        this.board.makeMove(entry.rawMove);
+        this.positionCursor++;
+
+        this.ui.updateMoveHistory(
+            this.gameMoves,
+            this.positionCursor
+        );
+
+        this.ui.draw();
+        this.showReviewEvaluation();
+
+        return true;
+
+    }
+
+    canReviewMoveHistory() {
+
+        if (this.coachMovePending) {
+            return false;
+        }
+
+        return (
+            this.positionCursor < this.gameMoves.length ||
+            this.isHumanTurn()
+        );
+
+    }
+
+    undoLastMove() {
+
+        this.stopInfiniteAnalysis();
+        this.goToCurrentPosition();
+
+        if (this.gameMoves.length === 0) {
+            return false;
+        }
+
+        this.board.undoMove();
+        this.gameMoves.pop();
+        this.positionCursor = this.gameMoves.length;
+
+        this.ui.draw();
+        this.ui.updateMoveHistory(
+            this.gameMoves,
+            this.positionCursor
+        );
+        this.showReviewEvaluation();
+
+        return true;
+
+    }
+
+    showReviewEvaluation() {
+
+        this.ui.enginePanel.setStatus("Searching...");
+
+        const result =
+            this.search.bestMove(
+                this.ui.currentCoachDepth(),
+                { quiet: true }
+            );
+
+        this.ui.enginePanel.update(result);
+        this.ui.enginePanel.setStatus("Review");
+
+    }
+
+    analyzeGameQuick(depth = 3) {
+
+        this.stopInfiniteAnalysis();
+
+        if (!this.currentResult().gameOver) {
+
+            return {
+                result: "NOT_READY",
+                message: "Game analysis is available after the game ends.",
+                findings: []
+            };
+
+        }
+
+        const originalCursor =
+            this.positionCursor;
+
+        const findings = [];
+
+        this.goToPly(0);
+
+        for (
+            let index = 0;
+            index < this.gameMoves.length;
+            index++
+        ) {
+
+            const entry =
+                this.gameMoves[index];
+
+            if (!entry || !entry.rawMove) {
+                continue;
+            }
+
+            const side =
+                entry.side === "White" ? 1 : -1;
+
+            if (side === this.humanSide) {
+
+                const bestBefore =
+                    this.search.bestMove(
+                        depth,
+                        { quiet: true }
+                    );
+
+                this.board.makeMove(entry.rawMove);
+                this.positionCursor = index + 1;
+
+                const actualAfter =
+                    this.search.bestMove(
+                        Math.max(1, depth - 1),
+                        { quiet: true }
+                    );
+
+                const bestEval =
+                    Number(bestBefore.evaluation);
+
+                const actualEval =
+                    Number(actualAfter.evaluation);
+
+                const loss =
+                    this.humanSide > 0
+                        ? bestEval - actualEval
+                        : actualEval - bestEval;
+
+                if (loss >= 0.75) {
+
+                    findings.push({
+                        ply: index + 1,
+                        moveNumber: entry.moveNumber,
+                        side: entry.side,
+                        played: entry.san || entry.move,
+                        suggested: bestBefore.notation,
+                        swing: Number(loss.toFixed(2)),
+                        beforeEval: bestBefore.evaluation,
+                        afterEval: actualAfter.evaluation
+                    });
+
+                }
+
+            } else {
+
+                this.board.makeMove(entry.rawMove);
+                this.positionCursor = index + 1;
+
+            }
+
+        }
+
+        this.goToPly(originalCursor);
+
+        findings.sort((a, b) => b.swing - a.swing);
+
+        return {
+            result: "PASS",
+            depth,
+            analyzedHumanMoves:
+                this.gameMoves.filter(
+                    entry => (
+                        entry.side === "White" ? 1 : -1
+                    ) === this.humanSide
+                ).length,
+            findingCount: findings.length,
+            findings: findings.slice(0, 6)
+        };
 
     }
 
@@ -766,7 +1220,7 @@ export default class GameController {
     exportPgn() {
 
         const result =
-            this.gameState.getResult().result;
+            this.currentResult().result;
 
         const pgn =
             PGN.buildPgnString({

@@ -318,25 +318,20 @@ function New-CoachCuteChessCommand {
     )
 
     $args = @(
-        "-engine", "name=Coach", "cmd=node", "arg=js/uci/uci.js", "dir=$CoachPath", "option.Hash=64", "option.Move Overhead=150", "restart=on",
+        "-engine", "name=Coach", "cmd=node", "arg=uci.js", "dir=$CoachPath", "option.Hash=64", "option.Move Overhead=150", "restart=on",
         "-engine", "name=$OpponentName", "cmd=$OpponentPath", "option.Threads=1", "option.Hash=64", "option.UCI_LimitStrength=true", "option.UCI_Elo=$StockfishElo", "restart=on",
         "-each", "tc=inf/$($SecondsPerMove)", "proto=uci",
         "-games", "$Games",
         "-concurrency", "$Concurrency",
         "-repeat",
         "-recover",
-        "-seed", "$Seed",
         "-event", $EventName,
         "-pgnout", $PgnOutputPath,
-        "-debug", "-srand", "$Seed"
+        "-srand", "$Seed"
     )
 
     if (-not [string]::IsNullOrWhiteSpace($BookPath)) {
         $args += @("-openings", "file=$BookPath", "format=bin", "order=random", "plies=$BookDepth")
-    }
-
-    if (-not [string]::IsNullOrWhiteSpace($LogOutputPath)) {
-        $args += @("-log", $LogOutputPath)
     }
 
     return [pscustomobject]@{
@@ -1001,14 +996,15 @@ if ($Mode -eq "Match" -or $Mode -eq "MatchThenBenchmark") {
             ConvertTo-Json -Depth 6 |
             Set-Content -LiteralPath (Join-Path $Results "match-summary.json") -Encoding UTF8
 
-        if ($match.Games -ne $Games -or $warnings.Count -gt 0) {
+        if ($match.Games -ne $Games -or @($warnings).Count -gt 0) {
             throw "Match validation failed; not proceeding automatically."
         }
 
         if ($RunPgnAnalyzer) {
             $analyzer = "<USERPROFILE>\OneDrive\Desktop\Coach Neural\neural\tools\analyze-pgn.mjs"
             if (Test-Path -LiteralPath $analyzer) {
-                Invoke-CoachCommand -FilePath "node" -Arguments @($analyzer, $PgnOutputPath) -ResultDirectory $Results -Name "pgn-analysis"
+                $analysisJson = Join-Path $Results "pgn-analysis.json"
+                Invoke-CoachCommand -FilePath "node" -Arguments @($analyzer, "--in", $PgnOutputPath, "--player", "Coach", "--json", $analysisJson) -ResultDirectory $Results -Name "pgn-analysis"
             }
         }
     }
@@ -1020,6 +1016,14 @@ if ($Mode -eq "AnalyzeExistingMatch") {
     [pscustomobject]@{ Match = $match; Warnings = $warnings } |
         ConvertTo-Json -Depth 6 |
         Set-Content -LiteralPath (Join-Path $Results "match-summary.json") -Encoding UTF8
+
+    if ($RunPgnAnalyzer) {
+        $analyzer = "<USERPROFILE>\OneDrive\Desktop\Coach Neural\neural\tools\analyze-pgn.mjs"
+        if (Test-Path -LiteralPath $analyzer) {
+            $analysisJson = Join-Path $Results "pgn-analysis.json"
+            Invoke-CoachCommand -FilePath "node" -Arguments @($analyzer, "--in", $PgnOutputPath, "--player", "Coach", "--json", $analysisJson) -ResultDirectory $Results -Name "pgn-analysis"
+        }
+    }
 }
 
 if ($Mode -eq "Benchmark" -or $Mode -eq "MatchThenBenchmark") {

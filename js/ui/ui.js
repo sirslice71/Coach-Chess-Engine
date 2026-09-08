@@ -23,6 +23,14 @@ export default class UI {
 
         this.selectedSquare = -1;
 
+        this.interactionMode = "drag";
+
+        this.moveHintsEnabled = true;
+
+        this.dragSourceSquare = -1;
+
+        this.dragImageElement = null;
+
         this.flipped = false;
 
         this.enginePanel = new EnginePanel();
@@ -97,6 +105,48 @@ export default class UI {
 
                 });
 
+                square.addEventListener("dragstart", event => {
+
+                    this.dragStarted(
+                        event,
+                        this.displaySquareToBoardSquare(
+                            displayIndex
+                        )
+                    );
+
+                });
+
+                square.addEventListener("dragover", event => {
+
+                    this.dragOver(event);
+
+                });
+
+                square.addEventListener("dragleave", event => {
+
+                    event.currentTarget.classList.remove(
+                        "dropTarget"
+                    );
+
+                });
+
+                square.addEventListener("drop", event => {
+
+                    this.dropMove(
+                        event,
+                        this.displaySquareToBoardSquare(
+                            displayIndex
+                        )
+                    );
+
+                });
+
+                square.addEventListener("dragend", () => {
+
+                    this.dragEnded();
+
+                });
+
                 this.boardElement.appendChild(square);
 
             }
@@ -106,6 +156,10 @@ export default class UI {
     }
 
     squareClicked(square) {
+
+        if (this.interactionMode !== "click") {
+            return;
+        }
 
         if (!window.chess.gameController.isHumanTurn()) {
             return;
@@ -146,6 +200,154 @@ export default class UI {
         }
 
         this.tryMove(this.selectedSquare, square);
+
+    }
+
+    dragStarted(event, square) {
+
+        if (this.interactionMode !== "drag") {
+            event.preventDefault();
+            return;
+        }
+
+        if (!this.canStartHumanMove(square)) {
+            event.preventDefault();
+            return;
+        }
+
+        this.dragSourceSquare = square;
+        this.clearSelection();
+        this.selectedSquare = square;
+        this.showLegalMoves(square);
+
+        event.currentTarget.classList.add("dragging");
+
+        if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData(
+                "text/plain",
+                String(square)
+            );
+
+            const image =
+                event.currentTarget.querySelector(".piece");
+
+            if (image) {
+
+                this.dragImageElement =
+                    image.cloneNode(true);
+
+                this.dragImageElement.classList.add(
+                    "dragPreview"
+                );
+
+                document.body.appendChild(
+                    this.dragImageElement
+                );
+
+                event.dataTransfer.setDragImage(
+                    this.dragImageElement,
+                    image.offsetWidth / 2,
+                    image.offsetHeight / 2
+                );
+
+            }
+        }
+
+    }
+
+    dragOver(event) {
+
+        if (
+            this.interactionMode !== "drag" ||
+            this.dragSourceSquare === -1
+        ) {
+            return;
+        }
+
+        event.preventDefault();
+
+        if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = "move";
+        }
+
+        if (this.moveHintsEnabled) {
+            event.currentTarget.classList.add("dropTarget");
+        }
+
+    }
+
+    dropMove(event, square) {
+
+        if (
+            this.interactionMode !== "drag" ||
+            this.dragSourceSquare === -1
+        ) {
+            return;
+        }
+
+        event.preventDefault();
+        event.currentTarget.classList.remove("dropTarget");
+
+        const fromSquare = this.dragSourceSquare;
+
+        this.dragSourceSquare = -1;
+        this.tryMove(fromSquare, square);
+
+    }
+
+    dragEnded() {
+
+        this.dragSourceSquare = -1;
+
+        [...this.boardElement.children].forEach(square => {
+
+            square.classList.remove("dragging");
+            square.classList.remove("dropTarget");
+
+        });
+
+        this.clearSelection();
+        this.removeDragImage();
+
+    }
+
+    removeDragImage() {
+
+        if (!this.dragImageElement) {
+            return;
+        }
+
+        this.dragImageElement.remove();
+        this.dragImageElement = null;
+
+    }
+
+    canStartHumanMove(square) {
+
+        if (
+            !window.chess ||
+            !window.chess.gameController ||
+            !window.chess.gameController.isHumanTurn()
+        ) {
+            return false;
+        }
+
+        const piece = this.board.pieceAt(square);
+
+        if (piece === Piece.EMPTY) {
+            return false;
+        }
+
+        if (this.board.sideToMove > 0 && piece < 0) {
+            return false;
+        }
+
+        if (this.board.sideToMove < 0 && piece > 0) {
+            return false;
+        }
+
+        return true;
 
     }
 
@@ -250,6 +452,9 @@ export default class UI {
                 boardSquare;
 
             square.innerHTML = "";
+            square.draggable = false;
+            square.classList.remove("dragging");
+            square.classList.remove("dropTarget");
 
             if (piece === Piece.EMPTY)
                 continue;
@@ -263,10 +468,66 @@ export default class UI {
             img.draggable = false;
 
             square.appendChild(img);
+            square.draggable =
+                this.canDragPiece(boardSquare);
 
         }
 
         this.updateDeveloperPanel();
+
+    }
+
+    setInteractionMode(mode) {
+
+        this.interactionMode =
+            mode === "click"
+                ? "click"
+                : "drag";
+
+        this.dragSourceSquare = -1;
+        this.selectedSquare = -1;
+
+        this.boardElement.classList.toggle(
+            "clickInput",
+            this.interactionMode === "click"
+        );
+
+        this.boardElement.classList.toggle(
+            "dragInput",
+            this.interactionMode === "drag"
+        );
+
+        this.draw();
+
+    }
+
+    setMoveHintsEnabled(enabled) {
+
+        this.moveHintsEnabled = !!enabled;
+
+        this.boardElement.classList.toggle(
+            "hideMoveHints",
+            !this.moveHintsEnabled
+        );
+
+        this.clearSelection();
+
+        if (
+            this.moveHintsEnabled &&
+            this.selectedSquare !== -1
+        ) {
+            this.selectSquare(this.selectedSquare);
+            this.showLegalMoves(this.selectedSquare);
+        }
+
+    }
+
+    canDragPiece(square) {
+
+        return (
+            this.interactionMode === "drag" &&
+            this.canStartHumanMove(square)
+        );
 
     }
 
@@ -334,13 +595,20 @@ export default class UI {
                 squareNumber
             )
         ]
-            .classList.add("selected");
+            .classList.toggle(
+                "selected",
+                this.moveHintsEnabled
+            );
 
         this.selectedSquare = squareNumber;
 
     }
 
     showLegalMoves(square) {
+
+        if (!this.moveHintsEnabled) {
+            return;
+        }
 
         const moves = this.legalMoveGenerator.generateMoves();
 
@@ -403,7 +671,10 @@ export default class UI {
 
     }
 
-    updateMoveHistory(gameMoves = []) {
+    updateMoveHistory(
+        gameMoves = [],
+        activePly = gameMoves.length
+    ) {
 
         if (!this.moveHistoryElement) {
             return;
@@ -444,6 +715,13 @@ export default class UI {
 
             row.className = "moveHistoryRow";
 
+            if (
+                activePly === index + 1 ||
+                activePly === index + 2
+            ) {
+                row.classList.add("active");
+            }
+
             const moveNumber =
                 document.createElement("span");
 
@@ -459,6 +737,10 @@ export default class UI {
             whiteText.className =
                 "moveHistoryMove";
 
+            if (activePly === index + 1) {
+                whiteText.classList.add("active");
+            }
+
             whiteText.textContent =
                 whiteMove ? whiteMove.move : "";
 
@@ -467,6 +749,10 @@ export default class UI {
 
             blackText.className =
                 "moveHistoryMove";
+
+            if (activePly === index + 2) {
+                blackText.classList.add("active");
+            }
 
             blackText.textContent =
                 blackMove ? blackMove.move : "...";

@@ -22,11 +22,36 @@
 
             <button id="newGameBtn">New Game</button>
 
+            <div id="newGameChooser"
+                 class="newGameChooser hidden">
+
+                <span>Play as</span>
+
+                <div class="segmentedControl">
+
+                    <button id="newGameWhiteBtn"
+                            class="segment"
+                            type="button">White</button>
+
+                    <button id="newGameBlackBtn"
+                            class="segment"
+                            type="button">Black</button>
+
+                </div>
+
+                <button id="newGameCancelBtn"
+                        class="secondaryButton"
+                        type="button">Cancel</button>
+
+            </div>
+
             <button id="undoBtn">Undo</button>
 
             <button id="flipBtn">Flip Board</button>
 
             <button id="hintBtn">Hint</button>
+
+            <button id="resignBtn">Resign</button>
 
         </div>
 
@@ -45,6 +70,42 @@
             </select>
 
         </div>
+
+        <div class="moveInput">
+
+            <label>Move Input</label>
+
+            <div class="segmentedControl"
+                 role="group"
+                 aria-label="Move input">
+
+                <button id="dragMoveModeBtn"
+                        class="segment active"
+                        type="button"
+                        aria-pressed="true">
+                    Drag
+                </button>
+
+                <button id="clickMoveModeBtn"
+                        class="segment"
+                        type="button"
+                        aria-pressed="false">
+                    Click
+                </button>
+
+            </div>
+
+        </div>
+
+        <label class="toggleOption">
+
+            <input id="moveHintsToggle"
+                   type="checkbox"
+                   checked>
+
+            <span>Move Hints</span>
+
+        </label>
 
         <div id="thinkingBox">
         
@@ -92,6 +153,21 @@
 
     <aside id="rightPanel">
 
+        <div class="sideTabs">
+
+            <button class="sideTab active"
+                    id="gameTabBtn"
+                    type="button">Game</button>
+
+            <button class="sideTab"
+                    id="labTabBtn"
+                    type="button">Lab</button>
+
+        </div>
+
+        <section id="gamePanel"
+                 class="sidePane active">
+
         <h3>Move History</h3>
 
         <div id="moveHistory"></div>
@@ -101,6 +177,52 @@
         <div id="capturedWhite"></div>
 
         <div id="capturedBlack"></div>
+
+        <h3>Review Tools</h3>
+
+        <div class="reviewActions">
+
+            <button id="infiniteAnalysisBtn"
+                    type="button">Start Analysis</button>
+
+            <button id="stopAnalysisBtn"
+                    type="button">Stop Analysis</button>
+
+            <button id="gameAnalysisBtn"
+                    type="button">Analyze Game</button>
+
+        </div>
+
+        <div id="gameAnalysisOutput"
+             class="analysisOutput"></div>
+
+        </section>
+
+        <section id="labPanel"
+                 class="sidePane">
+
+            <h3>Coach Lab</h3>
+
+            <label class="filePicker">
+                <span>Analysis JSON</span>
+                <input id="labFileInput"
+                       type="file"
+                       accept="application/json,.json">
+            </label>
+
+            <div id="labStatus"
+                 class="labStatus"></div>
+
+            <div id="labSummary"
+                 class="labSummary"></div>
+
+            <div id="labCandidates"
+                 class="labCandidates"></div>
+
+            <div id="labDetail"
+                 class="labDetail"></div>
+
+        </section>
 
     </aside>
 

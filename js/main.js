@@ -1,5 +1,6 @@
 import Board from "./core/board.js";
 import UI from "./ui/ui.js";
+import CoachLabPanel from "./ui/coachlabpanel.js";
 import MoveGenerator from "./engine/movegen.js";
 import Attack from "./engine/attack.js";
 import {
@@ -44,6 +45,12 @@ const ui = new UI(
     board,
     legalMoveGenerator
 );
+const coachLabPanel =
+    new CoachLabPanel({
+        onLoadFen(fen) {
+            window.chess.load(fen);
+        }
+    });
 const evaluation =
     new Evaluation(board);
 const search =
@@ -96,6 +103,8 @@ const coachLab = new CoachLab(
     evaluation
 
 );    
+
+coachLabPanel.initialize();
 
 console.log(search);
 
@@ -265,8 +274,16 @@ window.chess = {
     load(fen) {
 
         FEN.import(board, fen);
+        gameController.gameMoves = [];
+        gameController.positionCursor = 0;
+        gameController.coachMovePending = false;
 
         ui.draw();
+        ui.updateMoveHistory(
+            gameController.gameMoves,
+            gameController.positionCursor
+        );
+        gameController.showReviewEvaluation();
 
     },
 
@@ -489,38 +506,14 @@ function selectedCoachDepth() {
 
 }
 
-function chooseNewGameSide() {
+function setNewGameChooserVisible(visible) {
 
-    const answer = prompt(
-        "New Game\n\nChoose your color:\nW = Play as White\nB = Play as Black\n\nPress Cancel to keep the current game."
-    );
+    const chooser =
+        document.getElementById("newGameChooser");
 
-    if (answer === null) {
-        return null;
+    if (chooser) {
+        chooser.classList.toggle("hidden", !visible);
     }
-
-    const normalized =
-        answer.trim().toLowerCase();
-
-    if (
-        normalized === "w" ||
-        normalized === "white"
-    ) {
-        return 1;
-    }
-
-    if (
-        normalized === "b" ||
-        normalized === "black"
-    ) {
-        return -1;
-    }
-
-    alert(
-        "New Game canceled.\n\nPlease enter W for White or B for Black."
-    );
-
-    return null;
 
 }
 
@@ -528,116 +521,323 @@ function chooseNewGameSide() {
 // Button Events
 //----------------------------------
 
-//----------------------------------
-// New Game
-//----------------------------------
+function startNewGameFromUi() {
 
-document
+    setNewGameChooserVisible(true);
 
-    .getElementById("newGameBtn")
+}
 
-    .addEventListener(
+function startNewGameAs(humanSide) {
 
-        "click",
+    if (humanSide === null)
+        return;
 
-        () => {
+    gameController.startNewGame(
+        humanSide,
+        selectedCoachDepth()
+    );
 
-            const humanSide =
-                chooseNewGameSide();
+    setNewGameChooserVisible(false);
 
-            if (humanSide === null)
-                return;
+}
 
-            gameController.startNewGame(
-                humanSide,
-                selectedCoachDepth()
+function undoLastMoveFromUi() {
+
+    gameController.undoLastMove();
+
+}
+
+function showHintFromUi() {
+
+    const result =
+        search.bestMove(4);
+
+    console.log(
+        "Coach Suggests:",
+        result.notation,
+        result.evaluation
+    );
+
+}
+
+function resignFromUi() {
+
+    if (
+        !confirm(
+            "Resign this game?\n\nThis will end the game as a loss."
+        )
+    ) {
+        return;
+    }
+
+    gameController.resignHuman();
+
+}
+
+function setGameAnalysisOutput(text) {
+
+    const output =
+        document.getElementById("gameAnalysisOutput");
+
+    if (output) {
+        output.innerHTML = text;
+    }
+
+}
+
+function startInfiniteAnalysisFromUi() {
+
+    const result =
+        gameController.startInfiniteAnalysis();
+
+    if (result && result.result !== "PASS") {
+
+        setGameAnalysisOutput(
+            `<p>${result.message}</p>`
+        );
+
+    }
+
+}
+
+function stopInfiniteAnalysisFromUi() {
+
+    gameController.stopInfiniteAnalysis();
+
+}
+
+function analyzeGameFromUi() {
+
+    setGameAnalysisOutput(
+        "<p>Analyzing game...</p>"
+    );
+
+    setTimeout(() => {
+
+        const report =
+            gameController.analyzeGameQuick(3);
+
+        if (report.result !== "PASS") {
+
+            setGameAnalysisOutput(
+                `<p>${report.message}</p>`
             );
 
-        }
-
-    );
-
-//----------------------------------
-// Flip Board
-//----------------------------------
-
-document
-
-    .getElementById("flipBtn")
-
-    .addEventListener(
-
-        "click",
-
-        () => {
-
-            ui.flipBoard();
+            return;
 
         }
 
-    );
+        if (report.findingCount === 0) {
 
-//----------------------------------
-// Undo
-//----------------------------------
-
-document
-
-    .getElementById("undoBtn")
-
-    .addEventListener(
-
-        "click",
-
-        () => {
-
-            board.undoMove();
-
-            if (
-                gameController.gameMoves.length > 0
-            ) {
-                gameController.gameMoves.pop();
-            }
-
-            ui.draw();
-            ui.updateMoveHistory(
-                gameController.gameMoves
+            setGameAnalysisOutput(
+                "<p>No major missed opportunities found in the quick pass.</p>"
             );
 
-        }
-
-    );
-
-//----------------------------------
-// Hint
-//----------------------------------
-
-document
-
-    .getElementById("hintBtn")
-
-    .addEventListener(
-
-        "click",
-
-        () => {
-
-            const result =
-
-                search.bestMove(4);
-
-            console.log(
-
-                "Coach Suggests:",
-
-                result.notation,
-
-                result.evaluation
-
-            );
+            return;
 
         }
 
+        const rows =
+            report.findings
+                .map(finding => `
+                    <div class="analysisFinding">
+                        <strong>${finding.moveNumber}. ${finding.played}</strong>
+                        <span>Try ${finding.suggested}; swing ${finding.swing.toFixed(2)}</span>
+                        <small>Before ${finding.beforeEval}, after ${finding.afterEval}</small>
+                    </div>
+                `)
+                .join("");
+
+        setGameAnalysisOutput(`
+            <p>Quick depth-${report.depth} review found ${report.findingCount}
+            candidate improvement${report.findingCount === 1 ? "" : "s"}.</p>
+            ${rows}
+        `);
+
+    }, 20);
+
+}
+
+function bindButtons(ids, handler) {
+
+    for (const id of ids) {
+
+        const button =
+            document.getElementById(id);
+
+        if (!button) {
+            continue;
+        }
+
+        button.addEventListener(
+            "click",
+            handler
+        );
+
+    }
+
+}
+
+bindButtons(
+    ["newGameBtn"],
+    startNewGameFromUi
+);
+
+bindButtons(
+    ["newGameWhiteBtn"],
+    () => startNewGameAs(1)
+);
+
+bindButtons(
+    ["newGameBlackBtn"],
+    () => startNewGameAs(-1)
+);
+
+bindButtons(
+    ["newGameCancelBtn"],
+    () => setNewGameChooserVisible(false)
+);
+
+bindButtons(
+    ["flipBtn"],
+    () => ui.flipBoard()
+);
+
+bindButtons(
+    ["undoBtn"],
+    undoLastMoveFromUi
+);
+
+bindButtons(
+    ["hintBtn"],
+    showHintFromUi
+);
+
+bindButtons(
+    ["resignBtn"],
+    resignFromUi
+);
+
+bindButtons(
+    ["infiniteAnalysisBtn"],
+    startInfiniteAnalysisFromUi
+);
+
+bindButtons(
+    ["stopAnalysisBtn"],
+    stopInfiniteAnalysisFromUi
+);
+
+bindButtons(
+    ["gameAnalysisBtn"],
+    analyzeGameFromUi
+);
+
+function setMoveInputMode(mode) {
+
+    ui.setInteractionMode(mode);
+
+    const dragButton =
+        document.getElementById("dragMoveModeBtn");
+
+    const clickButton =
+        document.getElementById("clickMoveModeBtn");
+
+    if (dragButton) {
+
+        const active = mode === "drag";
+
+        dragButton.classList.toggle("active", active);
+        dragButton.setAttribute(
+            "aria-pressed",
+            String(active)
+        );
+
+    }
+
+    if (clickButton) {
+
+        const active = mode === "click";
+
+        clickButton.classList.toggle("active", active);
+        clickButton.setAttribute(
+            "aria-pressed",
+            String(active)
+        );
+
+    }
+
+}
+
+bindButtons(
+    ["dragMoveModeBtn"],
+    () => setMoveInputMode("drag")
+);
+
+bindButtons(
+    ["clickMoveModeBtn"],
+    () => setMoveInputMode("click")
+);
+
+setMoveInputMode("drag");
+
+const moveHintsToggle =
+    document.getElementById("moveHintsToggle");
+
+if (moveHintsToggle) {
+
+    ui.setMoveHintsEnabled(moveHintsToggle.checked);
+
+    moveHintsToggle.addEventListener("change", () => {
+
+        ui.setMoveHintsEnabled(moveHintsToggle.checked);
+
+    });
+
+}
+
+function isTextEditingTarget(element) {
+
+    if (!element) {
+        return false;
+    }
+
+    const tagName =
+        element.tagName
+            ? element.tagName.toLowerCase()
+            : "";
+
+    return (
+        tagName === "input" ||
+        tagName === "textarea" ||
+        tagName === "select" ||
+        element.isContentEditable
     );
 
+}
 
+document.addEventListener("keydown", event => {
+
+    if (isTextEditingTarget(event.target)) {
+        return;
+    }
+
+    if (event.key === "ArrowLeft") {
+
+        if (gameController.reviewPreviousMove()) {
+            event.preventDefault();
+        }
+
+        return;
+
+    }
+
+    if (event.key === "ArrowRight") {
+
+        if (gameController.reviewNextMove()) {
+            event.preventDefault();
+        }
+
+    }
+
+});
