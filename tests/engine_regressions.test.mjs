@@ -239,6 +239,28 @@ function searchBestMovesByDepth(fen, depths) {
 
 }
 
+function searchRootScores(fen, depth, notations) {
+
+    const result =
+        searchBestMove(fen, depth);
+
+    const rootScores =
+        new Map(
+            result.rootMoves.map(rootMove => [
+                rootMove.notation,
+                rootMove.score
+            ])
+        );
+
+    return Object.fromEntries(
+        notations.map(notation => [
+            notation,
+            rootScores.get(notation)
+        ])
+    );
+
+}
+
 function searchMoveScore(fen, notation, depth) {
 
     const {
@@ -424,6 +446,96 @@ const PGN_COLLAPSE_REGRESSIONS = [
                 depth: 6,
                 notation: "c3-c4",
                 evaluation: "-2.31"
+            }
+        ]
+    }
+];
+
+const MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS = [
+    {
+        label: "six-game 5s SF2400 game 3 before Qg3",
+        fen: "r5k1/q3bpp1/7p/8/1P2P3/1PP2Q1P/1K3PP1/7R w - - 1 31",
+        coachPlayed: "f3-g3",
+        target: "h3-h4",
+        theme: "passed-pawn tactical defense",
+        current: [
+            {
+                depth: 5,
+                notation: "e4-e5",
+                evaluation: "0.88"
+            },
+            {
+                depth: 6,
+                notation: "b2-c2",
+                evaluation: "0.30"
+            },
+            {
+                depth: 7,
+                notation: "b2-c2",
+                evaluation: "-0.56"
+            },
+            {
+                depth: 8,
+                notation: "f3-g3",
+                evaluation: "-3.47"
+            }
+        ]
+    },
+    {
+        label: "forty-game 2s SF2400 game 37 before Rd1",
+        fen: "3rkb2/8/2p2pRp/2P5/1pb1P3/2P1Q2P/Pq3P2/R3K3 w Q - 1 24",
+        coachPlayed: "a1-d1",
+        target: "a1-d1",
+        theme: "mate-net defensive resource",
+        current: [
+            {
+                depth: 5,
+                notation: "a1-d1",
+                evaluation: "0.13"
+            },
+            {
+                depth: 6,
+                notation: "a1-d1",
+                evaluation: "-0.87"
+            },
+            {
+                depth: 7,
+                notation: "a1-d1",
+                evaluation: "-6.99"
+            },
+            {
+                depth: 8,
+                notation: "f2-f3",
+                evaluation: "-8.33"
+            }
+        ]
+    },
+    {
+        label: "six-game 5s SF2400 game 1 before Kd4",
+        fen: "8/8/8/3K4/p7/7p/7k/5b2 w - - 0 102",
+        coachPlayed: "d5-d4",
+        target: "d5-e5",
+        theme: "low-material promotion-race mate conversion",
+        current: [
+            {
+                depth: 5,
+                notation: "d5-e5",
+                evaluation: "-8.62"
+            },
+            {
+                depth: 6,
+                notation: "d5-d4",
+                evaluation: "-12.93"
+            },
+            {
+                depth: 7,
+                notation: "d5-d4",
+                evaluation: "-12.93"
+            },
+            {
+                depth: 8,
+                notation: "d5-d4",
+                evaluation: "-13.39"
             }
         ]
     }
@@ -795,6 +907,117 @@ test("PGN collapse sentinel positions load and keep target moves legal", () => {
 
 });
 
+test("mined SF2400 collapse positions load and keep played/target moves legal", () => {
+
+    for (const position of MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS) {
+
+        const {
+            board,
+            legalMoveGenerator
+        } = createEngine(position.fen);
+
+        assert.equal(
+            FEN.export(board),
+            position.fen,
+            `${position.label} should round-trip through FEN import/export`
+        );
+
+        const legalMoveNotations =
+            new Set(
+                legalMoveGenerator
+                    .generateMoves()
+                    .map(move => move.toString())
+            );
+
+        assert.ok(
+            legalMoveNotations.has(position.coachPlayed),
+            `${position.label} should keep played move ${position.coachPlayed} legal`
+        );
+
+        assert.ok(
+            legalMoveNotations.has(position.target),
+            `${position.label} should keep target move ${position.target} legal`
+        );
+
+    }
+
+});
+
+test("mined SF2400 collapse positions preserve current depth snapshots", () => {
+
+    for (const position of MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS) {
+
+        const depths =
+            position.current.map(entry => entry.depth);
+
+        const results =
+            searchBestMovesByDepth(
+                position.fen,
+                depths
+            );
+
+        assert.deepEqual(
+            results.map(({ depth, notation, evaluation }) => ({
+                depth,
+                notation,
+                evaluation
+            })),
+            position.current,
+            `${position.label} current behavior changed; review whether the mined target is now fixed or needs a new baseline.`
+        );
+
+    }
+
+});
+
+test("mined SF2400 collapse positions expose current depth-8 root-score shape", () => {
+
+    const qg3 =
+        MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS[0];
+
+    assert.deepEqual(
+        searchRootScores(
+            qg3.fen,
+            8,
+            [qg3.coachPlayed, qg3.target]
+        ),
+        {
+            "f3-g3": -347,
+            "h3-h4": -347
+        }
+    );
+
+    const rd1 =
+        MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS[1];
+
+    assert.deepEqual(
+        searchRootScores(
+            rd1.fen,
+            8,
+            [rd1.coachPlayed, rd1.target]
+        ),
+        {
+            "a1-d1": -915
+        }
+    );
+
+    const kd4 =
+        MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS[2];
+
+    assert.deepEqual(
+        searchRootScores(
+            kd4.fen,
+            8,
+            [kd4.coachPlayed, kd4.target]
+        ),
+        {
+            "d5-d4": -1339,
+            "d5-e5": -1339
+        }
+    );
+
+});
+
 test("PGN collapse regression: game 8 vs Shallowblue move 73 finds g4-f3 at depth 8", () => {
 
     const result =
@@ -901,6 +1124,29 @@ for (const position of PGN_COLLAPSE_REGRESSIONS) {
             assert.equal(
                 results.at(-1)?.notation,
                 position.target
+            );
+
+        }
+    );
+
+}
+
+for (const position of MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS) {
+
+    test.skip(
+        `diagnostic mined SF2400 target: ${position.label} should eventually prefer ${position.target}`,
+        () => {
+
+            const results =
+                searchBestMovesByDepth(
+                    position.fen,
+                    [6, 7, 8]
+                );
+
+            assert.equal(
+                results.at(-1)?.notation,
+                position.target,
+                `${position.theme}: expected depth-8 search to prefer ${position.target}`
             );
 
         }

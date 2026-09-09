@@ -320,7 +320,7 @@ function New-CoachCuteChessCommand {
     $args = @(
         "-engine", "name=Coach", "cmd=node", "arg=uci.js", "dir=$CoachPath", "option.Hash=64", "option.Move Overhead=150", "restart=on",
         "-engine", "name=$OpponentName", "cmd=$OpponentPath", "option.Threads=1", "option.Hash=64", "option.UCI_LimitStrength=true", "option.UCI_Elo=$StockfishElo", "restart=on",
-        "-each", "tc=inf/$($SecondsPerMove)", "proto=uci",
+        "-each", "st=$($SecondsPerMove)", "timemargin=1000", "proto=uci",
         "-games", "$Games",
         "-concurrency", "$Concurrency",
         "-repeat",
@@ -483,7 +483,8 @@ function Invoke-CoachProcess {
         [string]$FilePath,
         [string[]]$Arguments,
         [string]$StandardOutputPath,
-        [string]$StandardErrorPath
+        [string]$StandardErrorPath,
+        [switch]$LiveOutput
     )
 
     $startInfo =
@@ -505,15 +506,23 @@ function Invoke-CoachProcess {
 
     [void]$process.Start()
 
-    $stdoutTask =
-        $process.StandardOutput.ReadToEndAsync()
-
     $stderrTask =
         $process.StandardError.ReadToEndAsync()
 
+    $stdoutBuilder =
+        New-Object System.Text.StringBuilder
+
+    while (-not $process.StandardOutput.EndOfStream) {
+        $line = $process.StandardOutput.ReadLine()
+        [void]$stdoutBuilder.AppendLine($line)
+        if ($LiveOutput) {
+            Write-Host $line
+        }
+    }
+
     $process.WaitForExit()
 
-    [System.IO.File]::WriteAllText($StandardOutputPath, $stdoutTask.Result, [System.Text.Encoding]::UTF8)
+    [System.IO.File]::WriteAllText($StandardOutputPath, $stdoutBuilder.ToString(), [System.Text.Encoding]::UTF8)
     [System.IO.File]::WriteAllText($StandardErrorPath, $stderrTask.Result, [System.Text.Encoding]::UTF8)
 
     return $process.ExitCode
@@ -534,8 +543,11 @@ function Invoke-CoachCommand {
         "DRYRUN ${Name}: $FilePath $($Arguments -join ' ')"
         return
     }
+    $liveOutput =
+        ($Name -eq "cutechess")
+
     $exitCode =
-        Invoke-CoachProcess -FilePath $FilePath -Arguments $Arguments -StandardOutputPath $stdout -StandardErrorPath $stderr
+        Invoke-CoachProcess -FilePath $FilePath -Arguments $Arguments -StandardOutputPath $stdout -StandardErrorPath $stderr -LiveOutput:$liveOutput
 
     if ($exitCode -ne 0) {
         throw "$Name failed with exit code $exitCode."
@@ -905,7 +917,13 @@ function Invoke-CoachSelfTest {
         }
 
         $cmd = New-CoachCuteChessCommand -CuteChessPath "cutechess-cli.exe" -CoachPath "C:\Coach" -OpponentPath "stockfish.exe" -OpponentName "Stockfish" -StockfishElo 2000 -Games 2 -Concurrency 1 -SecondsPerMove 1 -BookPath "book.bin" -BookDepth 8 -Seed 1 -PgnOutputPath "out.pgn" -LogOutputPath "out.log" -EventName "selftest"
-        if (-not ($cmd.Arguments -contains "option.UCI_LimitStrength=true") -or -not ($cmd.Arguments -contains "-recover")) {
+        if (
+            -not ($cmd.Arguments -contains "option.UCI_LimitStrength=true") -or
+            -not ($cmd.Arguments -contains "st=1") -or
+            -not ($cmd.Arguments -contains "timemargin=1000") -or
+            ($cmd.Arguments -contains "tc=inf/1") -or
+            -not ($cmd.Arguments -contains "-recover")
+        ) {
             throw "Command construction self-test failed."
         }
 

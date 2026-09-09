@@ -14,6 +14,13 @@ The wrapper uses the local CuteChess and Stockfish paths, creates a timestamped
 directory under `analysis-runs`, runs the match, and runs the PGN analyzer when
 available.
 
+CuteChess progress is shown live in the PowerShell window as each game starts
+and finishes, while the same output is still saved in `cutechess.stdout.txt`.
+
+`-SecondsPerMove` is passed to CuteChess as a fixed seconds-per-move search
+time (`st=<seconds>`) with a 1000ms engine timeout margin. Increase it for
+deeper analysis, or increase `-Games` for a broader corpus.
+
 ## Check the Latest Run
 
 ```powershell
