@@ -302,6 +302,12 @@ const MAX_CHECK_EXTENSIONS = 1;
 
 const CHECK_EXTENSION_MAX_DEPTH = 3;
 
+const ROOT_TIE_VERIFY_MIN_DEPTH = 6;
+
+const ROOT_TIE_VERIFY_SCORE_FLOOR = 300;
+
+const ROOT_TIE_VERIFY_MAX_MOVES = 6;
+
 export class SearchTimeout extends Error {}
 
 export default class Search {
@@ -490,6 +496,103 @@ export default class Search {
         }
 
         return captures.concat(quietForcingMoves);
+
+    }
+
+    verifyRootTie(depth, result) {
+
+        if (
+            depth < ROOT_TIE_VERIFY_MIN_DEPTH ||
+            !result.bestMove ||
+            !Array.isArray(result.rootMoves) ||
+            result.rootMoves.length < 2 ||
+            Math.abs(result.bestScore) < ROOT_TIE_VERIFY_SCORE_FLOOR ||
+            !this.isLowMaterialEnding()
+        ) {
+            return result;
+        }
+
+        const topScore =
+            result.rootMoves[0].score;
+
+        const tiedMoves =
+            result.rootMoves
+                .filter(rootMove => rootMove.score === topScore)
+                .slice(0, ROOT_TIE_VERIFY_MAX_MOVES);
+
+        if (tiedMoves.length < 2) {
+            return result;
+        }
+
+        let bestVerified = {
+            rootMove: tiedMoves[0],
+            score: -SearchConstants.INFINITY
+        };
+
+        try {
+
+            for (const rootMove of tiedMoves) {
+
+                this.board.makeMove(rootMove.move);
+
+                let score;
+
+                try {
+
+                    score =
+                        -this.negamax(
+                            depth,
+                            -SearchConstants.INFINITY,
+                            SearchConstants.INFINITY,
+                            1,
+                            false
+                        );
+
+                }
+
+                finally {
+
+                    this.board.undoMove();
+
+                }
+
+                if (score > bestVerified.score) {
+
+                    bestVerified = {
+                        rootMove,
+                        score
+                    };
+
+                }
+
+            }
+
+        }
+
+        catch (error) {
+
+            if (error instanceof SearchTimeout) {
+                return result;
+            }
+
+            throw error;
+
+        }
+
+        if (
+            bestVerified.rootMove.move.key !== result.bestMove.key ||
+            bestVerified.score !== result.bestScore
+        ) {
+
+            return {
+                ...result,
+                bestMove: bestVerified.rootMove.move,
+                bestScore: bestVerified.score
+            };
+
+        }
+
+        return result;
 
     }
 
@@ -792,6 +895,9 @@ export default class Search {
             };
 
         }
+
+        result =
+            this.verifyRootTie(completedDepth, result);
 
         const pv =
             completedDepth > 0 && result.bestMove

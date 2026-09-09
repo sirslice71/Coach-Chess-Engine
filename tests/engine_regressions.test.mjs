@@ -525,7 +525,7 @@ const MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS = [
             {
                 depth: 6,
                 notation: "d5-d4",
-                evaluation: "-12.93"
+                evaluation: "-13.39"
             },
             {
                 depth: 7,
@@ -535,7 +535,7 @@ const MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS = [
             {
                 depth: 8,
                 notation: "d5-d4",
-                evaluation: "-13.39"
+                evaluation: "-14.23"
             }
         ]
     }
@@ -628,8 +628,8 @@ const MINED_STOCKFISH_2400_HIGH_PRIORITY_REGRESSIONS = [
             },
             {
                 depth: 8,
-                notation: "f7-g8",
-                evaluation: "-3.71"
+                notation: "f7-e6",
+                evaluation: "-8.77"
             }
         ]
     }
@@ -1174,6 +1174,19 @@ test("mined SF2400 collapse positions expose current root-score shape", () => {
             "f7-e6": -371
         }
     );
+
+});
+
+test("low-material root tie verification chooses the deeper rook-pawn defense", () => {
+
+    const kxg8 =
+        MINED_STOCKFISH_2400_HIGH_PRIORITY_REGRESSIONS[3];
+
+    const result =
+        searchBestMove(kxg8.fen, 8);
+
+    assert.equal(result.notation, kxg8.target);
+    assert.equal(result.evaluation, "-8.77");
 
 });
 
