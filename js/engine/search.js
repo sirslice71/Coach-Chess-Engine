@@ -158,6 +158,18 @@ const QSEARCH_SEE_PRUNE_THRESHOLD = -300;
 const MAX_Q_CHECK_PLY = MAX_Q_PLY;
 
 //----------------------------------
+// Quiescence: Quiet Forcing Moves
+//
+// The normal not-in-check qsearch searches captures only. That
+// is fast, but it is blind to near-horizon mate nets where the
+// forcing move is a quiet check or a quiet promotion. Search
+// those forcing quiet moves only in the first qsearch ply so
+// the extension is tactical rather than a second full search.
+//----------------------------------
+
+const MAX_Q_QUIET_FORCING_PLY = 1;
+
+//----------------------------------
 // Principal Variation Search (PVS)
 //
 // Only applied inside negamax()'s own move loop (never the
@@ -427,6 +439,57 @@ export default class Search {
             this.board.isThreefoldRepetition() ||
             this.board.isFiftyMoveDraw()
         );
+
+    }
+
+    generateQuiescenceMoves(qPly) {
+
+        const captures =
+            this.legalMoveGenerator.generateCaptures();
+
+        if (qPly >= MAX_Q_QUIET_FORCING_PLY) {
+            return captures;
+        }
+
+        const captureKeys =
+            new Set(captures.map(move => move.key));
+
+        const quietForcingMoves = [];
+
+        for (const move of this.legalMoveGenerator.generateMoves()) {
+
+            if (captureKeys.has(move.key)) {
+                continue;
+            }
+
+            if (move.isCapture()) {
+                continue;
+            }
+
+            if (move.isPromotion()) {
+                quietForcingMoves.push(move);
+                continue;
+            }
+
+            this.board.makeMove(move);
+
+            let givesCheck;
+
+            try {
+                givesCheck = this.board.isInCheck();
+            }
+
+            finally {
+                this.board.undoMove();
+            }
+
+            if (givesCheck) {
+                quietForcingMoves.push(move);
+            }
+
+        }
+
+        return captures.concat(quietForcingMoves);
 
     }
 
@@ -1942,7 +2005,7 @@ export default class Search {
 
                 ? this.legalMoveGenerator.generateMoves()
 
-                : this.legalMoveGenerator.generateCaptures();
+                : this.generateQuiescenceMoves(qPly);
 
         if (inCheck && moves.length === 0) {
 

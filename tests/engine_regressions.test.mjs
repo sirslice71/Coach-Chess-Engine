@@ -461,23 +461,23 @@ const MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS = [
         current: [
             {
                 depth: 5,
-                notation: "e4-e5",
-                evaluation: "0.88"
+                notation: "b2-c2",
+                evaluation: "0.34"
             },
             {
                 depth: 6,
-                notation: "b2-c2",
-                evaluation: "0.30"
+                notation: "f3-e3",
+                evaluation: "-3.26"
             },
             {
                 depth: 7,
-                notation: "b2-c2",
-                evaluation: "-0.56"
+                notation: "f3-e3",
+                evaluation: "-3.26"
             },
             {
                 depth: 8,
                 notation: "f3-g3",
-                evaluation: "-3.47"
+                evaluation: "-3.42"
             }
         ]
     },
@@ -491,22 +491,22 @@ const MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS = [
             {
                 depth: 5,
                 notation: "a1-d1",
-                evaluation: "0.13"
+                evaluation: "-0.87"
             },
             {
                 depth: 6,
                 notation: "a1-d1",
-                evaluation: "-0.87"
+                evaluation: "-7.23"
             },
             {
                 depth: 7,
-                notation: "a1-d1",
-                evaluation: "-6.99"
+                notation: "f2-f4",
+                evaluation: "-8.28"
             },
             {
                 depth: 8,
                 notation: "f2-f3",
-                evaluation: "-8.33"
+                evaluation: "-8.59"
             }
         ]
     },
@@ -519,8 +519,8 @@ const MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS = [
         current: [
             {
                 depth: 5,
-                notation: "d5-e5",
-                evaluation: "-8.62"
+                notation: "d5-d4",
+                evaluation: "-12.93"
             },
             {
                 depth: 6,
@@ -530,7 +530,7 @@ const MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS = [
             {
                 depth: 7,
                 notation: "d5-d4",
-                evaluation: "-12.93"
+                evaluation: "-13.39"
             },
             {
                 depth: 8,
@@ -539,6 +539,105 @@ const MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS = [
             }
         ]
     }
+];
+
+const MINED_STOCKFISH_2400_HIGH_PRIORITY_REGRESSIONS = [
+    {
+        label: "twenty-game 5s SF2400 game 6 before Ke8",
+        fen: "r1qr1k2/P1pn1NQ1/2P4p/3p4/7P/2B1P1P1/R6K/8 b - - 0 50",
+        coachPlayed: "f8-e8",
+        target: "f8-e7",
+        theme: "passed-pawn mate-net defense",
+        current: [
+            {
+                depth: 6,
+                notation: "f8-e8",
+                evaluation: "999.92"
+            },
+            {
+                depth: 7,
+                notation: "f8-e8",
+                evaluation: "999.92"
+            },
+            {
+                depth: 8,
+                notation: "f8-e8",
+                evaluation: "999.92"
+            }
+        ]
+    },
+    {
+        label: "twenty-game 5s SF2400 game 17 before Kd1",
+        fen: "6k1/3p2p1/2b5/q5np/2P2Q2/1P2pP1P/3bR1P1/rNK3R1 w - - 1 39",
+        coachPlayed: "c1-d1",
+        target: "c1-c2",
+        theme: "king escape mate-net defense",
+        current: [
+            {
+                depth: 6,
+                notation: "c1-c2",
+                evaluation: "-12.37"
+            },
+            {
+                depth: 7,
+                notation: "c1-c2",
+                evaluation: "-12.37"
+            },
+            {
+                depth: 8,
+                notation: "c1-c2",
+                evaluation: "-999.88"
+            }
+        ]
+    },
+    {
+        label: "twenty-game 5s SF2400 game 17 after Kd1",
+        fen: "6k1/3p2p1/2b5/q5np/2P2Q2/1P2pP1P/3bR1P1/rN1K2R1 b - - 2 39",
+        coachPlayed: "a5-a2",
+        target: "a1-b1",
+        theme: "quiet mating move recognition",
+        current: [
+            {
+                depth: 6,
+                notation: "a1-b1",
+                evaluation: "-999.91"
+            },
+            {
+                depth: 7,
+                notation: "a1-b1",
+                evaluation: "-999.91"
+            }
+        ]
+    },
+    {
+        label: "twenty-game 5s SF2400 game 3 before Kxg8",
+        fen: "6r1/5K2/8/3p4/2k5/2P5/8/8 w - - 0 81",
+        coachPlayed: "f7-g8",
+        target: "f7-e6",
+        theme: "rook-pawn endgame mate horizon",
+        current: [
+            {
+                depth: 6,
+                notation: "f7-g8",
+                evaluation: "-2.86"
+            },
+            {
+                depth: 7,
+                notation: "f7-g8",
+                evaluation: "-2.76"
+            },
+            {
+                depth: 8,
+                notation: "f7-g8",
+                evaluation: "-3.71"
+            }
+        ]
+    }
+];
+
+const MINED_STOCKFISH_2400_REGRESSIONS = [
+    ...MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS,
+    ...MINED_STOCKFISH_2400_HIGH_PRIORITY_REGRESSIONS
 ];
 
 test("move ordering direct-check rays use one aligned direction", () => {
@@ -909,7 +1008,7 @@ test("PGN collapse sentinel positions load and keep target moves legal", () => {
 
 test("mined SF2400 collapse positions load and keep played/target moves legal", () => {
 
-    for (const position of MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS) {
+    for (const position of MINED_STOCKFISH_2400_REGRESSIONS) {
 
         const {
             board,
@@ -945,7 +1044,7 @@ test("mined SF2400 collapse positions load and keep played/target moves legal", 
 
 test("mined SF2400 collapse positions preserve current depth snapshots", () => {
 
-    for (const position of MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS) {
+    for (const position of MINED_STOCKFISH_2400_REGRESSIONS) {
 
         const depths =
             position.current.map(entry => entry.depth);
@@ -970,7 +1069,7 @@ test("mined SF2400 collapse positions preserve current depth snapshots", () => {
 
 });
 
-test("mined SF2400 collapse positions expose current depth-8 root-score shape", () => {
+test("mined SF2400 collapse positions expose current root-score shape", () => {
 
     const qg3 =
         MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS[0];
@@ -982,8 +1081,8 @@ test("mined SF2400 collapse positions expose current depth-8 root-score shape", 
             [qg3.coachPlayed, qg3.target]
         ),
         {
-            "f3-g3": -347,
-            "h3-h4": -347
+            "f3-g3": -342,
+            "h3-h4": -342
         }
     );
 
@@ -997,7 +1096,7 @@ test("mined SF2400 collapse positions expose current depth-8 root-score shape", 
             [rd1.coachPlayed, rd1.target]
         ),
         {
-            "a1-d1": -915
+            "a1-d1": -859
         }
     );
 
@@ -1013,6 +1112,66 @@ test("mined SF2400 collapse positions expose current depth-8 root-score shape", 
         {
             "d5-d4": -1339,
             "d5-e5": -1339
+        }
+    );
+
+    const ke8 =
+        MINED_STOCKFISH_2400_HIGH_PRIORITY_REGRESSIONS[0];
+
+    assert.deepEqual(
+        searchRootScores(
+            ke8.fen,
+            8,
+            [ke8.coachPlayed, ke8.target]
+        ),
+        {
+            "f8-e8": -99992,
+            "f8-e7": -99992
+        }
+    );
+
+    const kd1Before =
+        MINED_STOCKFISH_2400_HIGH_PRIORITY_REGRESSIONS[1];
+
+    assert.deepEqual(
+        searchRootScores(
+            kd1Before.fen,
+            8,
+            [kd1Before.target, kd1Before.coachPlayed]
+        ),
+        {
+            "c1-c2": -99988,
+            "c1-d1": -99988
+        }
+    );
+
+    const kd1After =
+        MINED_STOCKFISH_2400_HIGH_PRIORITY_REGRESSIONS[2];
+
+    assert.deepEqual(
+        searchRootScores(
+            kd1After.fen,
+            7,
+            [kd1After.target, kd1After.coachPlayed]
+        ),
+        {
+            "a1-b1": 99991,
+            "a5-a2": 99991
+        }
+    );
+
+    const kxg8 =
+        MINED_STOCKFISH_2400_HIGH_PRIORITY_REGRESSIONS[3];
+
+    assert.deepEqual(
+        searchRootScores(
+            kxg8.fen,
+            8,
+            [kxg8.coachPlayed, kxg8.target]
+        ),
+        {
+            "f7-g8": -371,
+            "f7-e6": -371
         }
     );
 
@@ -1131,7 +1290,7 @@ for (const position of PGN_COLLAPSE_REGRESSIONS) {
 
 }
 
-for (const position of MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS) {
+for (const position of MINED_STOCKFISH_2400_REGRESSIONS) {
 
     test.skip(
         `diagnostic mined SF2400 target: ${position.label} should eventually prefer ${position.target}`,
@@ -1467,6 +1626,48 @@ test("quiescence still detects real checkmate even past the in-check ply cap", (
         result,
         -SearchConstants.MATE + 3,
         "Expected real checkmate to still be reported despite the in-check ply cap"
+    );
+
+});
+
+test("quiescence move generation includes only capped quiet forcing moves", () => {
+
+    const checkingEngine =
+        createEngine("4k3/8/8/8/8/8/4R3/4K3 w - - 0 1");
+
+    const firstPlyQuietChecks =
+        checkingEngine.search
+            .generateQuiescenceMoves(0)
+            .map(move => moveToUci(move));
+
+    assert.ok(
+        firstPlyQuietChecks.includes("e2e7"),
+        "first qsearch ply should include a quiet checking move"
+    );
+
+    const cappedQuietChecks =
+        checkingEngine.search
+            .generateQuiescenceMoves(1)
+            .map(move => moveToUci(move));
+
+    assert.equal(
+        cappedQuietChecks.includes("e2e7"),
+        false,
+        "quiet checking moves should be excluded after the qsearch forcing cap"
+    );
+
+    const promotionEngine =
+        createEngine("4k3/P7/8/8/8/8/8/4K3 w - - 0 1");
+
+    const firstPlyPromotions =
+        promotionEngine.search
+            .generateQuiescenceMoves(0)
+            .filter(move => move.isPromotion());
+
+    assert.equal(
+        firstPlyPromotions.length,
+        4,
+        "first qsearch ply should include all quiet promotion choices"
     );
 
 });
