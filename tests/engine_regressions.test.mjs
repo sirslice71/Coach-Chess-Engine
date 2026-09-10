@@ -830,10 +830,254 @@ const MINED_STOCKFISH_2400_POST_TIE_REGRESSIONS = [
     }
 ];
 
+const MINED_STOCKFISH_2400_HUNDRED_GAME_REGRESSIONS = [
+    {
+        label: "100g game48 after Kf7",
+        fen: "3q3r/5k1p/p3bN1p/2P5/4QR2/4P1K1/5P2/8 w - - 19 54",
+        coachPlayed: "f6-d5",
+        target: "f6-g8",
+        theme: "passed-pawn forced-mate conversion",
+        current: [
+            {
+                depth: 6,
+                notation: "f6-d5",
+                evaluation: "15.03"
+            },
+            {
+                depth: 7,
+                notation: "f6-d5",
+                evaluation: "19.07"
+            },
+            {
+                depth: 8,
+                notation: "f6-d5",
+                evaluation: "19.07"
+            }
+        ]
+    },
+    {
+        label: "100g game58 before Ra7",
+        fen: "1Q6/4k3/3q1nR1/rp3p1B/p3p3/P3P3/1Q1N4/K7 b - - 0 45",
+        coachPlayed: "a5-a7",
+        target: "d6-a3",
+        theme: "queen sacrifice mate-net defense",
+        current: [
+            {
+                depth: 6,
+                notation: "a5-a7",
+                evaluation: "999.92"
+            },
+            {
+                depth: 7,
+                notation: "a5-a7",
+                evaluation: "999.92"
+            },
+            {
+                depth: 8,
+                notation: "a5-a7",
+                evaluation: "999.92"
+            }
+        ]
+    },
+    {
+        label: "100g game62 after Bxe4",
+        fen: "rr3k2/2p2p2/pp1p1BP1/6Qp/2P1b3/1P3P2/P7/2K5 w - - 0 31",
+        coachPlayed: "g6-g7",
+        target: "f3-e4",
+        theme: "passed-pawn mate conversion",
+        current: [
+            {
+                depth: 6,
+                notation: "g6-g7",
+                evaluation: "5.64"
+            },
+            {
+                depth: 7,
+                notation: "g6-g7",
+                evaluation: "11.77"
+            },
+            {
+                depth: 8,
+                notation: "f3-e4",
+                evaluation: "999.91"
+            }
+        ]
+    },
+    {
+        label: "100g game94 before Kh7",
+        fen: "4Q1k1/1p6/p6p/5pp1/1Bp4P/PbP3P1/5qBK/8 b - - 0 38",
+        coachPlayed: "g8-h7",
+        target: "g8-g7",
+        theme: "king move mate-net defense",
+        current: [
+            {
+                depth: 6,
+                notation: "g8-h7",
+                evaluation: "8.04"
+            },
+            {
+                depth: 7,
+                notation: "g8-h7",
+                evaluation: "9.10"
+            },
+            {
+                depth: 8,
+                notation: "g8-h7",
+                evaluation: "10.68"
+            }
+        ]
+    },
+    {
+        label: "100g game94 after Kh7",
+        fen: "4Q3/1p5k/p6p/5pp1/1Bp4P/PbP3P1/5qBK/8 w - - 1 39",
+        coachPlayed: "b4-d6",
+        target: "e8-f7",
+        theme: "bishop queen mate conversion",
+        current: [
+            {
+                depth: 6,
+                notation: "b4-d6",
+                evaluation: "9.48"
+            },
+            {
+                depth: 7,
+                notation: "b4-d6",
+                evaluation: "10.68"
+            },
+            {
+                depth: 8,
+                notation: "b4-f8",
+                evaluation: "999.91"
+            }
+        ]
+    },
+    {
+        label: "100g game34 before Ka7",
+        fen: "4b3/1k6/p2K1P2/P7/8/2R5/8/8 b - - 4 72",
+        coachPlayed: "b7-a7",
+        target: "e8-h5",
+        theme: "rook-pawn endgame mate defense",
+        current: [
+            {
+                depth: 6,
+                notation: "e8-g6",
+                evaluation: "5.84"
+            },
+            {
+                depth: 7,
+                notation: "b7-a7",
+                evaluation: "5.84"
+            },
+            {
+                depth: 8,
+                notation: "b7-a7",
+                evaluation: "5.92"
+            }
+        ]
+    },
+    {
+        label: "100g game34 after Ka7",
+        fen: "4b3/k7/p2K1P2/P7/8/2R5/8/8 w - - 5 73",
+        coachPlayed: "c3-g3",
+        target: "c3-c7",
+        theme: "rook-pawn mate conversion",
+        current: [
+            {
+                depth: 6,
+                notation: "c3-c7",
+                evaluation: "5.84"
+            },
+            {
+                depth: 7,
+                notation: "c3-g3",
+                evaluation: "8.53"
+            },
+            {
+                depth: 8,
+                notation: "c3-g3",
+                evaluation: "9.52"
+            }
+        ]
+    },
+    {
+        label: "100g game67 before Kd4",
+        fen: "8/5q2/5P2/pk2K3/8/8/8/8 w - - 2 100",
+        coachPlayed: "e5-d4",
+        target: "e5-f5",
+        theme: "queen-pawn endgame mate defense",
+        current: [
+            {
+                depth: 6,
+                notation: "e5-d4",
+                evaluation: "-12.97"
+            },
+            {
+                depth: 7,
+                notation: "e5-d4",
+                evaluation: "-14.64"
+            },
+            {
+                depth: 8,
+                notation: "e5-d4",
+                evaluation: "-18.46"
+            }
+        ]
+    },
+    {
+        label: "100g game67 after Kd4",
+        fen: "8/5q2/5P2/pk6/3K4/8/8/8 b - - 3 100",
+        coachPlayed: "a5-a4",
+        target: "f7-f6",
+        theme: "queen-pawn mate conversion",
+        current: [
+            {
+                depth: 6,
+                notation: "a5-a4",
+                evaluation: "-14.64"
+            },
+            {
+                depth: 7,
+                notation: "a5-a4",
+                evaluation: "-18.46"
+            },
+            {
+                depth: 8,
+                notation: "a5-a4",
+                evaluation: "-18.49"
+            }
+        ]
+    },
+    {
+        label: "100g game81 before Kf1",
+        fen: "N7/p2p1kp1/1p5r/3p4/1QBPb3/5q2/1PP2P1P/R1R3K1 w - - 1 23",
+        coachPlayed: "g1-f1",
+        target: "g1-f1",
+        theme: "same-move mate recognition",
+        current: [
+            {
+                depth: 6,
+                notation: "g1-f1",
+                evaluation: "1.93"
+            },
+            {
+                depth: 7,
+                notation: "g1-f1",
+                evaluation: "-4.13"
+            },
+            {
+                depth: 8,
+                notation: "g1-f1",
+                evaluation: "-4.13"
+            }
+        ]
+    }
+];
+
 const MINED_STOCKFISH_2400_REGRESSIONS = [
     ...MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS,
     ...MINED_STOCKFISH_2400_HIGH_PRIORITY_REGRESSIONS,
-    ...MINED_STOCKFISH_2400_POST_TIE_REGRESSIONS
+    ...MINED_STOCKFISH_2400_POST_TIE_REGRESSIONS,
+    ...MINED_STOCKFISH_2400_HUNDRED_GAME_REGRESSIONS
 ];
 
 test("move ordering direct-check rays use one aligned direction", () => {
