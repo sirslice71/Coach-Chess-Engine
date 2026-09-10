@@ -635,9 +635,205 @@ const MINED_STOCKFISH_2400_HIGH_PRIORITY_REGRESSIONS = [
     }
 ];
 
+const MINED_STOCKFISH_2400_POST_TIE_REGRESSIONS = [
+    {
+        label: "twenty-game 5s SF2400 post-tie game 17 before Rf1",
+        fen: "N1bk3r/pp3ppp/2n5/4p3/1b2P3/8/PPPP1PqP/R1BQK2R w KQ - 0 10",
+        coachPlayed: "h1-f1",
+        target: "d1-e2",
+        theme: "early queen-infiltration mate defense",
+        current: [
+            {
+                depth: 6,
+                notation: "h1-f1",
+                evaluation: "-2.09"
+            },
+            {
+                depth: 7,
+                notation: "h1-f1",
+                evaluation: "-7.73"
+            },
+            {
+                depth: 8,
+                notation: "h1-f1",
+                evaluation: "-7.73"
+            }
+        ]
+    },
+    {
+        label: "twenty-game 5s SF2400 post-tie game 17 before Qg5",
+        fen: "N2k3r/pp3ppp/8/4p2Q/1b1nP1b1/8/PPPP1PqP/R1B1KR2 w Q - 4 12",
+        coachPlayed: "h5-g5",
+        target: "h5-h4",
+        theme: "early forced-mate queen defense",
+        current: [
+            {
+                depth: 6,
+                notation: "h5-g5",
+                evaluation: "-7.14"
+            },
+            {
+                depth: 7,
+                notation: "h5-g5",
+                evaluation: "-8.85"
+            },
+            {
+                depth: 8,
+                notation: "h5-g5",
+                evaluation: "-13.01"
+            }
+        ]
+    },
+    {
+        label: "twenty-game 5s SF2400 post-tie game 17 after Qg5",
+        fen: "N2k3r/pp3ppp/8/4p1Q1/1b1nP1b1/8/PPPP1PqP/R1B1KR2 b Q - 5 12",
+        coachPlayed: "b4-e7",
+        target: "f7-f6",
+        theme: "quiet mating-net conversion",
+        current: [
+            {
+                depth: 6,
+                notation: "b4-e7",
+                evaluation: "-8.85"
+            },
+            {
+                depth: 7,
+                notation: "b4-e7",
+                evaluation: "-13.01"
+            },
+            {
+                depth: 8,
+                notation: "b4-e7",
+                evaluation: "-13.01"
+            }
+        ]
+    },
+    {
+        label: "twenty-game 5s SF2400 post-tie game 8 after Kh8",
+        fen: "r2r3k/5p2/4b2B/pp1p2Q1/2pb2PP/P7/2B3K1/8 w - - 2 37",
+        coachPlayed: "g5-h5",
+        target: "h6-f8",
+        theme: "bishop queen mating-net conversion",
+        current: [
+            {
+                depth: 6,
+                notation: "h6-f8",
+                evaluation: "-3.34"
+            },
+            {
+                depth: 7,
+                notation: "g5-h5",
+                evaluation: "-2.93"
+            },
+            {
+                depth: 8,
+                notation: "g5-h5",
+                evaluation: "-2.93"
+            }
+        ]
+    },
+    {
+        label: "twenty-game 5s SF2400 post-tie game 8 before Bc6",
+        fen: "r3b2k/4QBb1/5P2/ppB5/2p4P/P7/6K1/8 b - - 0 58",
+        coachPlayed: "e8-c6",
+        target: "e8-f7",
+        theme: "bishop mate-net defense",
+        current: [
+            {
+                depth: 6,
+                notation: "e8-f7",
+                evaluation: "4.81"
+            },
+            {
+                depth: 7,
+                notation: "e8-f7",
+                evaluation: "5.01"
+            },
+            {
+                depth: 8,
+                notation: "e8-c6",
+                evaluation: "8.01"
+            }
+        ]
+    },
+    {
+        label: "twenty-game 5s SF2400 post-tie game 2 after Kg7",
+        fen: "8/6k1/4K1B1/6P1/8/1p6/8/8 w - - 1 84",
+        coachPlayed: "g6-f5",
+        target: "g6-e4",
+        theme: "low-material bishop-pawn mate conversion",
+        current: [
+            {
+                depth: 6,
+                notation: "g6-e4",
+                evaluation: "2.95"
+            },
+            {
+                depth: 7,
+                notation: "g6-e4",
+                evaluation: "5.32"
+            },
+            {
+                depth: 8,
+                notation: "g6-b1",
+                evaluation: "8.98"
+            }
+        ]
+    },
+    {
+        label: "twenty-game 5s SF2400 post-tie game 10 after Rad7",
+        fen: "q3kb2/3r1r2/P2p1Q1p/P3p3/BR2P1R1/4P3/5PK1/8 w - - 5 56",
+        coachPlayed: "f6-e6",
+        target: "a4-d7",
+        theme: "queen-rook passed-pawn mating-net conversion",
+        current: [
+            {
+                depth: 6,
+                notation: "f6-e6",
+                evaluation: "5.72"
+            },
+            {
+                depth: 7,
+                notation: "f6-e6",
+                evaluation: "10.60"
+            },
+            {
+                depth: 8,
+                notation: "f6-e6",
+                evaluation: "10.60"
+            }
+        ]
+    },
+    {
+        label: "twenty-game 5s SF2400 post-tie game 7 after Kxf7",
+        fen: "8/k4K2/P1p5/1P3Pq1/2P1p3/8/8/8 b - - 0 96",
+        coachPlayed: "e4-e3",
+        target: "g5-f5",
+        theme: "low-material queen-pawn mate conversion",
+        current: [
+            {
+                depth: 6,
+                notation: "g5-f5",
+                evaluation: "-11.35"
+            },
+            {
+                depth: 7,
+                notation: "g5-f5",
+                evaluation: "-11.99"
+            },
+            {
+                depth: 8,
+                notation: "e4-e3",
+                evaluation: "-14.99"
+            }
+        ]
+    }
+];
+
 const MINED_STOCKFISH_2400_REGRESSIONS = [
     ...MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS,
-    ...MINED_STOCKFISH_2400_HIGH_PRIORITY_REGRESSIONS
+    ...MINED_STOCKFISH_2400_HIGH_PRIORITY_REGRESSIONS,
+    ...MINED_STOCKFISH_2400_POST_TIE_REGRESSIONS
 ];
 
 test("move ordering direct-check rays use one aligned direction", () => {
