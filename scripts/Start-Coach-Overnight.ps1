@@ -15,6 +15,8 @@ param(
     [int]$CoachHashMB = 64,
     [ValidateRange(1, 512)]
     [int]$OpponentHashMB = 64,
+    [string]$BookPath = "",
+    [int]$BookDepth = 8,
 
     [string]$PgnOutputPath = "",
     [string]$CandidatePath = "",
@@ -112,6 +114,10 @@ $arguments =
         "$CoachHashMB",
         "-OpponentHashMB",
         "$OpponentHashMB",
+        "-BookPath",
+        $BookPath,
+        "-BookDepth",
+        "$BookDepth",
         "-ResultDirectory",
         $ResultDirectory,
         "-BenchmarkProfile",

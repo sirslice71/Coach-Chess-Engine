@@ -337,7 +337,18 @@ function New-CoachCuteChessCommand {
     )
 
     if (-not [string]::IsNullOrWhiteSpace($BookPath)) {
-        $args += @("-openings", "file=$BookPath", "format=bin", "order=random", "plies=$BookDepth")
+        $bookExtension =
+            [System.IO.Path]::GetExtension($BookPath).ToLowerInvariant()
+
+        if ($bookExtension -eq ".bin") {
+            throw "This CuteChess build does not support Polyglot .bin books from the match wrapper. Use a PGN or EPD opening suite with -BookPath."
+        }
+        else {
+            $openingFormat =
+                if ($bookExtension -eq ".epd") { "epd" } else { "pgn" }
+
+            $args += @("-openings", "file=$BookPath", "format=$openingFormat", "order=random", "plies=$BookDepth")
+        }
     }
 
     return [pscustomobject]@{
@@ -922,11 +933,16 @@ function Invoke-CoachSelfTest {
             throw "Log warning self-test failed."
         }
 
-        $cmd = New-CoachCuteChessCommand -CuteChessPath "cutechess-cli.exe" -CoachPath "C:\Coach" -OpponentPath "stockfish.exe" -OpponentName "Stockfish" -StockfishElo 2000 -Games 2 -Concurrency 1 -SecondsPerMove 1 -BookPath "book.bin" -BookDepth 8 -Seed 1 -CoachHashMB 32 -OpponentHashMB 96 -PgnOutputPath "out.pgn" -LogOutputPath "out.log" -EventName "selftest"
+        $cmd = New-CoachCuteChessCommand -CuteChessPath "cutechess-cli.exe" -CoachPath "C:\Coach" -OpponentPath "stockfish.exe" -OpponentName "Stockfish" -StockfishElo 2000 -Games 2 -Concurrency 1 -SecondsPerMove 1 -BookPath "book.pgn" -BookDepth 8 -Seed 1 -CoachHashMB 32 -OpponentHashMB 96 -PgnOutputPath "out.pgn" -LogOutputPath "out.log" -EventName "selftest"
         if (
             -not ($cmd.Arguments -contains "option.UCI_LimitStrength=true") -or
             -not ($cmd.Arguments -contains "option.Hash=32") -or
             -not ($cmd.Arguments -contains "option.Hash=96") -or
+            -not ($cmd.Arguments -contains "-openings") -or
+            -not ($cmd.Arguments -contains "file=book.pgn") -or
+            -not ($cmd.Arguments -contains "format=pgn") -or
+            -not ($cmd.Arguments -contains "plies=8") -or
+            ($cmd.Arguments -contains "format=bin") -or
             -not ($cmd.Arguments -contains "st=1") -or
             -not ($cmd.Arguments -contains "timemargin=1000") -or
             ($cmd.Arguments -contains "tc=inf/1") -or
