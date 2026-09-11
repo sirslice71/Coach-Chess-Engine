@@ -93,7 +93,7 @@ test("corpus loading and primary/diagnostic selection are deterministic", () => 
         diagnostic.some(position => position.id === "game4")
     );
 
-    assert.equal(selectCorpus(corpus, "all").length, 18);
+    assert.equal(selectCorpus(corpus, "all").length, 21);
     assert.throws(() => selectCorpus(corpus, "nope"), /Unknown corpus/);
 
 });
@@ -534,11 +534,16 @@ test("resume compatibility and double-count prevention use run config", () => {
         seed: 1,
         warmups: 5,
         pairs: 10,
+        baselineHashMB: 32,
+        candidateHashMB: 128,
         exact: true
     };
 
     const config =
         makeRunConfig(args, positions);
+
+    assert.equal(config.baselineHashMB, 32);
+    assert.equal(config.candidateHashMB, 128);
 
     assert.equal(
         checkResumeCompatibility({ config }, config).ok,

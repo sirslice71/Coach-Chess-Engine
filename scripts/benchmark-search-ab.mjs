@@ -119,6 +119,12 @@ function parseArgs(argv) {
             case "--score-tolerance-cp":
                 args.scoreToleranceCp = parseInteger(value(), "--score-tolerance-cp");
                 break;
+            case "--baseline-hash-mb":
+                args.baselineHashMB = parsePositiveInteger(value(), "--baseline-hash-mb");
+                break;
+            case "--candidate-hash-mb":
+                args.candidateHashMB = parsePositiveInteger(value(), "--candidate-hash-mb");
+                break;
             case "--non-exact":
                 args.exact = false;
                 break;
@@ -156,6 +162,19 @@ function parseInteger(text, name) {
 
 }
 
+function parsePositiveInteger(text, name) {
+
+    const value =
+        parseInteger(text, name);
+
+    if (value <= 0) {
+        throw new Error(`${name} must be a positive integer.`);
+    }
+
+    return value;
+
+}
+
 function parseSeed(text) {
 
     if (/^0x/i.test(text)) {
@@ -181,6 +200,8 @@ Options:
   --pairs <n>                Measured AB/BA pairs per position (default 10).
   --groups <n>               ABBA groups for stability-short (default 16).
   --seed <n|0x...>           Deterministic pairing seed.
+  --baseline-hash-mb <n>     Override baseline TT size for benchmark samples.
+  --candidate-hash-mb <n>    Override candidate TT size for benchmark samples.
   --json <path>              Write full JSON report.
   --csv <path>               Write per-position CSV summary.
   --checkpoint <path>        Save resume checkpoint.
@@ -201,18 +222,30 @@ async function loadEngine(repoPath) {
     const module =
         await import(moduleUrl.href);
 
+    const ttModuleUrl =
+        pathToFileURL(`${repoPath.replaceAll("\\", "/")}/js/engine/transpositiontable.js`);
+
+    const ttModule =
+        await import(ttModuleUrl.href);
+
     return {
         repoPath,
+        TranspositionTable: ttModule.default,
         createEngineCore: module.createEngineCore,
         moveToUci: module.moveToUci
     };
 
 }
 
-function runSearch(engine, position) {
+function runSearch(engine, position, hashSizeMB = null) {
 
     const core =
         engine.createEngineCore(position.fen);
+
+    if (hashSizeMB !== null) {
+        core.search.tt =
+            new engine.TranspositionTable(hashSizeMB);
+    }
 
     const startedAt =
         performance.now();
@@ -304,6 +337,8 @@ async function environmentMetadata(args) {
         seed: args.seed,
         warmups: args.warmups,
         pairs: args.pairs,
+        baselineHashMB: args.baselineHashMB ?? null,
+        candidateHashMB: args.candidateHashMB ?? null,
         traceGc: args.traceGc === true
     };
 
@@ -487,6 +522,12 @@ async function main() {
     }
     console.log(`seed:      ${args.seed}`);
     console.log(`identity:  ${args.identityMode}`);
+    if (args.baselineHashMB || args.candidateHashMB) {
+        console.log(
+            `hash MB:   baseline=${args.baselineHashMB ?? "default"} ` +
+            `candidate=${args.candidateHashMB ?? "default"}`
+        );
+    }
     if (args.identityMode.toLowerCase() !== "exact") {
         console.log(`score tolerance: ${args.scoreToleranceCp} cp`);
     }
@@ -516,8 +557,8 @@ async function main() {
 
         if (bucket.length === 0) {
             for (let index = 0; index < args.warmups; index += 1) {
-                runSearch(baseline, position);
-                runSearch(candidate, position);
+                runSearch(baseline, position, args.baselineHashMB ?? null);
+                runSearch(candidate, position, args.candidateHashMB ?? null);
             }
         }
 
@@ -543,7 +584,13 @@ async function main() {
                 process.memoryUsage().heapUsed;
 
             const result =
-                runSearch(engines[label], position);
+                runSearch(
+                    engines[label],
+                    position,
+                    label === "baseline"
+                        ? args.baselineHashMB ?? null
+                        : args.candidateHashMB ?? null
+                );
 
             const heapAfter =
                 process.memoryUsage().heapUsed;

@@ -1073,11 +1073,145 @@ const MINED_STOCKFISH_2400_HUNDRED_GAME_REGRESSIONS = [
     }
 ];
 
+const MINED_STOCKFISH_2400_HASH32_REGRESSIONS = [
+    {
+        label: "hash32 twenty-game game12 after repeated Kf8",
+        fen: "1r3k2/6RR/3r3p/pp2NBp1/6P1/1b2P1K1/8/8 w - - 8 62",
+        coachPlayed: "f5-e6",
+        target: "e5-d7",
+        theme: "repeated passed-pawn mate conversion",
+        current: [
+            {
+                depth: 6,
+                notation: "f5-e6",
+                evaluation: "999.93"
+            }
+        ]
+    }
+];
+
+const MINED_STOCKFISH_2400_SWING_ANALYSIS_REGRESSIONS = [
+    {
+        label: "100g swing game95 ply109 after Kc3",
+        fen: "1RQ5/8/8/8/7r/P1K5/1P6/1k6 b - - 2 55",
+        coachPlayed: "h4-h5",
+        target: "h4-h2",
+        theme: "passed-pawn mate conversion",
+        current: [
+            {
+                depth: 6,
+                notation: "h4-h5",
+                evaluation: "12.17"
+            }
+        ]
+    },
+    {
+        label: "100g swing game95 ply111 before Kb3",
+        fen: "1RQ5/8/8/8/7r/P1K5/1P6/k7 w - - 3 56",
+        coachPlayed: "c3-b3",
+        target: "c3-b3",
+        theme: "same-move mate recognition",
+        current: [
+            {
+                depth: 6,
+                notation: "c8-c6",
+                evaluation: "12.26"
+            }
+        ]
+    },
+    {
+        label: "100g swing game54 ply188 before Kb6",
+        fen: "8/8/2kb4/8/Qnpp4/1p6/p7/K7 b - - 9 94",
+        coachPlayed: "c6-b6",
+        target: "c6-b6",
+        theme: "same-move mate recognition",
+        current: [
+            {
+                depth: 6,
+                notation: "c6-b6",
+                evaluation: "-11.46"
+            }
+        ]
+    },
+    {
+        label: "100g swing game54 ply188 after Kb6",
+        fen: "8/8/1k1b4/8/Qnpp4/1p6/p7/K7 w - - 10 95",
+        coachPlayed: "a1-b2",
+        target: "a1-b2",
+        theme: "same-move mate recognition",
+        current: [
+            {
+                depth: 6,
+                notation: "a1-b2",
+                evaluation: "-11.84"
+            }
+        ]
+    },
+    {
+        label: "100g swing game36 ply74 after Rxh2",
+        fen: "8/1b2k3/1p6/p3P3/2n4p/2PR4/7r/4K3 w - - 0 38",
+        coachPlayed: "e5-e6",
+        target: "d3-d4",
+        theme: "passed-pawn forcing defense",
+        current: [
+            {
+                depth: 6,
+                notation: "e1-f1",
+                evaluation: "-10.58"
+            }
+        ]
+    },
+    {
+        label: "100g swing game95 ply109 before Kc3",
+        fen: "1RQ5/8/8/8/3K3r/P7/1P6/1k6 w - - 1 55",
+        coachPlayed: "d4-c3",
+        target: "d4-c5",
+        theme: "passed-pawn forcing conversion",
+        current: [
+            {
+                depth: 6,
+                notation: "d4-d3",
+                evaluation: "12.15"
+            }
+        ]
+    },
+    {
+        label: "100g swing game92 ply78 after Qba1",
+        fen: "5k2/P2Q2pp/4p3/8/5P2/8/5PKP/q1q5 w - - 1 40",
+        coachPlayed: "d7-d8",
+        target: "d7-d6",
+        theme: "queen-pawn forcing defense",
+        current: [
+            {
+                depth: 6,
+                notation: "d7-d8",
+                evaluation: "-1.89"
+            }
+        ]
+    },
+    {
+        label: "100g swing game36 ply74 before Rxh2",
+        fen: "8/1b2k3/1p6/p3P3/2n4p/2PR4/6rP/4K3 b - - 8 37",
+        coachPlayed: "g2-h2",
+        target: "c4-e5",
+        theme: "passed-pawn forcing defense",
+        current: [
+            {
+                depth: 6,
+                notation: "g2-h2",
+                evaluation: "-10.21"
+            }
+        ]
+    }
+];
+
 const MINED_STOCKFISH_2400_REGRESSIONS = [
     ...MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS,
     ...MINED_STOCKFISH_2400_HIGH_PRIORITY_REGRESSIONS,
     ...MINED_STOCKFISH_2400_POST_TIE_REGRESSIONS,
-    ...MINED_STOCKFISH_2400_HUNDRED_GAME_REGRESSIONS
+    ...MINED_STOCKFISH_2400_HUNDRED_GAME_REGRESSIONS,
+    ...MINED_STOCKFISH_2400_HASH32_REGRESSIONS,
+    ...MINED_STOCKFISH_2400_SWING_ANALYSIS_REGRESSIONS
 ];
 
 test("move ordering direct-check rays use one aligned direction", () => {

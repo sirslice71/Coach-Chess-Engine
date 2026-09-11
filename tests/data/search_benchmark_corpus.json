@@ -145,6 +145,30 @@
       "depth": 6,
       "classification": "diagnostic",
       "expectedBestMove": "f2-e3"
+    },
+    {
+      "id": "swing-game95-kc3-after",
+      "description": "100-game swing target: passed-pawn mate conversion after Kc3",
+      "fen": "1RQ5/8/8/8/7r/P1K5/1P6/1k6 b - - 2 55",
+      "depth": 6,
+      "classification": "diagnostic",
+      "expectedBestMove": "h4-h5"
+    },
+    {
+      "id": "swing-game36-rxh2-after",
+      "description": "100-game swing target: passed-pawn forcing defense after Rxh2",
+      "fen": "8/1b2k3/1p6/p3P3/2n4p/2PR4/7r/4K3 w - - 0 38",
+      "depth": 6,
+      "classification": "diagnostic",
+      "expectedBestMove": "e1-f1"
+    },
+    {
+      "id": "swing-game92-qba1-after",
+      "description": "100-game swing target: queen-pawn forcing defense after Qba1",
+      "fen": "5k2/P2Q2pp/4p3/8/5P2/8/5PKP/q1q5 w - - 1 40",
+      "depth": 6,
+      "classification": "diagnostic",
+      "expectedBestMove": "d7-d8"
     }
   ]
 }

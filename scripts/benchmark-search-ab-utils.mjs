@@ -1095,6 +1095,8 @@ export function makeRunConfig(args, corpusPositions) {
         exact: args.exact,
         identityMode: normalizeIdentityMode(args.identityMode),
         scoreToleranceCp: args.scoreToleranceCp ?? 0,
+        baselineHashMB: args.baselineHashMB ?? null,
+        candidateHashMB: args.candidateHashMB ?? null,
         profile: args.profile || DEFAULT_PROFILE,
         groups: args.groups ?? null,
         positionIds: corpusPositions.map(position => position.id),

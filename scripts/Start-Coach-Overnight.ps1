@@ -11,6 +11,10 @@ param(
     [int]$SecondsPerMove = 1,
     [int]$StockfishElo = 2000,
     [int]$Seed = 26071521,
+    [ValidateRange(1, 512)]
+    [int]$CoachHashMB = 64,
+    [ValidateRange(1, 512)]
+    [int]$OpponentHashMB = 64,
 
     [string]$PgnOutputPath = "",
     [string]$CandidatePath = "",
@@ -104,6 +108,10 @@ $arguments =
         "$StockfishElo",
         "-Seed",
         "$Seed",
+        "-CoachHashMB",
+        "$CoachHashMB",
+        "-OpponentHashMB",
+        "$OpponentHashMB",
         "-ResultDirectory",
         $ResultDirectory,
         "-BenchmarkProfile",

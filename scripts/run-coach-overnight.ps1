@@ -13,6 +13,10 @@ param(
     [string]$BookPath = "",
     [int]$BookDepth = 8,
     [int]$Seed = 26071521,
+    [ValidateRange(1, 512)]
+    [int]$CoachHashMB = 64,
+    [ValidateRange(1, 512)]
+    [int]$OpponentHashMB = 64,
     [string]$PgnOutputPath = "",
     [string]$LogOutputPath = "",
     [string]$EventName = "Coach overnight",
@@ -312,14 +316,16 @@ function New-CoachCuteChessCommand {
         [string]$BookPath,
         [int]$BookDepth,
         [int]$Seed,
+        [int]$CoachHashMB,
+        [int]$OpponentHashMB,
         [string]$PgnOutputPath,
         [string]$LogOutputPath,
         [string]$EventName
     )
 
     $args = @(
-        "-engine", "name=Coach", "cmd=node", "arg=uci.js", "dir=$CoachPath", "option.Hash=64", "option.Move Overhead=150", "restart=on",
-        "-engine", "name=$OpponentName", "cmd=$OpponentPath", "option.Threads=1", "option.Hash=64", "option.UCI_LimitStrength=true", "option.UCI_Elo=$StockfishElo", "restart=on",
+        "-engine", "name=Coach", "cmd=node", "arg=uci.js", "dir=$CoachPath", "option.Hash=$CoachHashMB", "option.Move Overhead=150", "restart=on",
+        "-engine", "name=$OpponentName", "cmd=$OpponentPath", "option.Threads=1", "option.Hash=$OpponentHashMB", "option.UCI_LimitStrength=true", "option.UCI_Elo=$StockfishElo", "restart=on",
         "-each", "st=$($SecondsPerMove)", "timemargin=1000", "proto=uci",
         "-games", "$Games",
         "-concurrency", "$Concurrency",
@@ -916,9 +922,11 @@ function Invoke-CoachSelfTest {
             throw "Log warning self-test failed."
         }
 
-        $cmd = New-CoachCuteChessCommand -CuteChessPath "cutechess-cli.exe" -CoachPath "C:\Coach" -OpponentPath "stockfish.exe" -OpponentName "Stockfish" -StockfishElo 2000 -Games 2 -Concurrency 1 -SecondsPerMove 1 -BookPath "book.bin" -BookDepth 8 -Seed 1 -PgnOutputPath "out.pgn" -LogOutputPath "out.log" -EventName "selftest"
+        $cmd = New-CoachCuteChessCommand -CuteChessPath "cutechess-cli.exe" -CoachPath "C:\Coach" -OpponentPath "stockfish.exe" -OpponentName "Stockfish" -StockfishElo 2000 -Games 2 -Concurrency 1 -SecondsPerMove 1 -BookPath "book.bin" -BookDepth 8 -Seed 1 -CoachHashMB 32 -OpponentHashMB 96 -PgnOutputPath "out.pgn" -LogOutputPath "out.log" -EventName "selftest"
         if (
             -not ($cmd.Arguments -contains "option.UCI_LimitStrength=true") -or
+            -not ($cmd.Arguments -contains "option.Hash=32") -or
+            -not ($cmd.Arguments -contains "option.Hash=96") -or
             -not ($cmd.Arguments -contains "st=1") -or
             -not ($cmd.Arguments -contains "timemargin=1000") -or
             ($cmd.Arguments -contains "tc=inf/1") -or
@@ -1004,7 +1012,7 @@ Write-CoachLog -ResultDirectory $Results -Message "Mode=$Mode"
 Write-CoachLog -ResultDirectory $Results -Message "DryRun=$($DryRun.IsPresent)"
 
 if ($Mode -eq "Match" -or $Mode -eq "MatchThenBenchmark") {
-    $command = New-CoachCuteChessCommand -CuteChessPath $CuteChessPath -CoachPath $CoachPath -OpponentPath $OpponentPath -OpponentName $OpponentName -StockfishElo $StockfishElo -Games $Games -Concurrency $Concurrency -SecondsPerMove $SecondsPerMove -BookPath $BookPath -BookDepth $BookDepth -Seed $Seed -PgnOutputPath $PgnOutputPath -LogOutputPath $LogOutputPath -EventName $EventName
+    $command = New-CoachCuteChessCommand -CuteChessPath $CuteChessPath -CoachPath $CoachPath -OpponentPath $OpponentPath -OpponentName $OpponentName -StockfishElo $StockfishElo -Games $Games -Concurrency $Concurrency -SecondsPerMove $SecondsPerMove -BookPath $BookPath -BookDepth $BookDepth -Seed $Seed -CoachHashMB $CoachHashMB -OpponentHashMB $OpponentHashMB -PgnOutputPath $PgnOutputPath -LogOutputPath $LogOutputPath -EventName $EventName
     Invoke-CoachCommand -FilePath $command.FilePath -Arguments $command.Arguments -ResultDirectory $Results -Name "cutechess"
 
     if (-not $DryRun) {
