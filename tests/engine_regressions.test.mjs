@@ -1205,13 +1205,73 @@ const MINED_STOCKFISH_2400_SWING_ANALYSIS_REGRESSIONS = [
     }
 ];
 
+const MINED_STOCKFISH_2400_BOOK_SWING_REGRESSIONS = [
+    {
+        label: "book-run game2 ply76 c3 before",
+        fen: "8/6p1/8/4p2p/2p1p2P/1k2P1P1/1P6/2K5 b - - 0 38",
+        coachPlayed: "c4-c3",
+        target: "c4-c3",
+        theme: "king-pawn endgame conversion",
+        current: [
+            {
+                depth: 8,
+                notation: "c4-c3",
+                evaluation: "-3.85"
+            }
+        ]
+    },
+    {
+        label: "book-run game2 ply76 c3 after",
+        fen: "8/6p1/8/4p2p/4p2P/1kp1P1P1/1P6/2K5 w - - 0 39",
+        coachPlayed: "b2-c3",
+        target: "b2-c3",
+        theme: "king-pawn endgame conversion",
+        current: [
+            {
+                depth: 8,
+                notation: "b2-c3",
+                evaluation: "-4.32"
+            }
+        ]
+    },
+    {
+        label: "book-run game2 ply74 Kb3 before",
+        fen: "8/6p1/8/4p2p/1kp1p3/4P1PP/1P6/2K5 b - - 3 37",
+        coachPlayed: "b4-b3",
+        target: "b4-b3",
+        theme: "king-pawn endgame conversion",
+        current: [
+            {
+                depth: 8,
+                notation: "b4-b3",
+                evaluation: "-1.89"
+            }
+        ]
+    },
+    {
+        label: "book-run game2 ply74 Kb3 after",
+        fen: "8/6p1/8/4p2p/2p1p3/1k2P1PP/1P6/2K5 w - - 4 38",
+        coachPlayed: "g3-g4",
+        target: "c1-b1",
+        theme: "king-pawn root-tie defense",
+        current: [
+            {
+                depth: 8,
+                notation: "c1-b1",
+                evaluation: "-3.75"
+            }
+        ]
+    }
+];
+
 const MINED_STOCKFISH_2400_REGRESSIONS = [
     ...MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS,
     ...MINED_STOCKFISH_2400_HIGH_PRIORITY_REGRESSIONS,
     ...MINED_STOCKFISH_2400_POST_TIE_REGRESSIONS,
     ...MINED_STOCKFISH_2400_HUNDRED_GAME_REGRESSIONS,
     ...MINED_STOCKFISH_2400_HASH32_REGRESSIONS,
-    ...MINED_STOCKFISH_2400_SWING_ANALYSIS_REGRESSIONS
+    ...MINED_STOCKFISH_2400_SWING_ANALYSIS_REGRESSIONS,
+    ...MINED_STOCKFISH_2400_BOOK_SWING_REGRESSIONS
 ];
 
 test("move ordering direct-check rays use one aligned direction", () => {
@@ -1749,6 +1809,21 @@ test("mined SF2400 collapse positions expose current root-score shape", () => {
         }
     );
 
+    const kb3After =
+        MINED_STOCKFISH_2400_BOOK_SWING_REGRESSIONS[3];
+
+    assert.deepEqual(
+        searchRootScores(
+            kb3After.fen,
+            8,
+            [kb3After.coachPlayed, kb3After.target]
+        ),
+        {
+            "g3-g4": -189,
+            "c1-b1": -189
+        }
+    );
+
 });
 
 test("low-material root tie verification chooses the deeper rook-pawn defense", () => {
@@ -1761,6 +1836,19 @@ test("low-material root tie verification chooses the deeper rook-pawn defense", 
 
     assert.equal(result.notation, kxg8.target);
     assert.equal(result.evaluation, "-8.77");
+
+});
+
+test("pure-pawn root tie verification prefers the defensive king move", () => {
+
+    const kb3After =
+        MINED_STOCKFISH_2400_BOOK_SWING_REGRESSIONS[3];
+
+    const result =
+        searchBestMove(kb3After.fen, 8);
+
+    assert.equal(result.notation, kb3After.target);
+    assert.equal(result.evaluation, "-3.75");
 
 });
 

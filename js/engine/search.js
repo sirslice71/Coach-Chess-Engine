@@ -306,6 +306,8 @@ const ROOT_TIE_VERIFY_MIN_DEPTH = 6;
 
 const ROOT_TIE_VERIFY_SCORE_FLOOR = 300;
 
+const ROOT_PAWN_ENDING_TIE_VERIFY_SCORE_FLOOR = 150;
+
 const ROOT_TIE_VERIFY_MAX_MOVES = 6;
 
 export class SearchTimeout extends Error {}
@@ -501,12 +503,17 @@ export default class Search {
 
     verifyRootTie(depth, result) {
 
+        const scoreFloor =
+            this.isPurePawnEnding()
+                ? ROOT_PAWN_ENDING_TIE_VERIFY_SCORE_FLOOR
+                : ROOT_TIE_VERIFY_SCORE_FLOOR;
+
         if (
             depth < ROOT_TIE_VERIFY_MIN_DEPTH ||
             !result.bestMove ||
             !Array.isArray(result.rootMoves) ||
             result.rootMoves.length < 2 ||
-            Math.abs(result.bestScore) < ROOT_TIE_VERIFY_SCORE_FLOOR ||
+            Math.abs(result.bestScore) < scoreFloor ||
             !this.isLowMaterialEnding()
         ) {
             return result;
@@ -556,7 +563,14 @@ export default class Search {
 
                 }
 
-                if (score > bestVerified.score) {
+                if (
+                    score > bestVerified.score ||
+                    (
+                        score === bestVerified.score &&
+                        this.rootTiePreference(rootMove) >
+                            this.rootTiePreference(bestVerified.rootMove)
+                    )
+                ) {
 
                     bestVerified = {
                         rootMove,
@@ -602,6 +616,31 @@ export default class Search {
 
     }
 
+    rootTiePreference(rootMove) {
+
+        const move = rootMove.move;
+        const piece = Math.abs(move.piece);
+
+        if (move.isPromotion()) {
+            return 4;
+        }
+
+        if (move.isCapture()) {
+            return 3;
+        }
+
+        if (piece === Math.abs(Piece.WK)) {
+            return 2;
+        }
+
+        if (piece !== Math.abs(Piece.WP)) {
+            return 1;
+        }
+
+        return 0;
+
+    }
+
     hasReverseFutilityMaterial() {
 
         const sidePieces =
@@ -632,6 +671,31 @@ export default class Search {
             blackPieces.queens.length;
 
         return nonPawnMaterial <= 2;
+
+    }
+
+    isPurePawnEnding() {
+
+        const whitePieces = this.board.whitePieces;
+        const blackPieces = this.board.blackPieces;
+
+        const nonPawnMaterial =
+            whitePieces.knights.length +
+            whitePieces.bishops.length +
+            whitePieces.rooks.length +
+            whitePieces.queens.length +
+            blackPieces.knights.length +
+            blackPieces.bishops.length +
+            blackPieces.rooks.length +
+            blackPieces.queens.length;
+
+        return (
+            nonPawnMaterial === 0 &&
+            (
+                whitePieces.pawns.length +
+                blackPieces.pawns.length
+            ) > 0
+        );
 
     }
 
