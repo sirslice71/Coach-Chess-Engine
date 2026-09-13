@@ -1264,6 +1264,51 @@ const MINED_STOCKFISH_2400_BOOK_SWING_REGRESSIONS = [
     }
 ];
 
+const MINED_STOCKFISH_2400_PURE_PAWN_TIE_MATCH_REGRESSIONS = [
+    {
+        label: "pure-pawn tie 100g game87 ply249 before Re8",
+        fen: "R7/4k2P/4P3/5K2/8/8/8/2r5 w - - 3 125",
+        coachPlayed: "a8-e8",
+        target: "a8-a7",
+        theme: "rook-pawn mate conversion",
+        current: [
+            {
+                depth: 8,
+                notation: "a8-e8",
+                evaluation: "11.78"
+            }
+        ]
+    },
+    {
+        label: "pure-pawn tie 100g game20 ply176 after h2",
+        fen: "8/3N4/6p1/6r1/4k3/2Bp4/7p/4K3 w - - 0 89",
+        coachPlayed: "d7-f6",
+        target: "e1-f2",
+        theme: "rook-pawn mate defense",
+        current: [
+            {
+                depth: 9,
+                notation: "d7-f6",
+                evaluation: "-12.10"
+            }
+        ]
+    },
+    {
+        label: "pure-pawn tie 100g game98 ply114 before Qb7",
+        fen: "1r3k2/2q2pRQ/4r3/3pR3/7P/6P1/5PK1/8 b - - 0 57",
+        coachPlayed: "c7-b7",
+        target: "c7-d7",
+        theme: "queen-rook passed-pawn mate defense",
+        current: [
+            {
+                depth: 8,
+                notation: "c7-b7",
+                evaluation: "15.45"
+            }
+        ]
+    }
+];
+
 const MINED_STOCKFISH_2400_REGRESSIONS = [
     ...MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS,
     ...MINED_STOCKFISH_2400_HIGH_PRIORITY_REGRESSIONS,
@@ -1697,6 +1742,62 @@ test("mined SF2400 collapse positions preserve current depth snapshots", () => {
             })),
             position.current,
             `${position.label} current behavior changed; review whether the mined target is now fixed or needs a new baseline.`
+        );
+
+    }
+
+});
+
+test("pure-pawn tie 100g high-priority targets keep played and reference moves legal", () => {
+
+    for (const position of MINED_STOCKFISH_2400_PURE_PAWN_TIE_MATCH_REGRESSIONS) {
+
+        const {
+            legalMoveGenerator
+        } = createEngine(position.fen);
+
+        const legalMoveNotations =
+            new Set(
+                legalMoveGenerator
+                    .generateMoves()
+                    .map(move => move.toString())
+            );
+
+        assert.ok(
+            legalMoveNotations.has(position.coachPlayed),
+            `${position.label} should keep Coach move ${position.coachPlayed} legal`
+        );
+
+        assert.ok(
+            legalMoveNotations.has(position.target),
+            `${position.label} should keep reference move ${position.target} legal`
+        );
+
+    }
+
+});
+
+test("pure-pawn tie 100g high-priority targets preserve current depth snapshots", () => {
+
+    for (const position of MINED_STOCKFISH_2400_PURE_PAWN_TIE_MATCH_REGRESSIONS) {
+
+        const depths =
+            position.current.map(entry => entry.depth);
+
+        const results =
+            searchBestMovesByDepth(
+                position.fen,
+                depths
+            );
+
+        assert.deepEqual(
+            results.map(({ depth, notation, evaluation }) => ({
+                depth,
+                notation,
+                evaluation
+            })),
+            position.current,
+            `${position.label} current behavior changed; review whether the mate-conversion target is now fixed or needs a new baseline.`
         );
 
     }
