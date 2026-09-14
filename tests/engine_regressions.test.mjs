@@ -1953,6 +1953,19 @@ test("pure-pawn root tie verification prefers the defensive king move", () => {
 
 });
 
+test("low-material root tie tolerance prefers the defensive king move", () => {
+
+    const result =
+        searchBestMove(
+            "8/8/8/1kp5/5n2/6Kp/p5p1/4R3 w - - 0 80",
+            8
+        );
+
+    assert.equal(result.notation, "g3-h2");
+    assert.equal(result.evaluation, "-13.34");
+
+});
+
 test("PGN collapse regression: game 8 vs Shallowblue move 73 finds g4-f3 at depth 8", () => {
 
     const result =

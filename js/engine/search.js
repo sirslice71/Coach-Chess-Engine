@@ -310,6 +310,8 @@ const ROOT_PAWN_ENDING_TIE_VERIFY_SCORE_FLOOR = 150;
 
 const ROOT_TIE_VERIFY_MAX_MOVES = 6;
 
+const ROOT_TIE_VERIFY_SCORE_TOLERANCE = 10;
+
 export class SearchTimeout extends Error {}
 
 export default class Search {
@@ -563,10 +565,13 @@ export default class Search {
 
                 }
 
+                const scoreDelta =
+                    score - bestVerified.score;
+
                 if (
-                    score > bestVerified.score ||
+                    scoreDelta > ROOT_TIE_VERIFY_SCORE_TOLERANCE ||
                     (
-                        score === bestVerified.score &&
+                        Math.abs(scoreDelta) <= ROOT_TIE_VERIFY_SCORE_TOLERANCE &&
                         this.rootTiePreference(rootMove) >
                             this.rootTiePreference(bestVerified.rootMove)
                     )
