@@ -130,8 +130,9 @@ function parseLabMoveString(moveString) {
 // distinct root moves to an identical score. Testing the exact
 // boundary empirically (by re-running that regression test at
 // several thresholds) showed -210 was the precise cutoff where
-// the regression appeared; -300 leaves a full, deliberate
-// safety margin below that. Practically, this means the
+// the regression appeared; -250 keeps a deliberate margin below
+// that while pruning a few more hopeless captures. Practically,
+// this means the
 // pruning now only removes captures that lose at least a minor
 // piece for little or nothing in return -- clearly hopeless
 // exchanges -- while any capture that only gives up "a piece
@@ -141,7 +142,7 @@ function parseLabMoveString(moveString) {
 // are never pruned if they are also promotions.
 //----------------------------------
 
-const QSEARCH_SEE_PRUNE_THRESHOLD = -300;
+const QSEARCH_SEE_PRUNE_THRESHOLD = -250;
 
 //----------------------------------
 // Quiescence: In-Check Ply Cap
