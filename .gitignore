@@ -17,3 +17,12 @@ dist/
 
 # Coach Analysis Lab run output (tools/coach-analysis-lab.mjs)
 analysis-runs/
+
+# Local scratch and generated artifacts
+tmp/
+output/
+tmp-*.mjs
+tmq.*
+Correction*-Generator-Console-*.txt
+Generate-Correction4-WindowsValidation-*.ps1
+build_natasha_followup_doc.py
