@@ -367,6 +367,7 @@ function markdownReport(summary) {
     for (const [title, records] of [
         ["Top Centipawn Drops", summary.topCentipawnDrops],
         ["Top Losing-Mate Entries", summary.topLosingMateEntries],
+        ["Top Mate Score Changes", summary.topMateScoreChanges],
         ["Top All Swings", summary.topAllSwings]
     ]) {
         lines.push(`## ${title}`, "");
@@ -520,12 +521,20 @@ function main() {
         .filter(record => record.category === "entered-losing-mate")
         .slice(0, args.top);
 
+    const topMateScoreChanges = swings
+        .filter(record => record.category === "mate-score-change")
+        .slice(0, args.top);
+
     const topAllSwings = swings.slice(0, args.top);
 
-    const selected = [
+    let selected = [
         ...topLosingMateEntries,
         ...topCentipawnDrops
     ];
+
+    if (selected.length === 0) {
+        selected = [...topMateScoreChanges];
+    }
 
     const uniqueSelected = [];
     const seen = new Set();
@@ -549,6 +558,7 @@ function main() {
         swings,
         topCentipawnDrops,
         topLosingMateEntries,
+        topMateScoreChanges,
         topAllSwings,
         selectedFenRecords: uniqueSelected
     };
@@ -577,6 +587,7 @@ function main() {
         swings: swings.length,
         topCentipawnDrops: topCentipawnDrops.length,
         topLosingMateEntries: topLosingMateEntries.length,
+        topMateScoreChanges: topMateScoreChanges.length,
         selectedFenPositions: uniqueSelected.length * 2,
         worst: topAllSwings.slice(0, 5).map(record => ({
             label: record.label,

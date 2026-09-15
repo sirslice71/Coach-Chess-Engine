@@ -1,0 +1,9 @@
+[Event "Swing Miner Mate Change Fixture"]
+[Site "?"]
+[Date "2026.09.14"]
+[Round "1"]
+[White "Coach"]
+[Black "Stockfish"]
+[Result "*"]
+
+1. e4 {+M20} e5 {-M20} 2. Nf3 {+12.00} Nc6 {+12.00} *
