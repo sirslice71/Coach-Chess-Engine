@@ -309,9 +309,13 @@ const ROOT_TIE_VERIFY_SCORE_FLOOR = 300;
 
 const ROOT_PAWN_ENDING_TIE_VERIFY_SCORE_FLOOR = 150;
 
+const ROOT_EXTENDED_ENDING_TIE_VERIFY_SCORE_FLOOR = 1000;
+
 const ROOT_TIE_VERIFY_MAX_MOVES = 6;
 
 const ROOT_TIE_VERIFY_SCORE_TOLERANCE = 10;
+
+const ROOT_TIE_VERIFY_MAX_NON_PAWN_MATERIAL = 4;
 
 export class SearchTimeout extends Error {}
 
@@ -507,17 +511,16 @@ export default class Search {
     verifyRootTie(depth, result) {
 
         const scoreFloor =
-            this.isPurePawnEnding()
-                ? ROOT_PAWN_ENDING_TIE_VERIFY_SCORE_FLOOR
-                : ROOT_TIE_VERIFY_SCORE_FLOOR;
+            this.rootTieVerificationScoreFloor();
 
         if (
             depth < ROOT_TIE_VERIFY_MIN_DEPTH ||
             !result.bestMove ||
             !Array.isArray(result.rootMoves) ||
             result.rootMoves.length < 2 ||
+            scoreFloor === null ||
             Math.abs(result.bestScore) < scoreFloor ||
-            !this.isLowMaterialEnding()
+            !this.isRootTieVerificationMaterialEligible()
         ) {
             return result;
         }
@@ -677,6 +680,54 @@ export default class Search {
             blackPieces.queens.length;
 
         return nonPawnMaterial <= 2;
+
+    }
+
+    rootTieVerificationNonPawnMaterial() {
+
+        const whitePieces = this.board.whitePieces;
+        const blackPieces = this.board.blackPieces;
+
+        return (
+            whitePieces.knights.length +
+            whitePieces.bishops.length +
+            whitePieces.rooks.length +
+            whitePieces.queens.length +
+            blackPieces.knights.length +
+            blackPieces.bishops.length +
+            blackPieces.rooks.length +
+            blackPieces.queens.length
+        );
+
+    }
+
+    isRootTieVerificationMaterialEligible() {
+
+        return (
+            this.rootTieVerificationNonPawnMaterial() <=
+            ROOT_TIE_VERIFY_MAX_NON_PAWN_MATERIAL
+        );
+
+    }
+
+    rootTieVerificationScoreFloor() {
+
+        if (this.isPurePawnEnding()) {
+            return ROOT_PAWN_ENDING_TIE_VERIFY_SCORE_FLOOR;
+        }
+
+        const nonPawnMaterial =
+            this.rootTieVerificationNonPawnMaterial();
+
+        if (nonPawnMaterial <= 2) {
+            return ROOT_TIE_VERIFY_SCORE_FLOOR;
+        }
+
+        if (nonPawnMaterial <= ROOT_TIE_VERIFY_MAX_NON_PAWN_MATERIAL) {
+            return ROOT_EXTENDED_ENDING_TIE_VERIFY_SCORE_FLOOR;
+        }
+
+        return null;
 
     }
 
