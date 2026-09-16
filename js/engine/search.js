@@ -680,6 +680,78 @@ export default class Search {
 
     }
 
+    undevelopedMinorCount(white) {
+
+        if (white) {
+            return (
+                (this.board.pieceAt(57) === Piece.WN ? 1 : 0) +
+                (this.board.pieceAt(62) === Piece.WN ? 1 : 0) +
+                (this.board.pieceAt(58) === Piece.WB ? 1 : 0) +
+                (this.board.pieceAt(61) === Piece.WB ? 1 : 0)
+            );
+        }
+
+        return (
+            (this.board.pieceAt(1) === Piece.BN ? 1 : 0) +
+            (this.board.pieceAt(6) === Piece.BN ? 1 : 0) +
+            (this.board.pieceAt(2) === Piece.BB ? 1 : 0) +
+            (this.board.pieceAt(5) === Piece.BB ? 1 : 0)
+        );
+
+    }
+
+    isOpeningPosition() {
+
+        return (
+            this.undevelopedMinorCount(true) > 0 ||
+            this.undevelopedMinorCount(false) > 0
+        );
+
+    }
+
+    isCastledPosition(white) {
+
+        if (white) {
+            return (
+                this.board.whiteKing === 62 ||
+                this.board.whiteKing === 58
+            );
+        }
+
+        return (
+            this.board.blackKing === 6 ||
+            this.board.blackKing === 2
+        );
+
+    }
+
+    isPrematureOpeningCentralPawnThrust(move) {
+
+        if (
+            !move ||
+            Math.abs(move.piece) !== Math.abs(Piece.WP) ||
+            move.isCapture() ||
+            move.isPromotion() ||
+            !this.isOpeningPosition()
+        ) {
+            return false;
+        }
+
+        const white = move.piece > 0;
+        const toRank = rank(move.toSquare);
+        const advancesToFifthRank =
+            white
+                ? toRank === 3
+                : toRank === 4;
+
+        return (
+            advancesToFifthRank &&
+            !this.isCastledPosition(white) &&
+            this.undevelopedMinorCount(white) >= 2
+        );
+
+    }
+
     rootSearchTiePreference(move) {
 
         if (!move) {
@@ -694,7 +766,10 @@ export default class Search {
             return 40;
         }
 
-        if (this.isQuietCoreCentralPawnAdvance(move)) {
+        if (
+            this.isQuietCoreCentralPawnAdvance(move) &&
+            !this.isPrematureOpeningCentralPawnThrust(move)
+        ) {
             return 30;
         }
 
@@ -737,6 +812,7 @@ export default class Search {
             if (
                 Math.abs(rootMove.score) < SearchConstants.MATE_THRESHOLD &&
                 this.isQuietCoreCentralPawnAdvance(rootMove.move) &&
+                !this.isPrematureOpeningCentralPawnThrust(rootMove.move) &&
                 (
                     !bestCentralPawnBreak ||
                     rootMove.score > bestCentralPawnBreak.score

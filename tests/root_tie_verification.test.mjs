@@ -137,3 +137,42 @@ test("SF-confirmed Lucas pawn-center ties prefer central breaks", () => {
     }
 
 });
+
+test("early opening root ties prefer development over fifth-rank pawn thrusts", () => {
+
+    const cases = [
+        {
+            fen:
+                "rnbqkbnr/pppp1ppp/8/8/3pP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3",
+            avoided: "e4e5",
+            expected: "g1f3"
+        },
+        {
+            fen:
+                "rnbqkbnr/pp1p1ppp/4p3/8/3pP3/5N2/PPP2PPP/RNBQKB1R w KQkq - 0 4",
+            avoided: "e4e5",
+            expected: "f3d4"
+        }
+    ];
+
+    for (const { fen, avoided, expected } of cases) {
+
+        const search =
+            createSearch(fen);
+
+        const result =
+            search.bestMove(5, { quiet: true });
+
+        assert.equal(
+            moveToUci(result.move),
+            expected
+        );
+
+        assert.notEqual(
+            moveToUci(result.move),
+            avoided
+        );
+
+    }
+
+});
