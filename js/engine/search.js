@@ -6,7 +6,7 @@ import { SearchConstants } from "./searchconstants.js";
 import MoveOrdering from "./moveordering.js";
 import EngineDebug from "../dev/enginedebug.js";
 import { Piece } from "../core/piece.js";
-import { algebraic } from "../core/square.js";
+import { algebraic, file, rank } from "../core/square.js";
 import Zobrist from "./zobrist.js";
 import TranspositionTable from "./transpositiontable.js";
 import {
@@ -315,6 +315,12 @@ const ROOT_TIE_VERIFY_MAX_MOVES = 6;
 
 const ROOT_TIE_VERIFY_SCORE_TOLERANCE = 10;
 
+const ROOT_SPARSE_ENDING_TIE_VERIFY_SCORE_TOLERANCE = 25;
+
+const ROOT_CENTRAL_PAWN_BREAK_SCORE_TOLERANCE = 40;
+
+const ROOT_CENTRAL_PAWN_BREAK_MAX_TOP_SCORE = 150;
+
 const ROOT_TIE_VERIFY_MAX_NON_PAWN_MATERIAL = 4;
 
 export class SearchTimeout extends Error {}
@@ -572,10 +578,13 @@ export default class Search {
                 const scoreDelta =
                     score - bestVerified.score;
 
+                const scoreTolerance =
+                    this.rootTieVerificationScoreTolerance();
+
                 if (
-                    scoreDelta > ROOT_TIE_VERIFY_SCORE_TOLERANCE ||
+                    scoreDelta > scoreTolerance ||
                     (
-                        Math.abs(scoreDelta) <= ROOT_TIE_VERIFY_SCORE_TOLERANCE &&
+                        Math.abs(scoreDelta) <= scoreTolerance &&
                         this.rootTiePreference(rootMove) >
                             this.rootTiePreference(bestVerified.rootMove)
                     )
@@ -647,6 +656,100 @@ export default class Search {
         }
 
         return 0;
+
+    }
+
+    isQuietCoreCentralPawnAdvance(move) {
+
+        if (
+            !move ||
+            Math.abs(move.piece) !== Math.abs(Piece.WP) ||
+            move.isCapture() ||
+            move.isPromotion()
+        ) {
+            return false;
+        }
+
+        const toFile = file(move.toSquare);
+        const toRank = rank(move.toSquare);
+
+        return (
+            (toFile === 3 || toFile === 4) &&
+            (toRank === 3 || toRank === 4)
+        );
+
+    }
+
+    rootSearchTiePreference(move) {
+
+        if (!move) {
+            return -1;
+        }
+
+        if (move.isPromotion()) {
+            return 50;
+        }
+
+        if (move.isCapture()) {
+            return 40;
+        }
+
+        if (this.isQuietCoreCentralPawnAdvance(move)) {
+            return 30;
+        }
+
+        if (Math.abs(move.piece) === Math.abs(Piece.WK)) {
+            return 10;
+        }
+
+        return 0;
+
+    }
+
+    selectRootSearchPreferredMove(rootMoves, alphaOriginal, beta) {
+
+        if (!rootMoves.length) {
+            return null;
+        }
+
+        const topMove = rootMoves[0];
+
+        if (
+            Math.abs(topMove.score) >= SearchConstants.MATE_THRESHOLD ||
+            Math.abs(topMove.score) > ROOT_CENTRAL_PAWN_BREAK_MAX_TOP_SCORE ||
+            topMove.score <= alphaOriginal ||
+            topMove.score >= beta
+        ) {
+            return topMove;
+        }
+
+        let bestCentralPawnBreak = null;
+
+        for (const rootMove of rootMoves) {
+
+            if (
+                topMove.score - rootMove.score >
+                    ROOT_CENTRAL_PAWN_BREAK_SCORE_TOLERANCE
+            ) {
+                break;
+            }
+
+            if (
+                Math.abs(rootMove.score) < SearchConstants.MATE_THRESHOLD &&
+                this.isQuietCoreCentralPawnAdvance(rootMove.move) &&
+                (
+                    !bestCentralPawnBreak ||
+                    rootMove.score > bestCentralPawnBreak.score
+                )
+            ) {
+
+                bestCentralPawnBreak = rootMove;
+
+            }
+
+        }
+
+        return bestCentralPawnBreak || topMove;
 
     }
 
@@ -728,6 +831,16 @@ export default class Search {
         }
 
         return null;
+
+    }
+
+    rootTieVerificationScoreTolerance() {
+
+        if (this.rootTieVerificationNonPawnMaterial() <= 1) {
+            return ROOT_SPARSE_ENDING_TIE_VERIFY_SCORE_TOLERANCE;
+        }
+
+        return ROOT_TIE_VERIFY_SCORE_TOLERANCE;
 
     }
 
@@ -1387,6 +1500,21 @@ export default class Search {
                 b.score - a.score
 
         );
+
+        const preferredRootMove =
+            this.selectRootSearchPreferredMove(
+                rootMoves,
+                alphaOriginal,
+                beta
+            );
+
+        if (preferredRootMove) {
+
+            bestMove = preferredRootMove.move;
+            bestScore = preferredRootMove.score;
+            this.rootBestMove = preferredRootMove.move;
+
+        }
 
         //----------------------------------
         // Store Root Position

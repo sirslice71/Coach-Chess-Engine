@@ -44,9 +44,58 @@ test("mate-score swings populate fallback target FENs", async () => {
         assert.equal(summary.topCentipawnDrops.length, 0);
         assert.equal(summary.topLosingMateEntries.length, 0);
         assert.equal(summary.topMateScoreChanges.length, 1);
+        assert.equal(summary.selectedFenCategoryCounts["mate-score-change"], 1);
         assert.equal(summary.selectedFenRecords.length, 1);
         assert.match(fenTargets, /-before \| /);
         assert.match(fenTargets, /-after \| /);
+    }
+    finally {
+        await rm(outDir, { recursive: true, force: true });
+    }
+
+});
+
+test("mate-score swings are exported alongside centipawn targets", async () => {
+
+    const outDir =
+        await mkdtemp(join(tmpdir(), "coach-swing-miner-test-"));
+
+    try {
+        await execFileAsync(
+            process.execPath,
+            [
+                "tools/mine-coach-pgn-swings.mjs",
+                "--pgn",
+                "tests/data/swing_miner_mixed_swings.pgn",
+                "--out",
+                outDir,
+                "--player",
+                "Coach",
+                "--top",
+                "5",
+                "--drop-cp",
+                "300"
+            ],
+            {
+                cwd: resolve(".")
+            }
+        );
+
+        const summary =
+            JSON.parse(
+                await readFile(join(outDir, "swing-report.json"), "utf8")
+            );
+        const fenTargets =
+            await readFile(join(outDir, "coach-swing-targets.fens"), "utf8");
+
+        assert.equal(summary.topCentipawnDrops.length, 1);
+        assert.equal(summary.topLosingMateEntries.length, 0);
+        assert.equal(summary.topMateScoreChanges.length, 1);
+        assert.equal(summary.selectedFenCategoryCounts["centipawn-drop"], 1);
+        assert.equal(summary.selectedFenCategoryCounts["mate-score-change"], 1);
+        assert.equal(summary.selectedFenRecords.length, 2);
+        assert.match(fenTargets, /game1-ply5-Bc4-before \| /);
+        assert.match(fenTargets, /game1-ply3-Nf3-before \| /);
     }
     finally {
         await rm(outDir, { recursive: true, force: true });

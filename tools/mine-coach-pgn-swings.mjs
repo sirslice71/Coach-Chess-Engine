@@ -529,12 +529,9 @@ function main() {
 
     let selected = [
         ...topLosingMateEntries,
-        ...topCentipawnDrops
+        ...topCentipawnDrops,
+        ...topMateScoreChanges
     ];
-
-    if (selected.length === 0) {
-        selected = [...topMateScoreChanges];
-    }
 
     const uniqueSelected = [];
     const seen = new Set();
@@ -545,6 +542,12 @@ function main() {
             uniqueSelected.push(record);
         }
     }
+
+    const selectedFenCategoryCounts =
+        uniqueSelected.reduce((counts, record) => {
+            counts[record.category] = (counts[record.category] ?? 0) + 1;
+            return counts;
+        }, {});
 
     const summary = {
         sourcePgn: path.resolve(args.pgn),
@@ -560,6 +563,7 @@ function main() {
         topLosingMateEntries,
         topMateScoreChanges,
         topAllSwings,
+        selectedFenCategoryCounts,
         selectedFenRecords: uniqueSelected
     };
 
@@ -588,6 +592,8 @@ function main() {
         topCentipawnDrops: topCentipawnDrops.length,
         topLosingMateEntries: topLosingMateEntries.length,
         topMateScoreChanges: topMateScoreChanges.length,
+        selectedFenRecords: uniqueSelected.length,
+        selectedFenCategoryCounts,
         selectedFenPositions: uniqueSelected.length * 2,
         worst: topAllSwings.slice(0, 5).map(record => ({
             label: record.label,

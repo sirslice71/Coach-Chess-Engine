@@ -269,6 +269,272 @@
       "fen": "2r2rk1/pp2qppp/2n1pn2/3p4/3P4/2NBPN2/PPQ2PPP/2RR2K1 w - - 0 15",
       "depths": [5],
       "tags": ["control", "rook-file"]
+    },
+    {
+      "id": "arena-shallowblue-3sec-rxa7",
+      "category": "arena-shallowblue-endgame",
+      "mode": "diagnostic-search",
+      "fen": "r7/R7/2P5/k7/2KB4/P6P/8/8 b - - 36 85",
+      "depths": [6, 8],
+      "observedMove": "a8a7",
+      "source": "analysis-runs/arena-shallowblue/091526_3sec_tourn1.pgn",
+      "tags": ["arena", "shallowblue", "low-material", "rook-pawn-conversion"]
+    },
+    {
+      "id": "arena-shallowblue-3sec-kb8",
+      "category": "arena-shallowblue-endgame",
+      "mode": "diagnostic-search",
+      "fen": "8/1k4p1/p2KB2p/P4P1P/5P2/8/8/8 b - - 8 49",
+      "depths": [6, 8],
+      "observedMove": "b7b8",
+      "source": "analysis-runs/arena-shallowblue/091526_3sec_tourn1.pgn",
+      "tags": ["arena", "shallowblue", "low-material", "king-opposition", "passed-pawn-stopper"]
+    },
+    {
+      "id": "arena-shallowblue-3sec-kd7",
+      "category": "arena-shallowblue-endgame",
+      "mode": "diagnostic-search",
+      "fen": "2k5/8/p7/P2KB1P1/1P6/8/8/8 b - - 0 69",
+      "depths": [6, 8],
+      "observedMove": "c8d7",
+      "source": "analysis-runs/arena-shallowblue/091526_3sec_tourn1.pgn",
+      "tags": ["arena", "shallowblue", "low-material", "king-opposition", "passed-pawn-stopper"]
+    },
+    {
+      "id": "arena-shallowblue-3sec-ka5",
+      "category": "arena-shallowblue-endgame",
+      "mode": "diagnostic-search",
+      "fen": "r7/5R2/k1P5/8/2KB4/P6P/8/8 b - - 34 84",
+      "depths": [6, 8],
+      "observedMove": "a6a5",
+      "source": "analysis-runs/arena-shallowblue/091526_3sec_tourn1.pgn",
+      "tags": ["arena", "shallowblue", "low-material", "rook-pawn-conversion"]
+    },
+    {
+      "id": "arena-shallowblue-3sec-qxa6",
+      "category": "arena-shallowblue-endgame",
+      "mode": "diagnostic-search",
+      "fen": "7Q/6p1/p5k1/2p2q1p/P1Q1N1p1/8/2K5/8 w - - 3 53",
+      "depths": [6, 8],
+      "observedMove": "c4a6",
+      "source": "analysis-runs/arena-shallowblue/091526_3sec_tourn1.pgn",
+      "tags": ["arena", "shallowblue", "queen-ending", "mate-score-change"]
+    },
+    {
+      "id": "arena-shallowblue-5min-g4",
+      "category": "arena-shallowblue-endgame",
+      "mode": "diagnostic-search",
+      "fen": "6k1/7p/4K3/6p1/5r2/8/8/8 b - - 1 72",
+      "depths": [6, 8],
+      "observedMove": "g5g4",
+      "source": "analysis-runs/arena-shallowblue/091526_5_0_tourn1.pgn",
+      "tags": ["arena", "shallowblue", "low-material", "rook-pawn-conversion", "passed-pawn-stopper"]
+    },
+    {
+      "id": "arena-shallowblue-5min-ree1",
+      "category": "arena-shallowblue-endgame",
+      "mode": "diagnostic-search",
+      "fen": "7r/8/4k3/8/4r1n1/PPP1pp1p/4R2p/2K4R w - - 0 52",
+      "depths": [6, 8],
+      "observedMove": "e2e1",
+      "source": "analysis-runs/arena-shallowblue/091526_5_0_tourn1.pgn",
+      "tags": ["arena", "shallowblue", "rook-ending", "centipawn-drop"]
+    },
+    {
+      "id": "arena-shallowblue-5min-rxh4",
+      "category": "arena-shallowblue-endgame",
+      "mode": "diagnostic-search",
+      "fen": "8/8/8/7r/3k3P/8/2K5/8 b - - 8 50",
+      "depths": [6, 8],
+      "observedMove": "h5h4",
+      "source": "analysis-runs/arena-shallowblue/091526_5_0_tourn1.pgn",
+      "tags": ["arena", "shallowblue", "low-material", "rook-pawn-conversion"]
+    },
+    {
+      "id": "arena-shallowblue-5min-rh2",
+      "category": "arena-shallowblue-endgame",
+      "mode": "diagnostic-search",
+      "fen": "8/8/8/8/3k3r/8/3K4/8 b - - 1 51",
+      "depths": [6, 8],
+      "observedMove": "h4h2",
+      "source": "analysis-runs/arena-shallowblue/091526_5_0_tourn1.pgn",
+      "tags": ["arena", "shallowblue", "low-material", "rook-conversion"]
+    },
+    {
+      "id": "lucas-pawn-center-g13-i31",
+      "category": "lucas-sts-regression",
+      "mode": "diagnostic-search",
+      "fen": "2r1r1k1/5npp/3q4/1QpP1p2/1p6/4PP2/1B2R1PP/2R3K1 w - - 0 1",
+      "depths": [5, 6, 8],
+      "expected": { "depth": 5, "moves": ["e3e4"], "strict": false },
+      "lucas": { "group": "Pawn Play in the Center", "item": 31, "oldMove": "e3e4", "newMove": "b5c4", "delta": -10 },
+      "source": "analysis-runs/lucas-sts-20260916-comparison/lucas-sts-item-comparison.csv",
+      "tags": ["lucas", "pawn-center", "regression"]
+    },
+    {
+      "id": "lucas-pawn-center-g13-i38",
+      "category": "lucas-sts-regression",
+      "mode": "diagnostic-search",
+      "fen": "2rbr1k1/1p1nqp1p/4bn1P/pP2p1p1/N7/P1NRPP2/1Q2BBP1/1K5R w - - 0 1",
+      "depths": [5, 6, 8],
+      "expected": { "depth": 5, "moves": ["e3e4"], "strict": false },
+      "lucas": { "group": "Pawn Play in the Center", "item": 38, "oldMove": "e3e4", "newMove": "b1c1", "delta": -10 },
+      "source": "analysis-runs/lucas-sts-20260916-comparison/lucas-sts-item-comparison.csv",
+      "tags": ["lucas", "pawn-center", "regression"]
+    },
+    {
+      "id": "lucas-pawn-center-g13-i43",
+      "category": "lucas-sts-regression",
+      "mode": "diagnostic-search",
+      "fen": "3r1k2/5p2/1p2q1p1/p2p4/P7/1P1Q3P/4nPP1/B2R3K b - - 0 1",
+      "depths": [5, 6, 8],
+      "expected": { "depth": 5, "moves": ["d5d4"], "strict": false },
+      "lucas": { "group": "Pawn Play in the Center", "item": 43, "oldMove": "d5d4", "newMove": "f8e8", "delta": -10 },
+      "source": "analysis-runs/lucas-sts-20260916-comparison/lucas-sts-item-comparison.csv",
+      "tags": ["lucas", "pawn-center", "regression"]
+    },
+    {
+      "id": "lucas-pawn-center-g13-i58",
+      "category": "lucas-sts-regression",
+      "mode": "diagnostic-search",
+      "fen": "5rk1/1r2bpp1/pp2qn1p/2p5/P7/2N1PPP1/1PQB2KP/2RR4 w - - 0 1",
+      "depths": [5, 6, 8],
+      "expected": { "depth": 5, "moves": ["e3e4"], "strict": false },
+      "lucas": { "group": "Pawn Play in the Center", "item": 58, "oldMove": "e3e4", "newMove": "g2g1", "delta": -10 },
+      "source": "analysis-runs/lucas-sts-20260916-comparison/lucas-sts-item-comparison.csv",
+      "tags": ["lucas", "pawn-center", "regression"]
+    },
+    {
+      "id": "lucas-open-files-g2-i3",
+      "category": "lucas-sts-regression",
+      "mode": "diagnostic-search",
+      "fen": "1k1r3r/1p1b1Q1p/p7/q3p3/4p3/2P1N3/P4PPP/R4RK1 w - - 0 1",
+      "depths": [5, 6, 8],
+      "expected": { "depth": 5, "moves": ["a1d1"], "strict": false },
+      "lucas": { "group": "Open Files and Diagonals", "item": 3, "oldMove": "a1d1", "newMove": "c3c4", "delta": -10 },
+      "source": "analysis-runs/lucas-sts-20260916-comparison/lucas-sts-item-comparison.csv",
+      "tags": ["lucas", "open-files", "diagonals", "regression"]
+    },
+    {
+      "id": "lucas-open-files-g2-i4",
+      "category": "lucas-sts-regression",
+      "mode": "diagnostic-search",
+      "fen": "1Q6/1b4pk/2q2b1p/1p1ppP2/1Pp5/2P2P1P/2BB2P1/6K1 b - - 0 1",
+      "depths": [5, 6, 8],
+      "expected": { "depth": 5, "moves": ["c6a6"], "strict": false },
+      "lucas": { "group": "Open Files and Diagonals", "item": 4, "oldMove": "c6a6", "newMove": "c6b6", "delta": -10 },
+      "source": "analysis-runs/lucas-sts-20260916-comparison/lucas-sts-item-comparison.csv",
+      "tags": ["lucas", "open-files", "diagonals", "regression"]
+    },
+    {
+      "id": "lucas-open-files-g2-i9",
+      "category": "lucas-sts-regression",
+      "mode": "diagnostic-search",
+      "fen": "1r1q4/5p2/2p4k/1n2p1pP/4P3/P4BR1/3Q1PKP/8 w - - 0 1",
+      "depths": [5, 6, 8],
+      "expected": { "depth": 5, "moves": ["d2c1"], "strict": false },
+      "lucas": { "group": "Open Files and Diagonals", "item": 9, "oldMove": "d2c1", "newMove": "d2d8", "delta": -10 },
+      "source": "analysis-runs/lucas-sts-20260916-comparison/lucas-sts-item-comparison.csv",
+      "tags": ["lucas", "open-files", "diagonals", "regression"]
+    },
+    {
+      "id": "lucas-open-files-g2-i12",
+      "category": "lucas-sts-regression",
+      "mode": "diagnostic-search",
+      "fen": "1r3rk1/2b3pp/p4p2/2p5/P1Np4/1P1R2P1/1P3P1P/2R3K1 b - - 0 1",
+      "depths": [5, 6, 8],
+      "expected": { "depth": 5, "moves": ["f8e8"], "strict": false },
+      "lucas": { "group": "Open Files and Diagonals", "item": 12, "oldMove": "f8e8", "newMove": "b8b7", "delta": -10 },
+      "source": "analysis-runs/lucas-sts-20260916-comparison/lucas-sts-item-comparison.csv",
+      "tags": ["lucas", "open-files", "diagonals", "regression"]
+    },
+    {
+      "id": "lucas-square-vacancy-g4-i40",
+      "category": "lucas-sts-regression",
+      "mode": "diagnostic-search",
+      "fen": "2r2r1k/3q2np/p2P1pp1/1pP1p3/7N/5QP1/P4P1P/2R1R1K1 w - - 0 1",
+      "depths": [5, 6, 8],
+      "expected": { "depth": 5, "moves": ["f3d5"], "strict": false },
+      "lucas": { "group": "Square Vacancy", "item": 40, "oldMove": "f3d5", "newMove": "e1d1", "delta": -10 },
+      "source": "analysis-runs/lucas-sts-20260916-comparison/lucas-sts-item-comparison.csv",
+      "tags": ["lucas", "square-vacancy", "regression"]
+    },
+    {
+      "id": "lucas-square-vacancy-g4-i73",
+      "category": "lucas-sts-regression",
+      "mode": "diagnostic-search",
+      "fen": "2r4k/7p/2q2nr1/p3R3/Ppp1P3/7P/P1B3P1/3R1Q1K w - - 0 1",
+      "depths": [5, 6, 8],
+      "expected": { "depth": 5, "moves": ["f1f5"], "strict": false },
+      "lucas": { "group": "Square Vacancy", "item": 73, "oldMove": "f1f5", "newMove": "d1d4", "delta": -10 },
+      "source": "analysis-runs/lucas-sts-20260916-comparison/lucas-sts-item-comparison.csv",
+      "tags": ["lucas", "square-vacancy", "regression"]
+    },
+    {
+      "id": "lucas-square-vacancy-g4-i75",
+      "category": "lucas-sts-regression",
+      "mode": "diagnostic-search",
+      "fen": "b3qbk1/B6p/1QNp2p1/3Pp3/2P2p2/5P1P/6P1/6K1 w - - 0 1",
+      "depths": [5, 6, 8],
+      "expected": { "depth": 5, "moves": ["b6c7"], "strict": false },
+      "lucas": { "group": "Square Vacancy", "item": 75, "oldMove": "b6c7", "newMove": "a7b8", "delta": -10 },
+      "source": "analysis-runs/lucas-sts-20260916-comparison/lucas-sts-item-comparison.csv",
+      "tags": ["lucas", "square-vacancy", "regression"]
+    },
+    {
+      "id": "lucas-square-vacancy-g4-i96",
+      "category": "lucas-sts-regression",
+      "mode": "diagnostic-search",
+      "fen": "r3r1k1/5pp1/p2p3p/2nPP3/p5q1/2P1RNP1/2Q2P1P/2R3K1 b - - 0 1",
+      "depths": [5, 6, 8],
+      "expected": { "depth": 5, "moves": ["g4c4"], "strict": false },
+      "lucas": { "group": "Square Vacancy", "item": 96, "oldMove": "g4c4", "newMove": "d6e5", "delta": -10 },
+      "source": "analysis-runs/lucas-sts-20260916-comparison/lucas-sts-item-comparison.csv",
+      "tags": ["lucas", "square-vacancy", "regression"]
+    },
+    {
+      "id": "lucas-simplification-g10-i14",
+      "category": "lucas-sts-regression",
+      "mode": "diagnostic-search",
+      "fen": "1r1r3k/1qpn1pbp/p1n3pB/P2bp3/BpN3Q1/3P3P/1PPN1PP1/R3R1K1 w - - 0 1",
+      "depths": [5, 6, 8],
+      "expected": { "depth": 5, "moves": ["h6g7"], "strict": false },
+      "lucas": { "group": "Simplification", "item": 14, "oldMove": "h6g7", "newMove": "h6g5", "delta": -10 },
+      "source": "analysis-runs/lucas-sts-20260916-comparison/lucas-sts-item-comparison.csv",
+      "tags": ["lucas", "simplification", "regression"]
+    },
+    {
+      "id": "lucas-simplification-g10-i35",
+      "category": "lucas-sts-regression",
+      "mode": "diagnostic-search",
+      "fen": "2r3k1/4qpp1/4p2p/1P1bP3/4pPP1/4Q3/4B2P/2R3K1 b - - 0 1",
+      "depths": [5, 6, 8],
+      "expected": { "depth": 5, "moves": ["c8c1"], "strict": false },
+      "lucas": { "group": "Simplification", "item": 35, "oldMove": "c8c1", "newMove": "c8b8", "delta": -10 },
+      "source": "analysis-runs/lucas-sts-20260916-comparison/lucas-sts-item-comparison.csv",
+      "tags": ["lucas", "simplification", "regression"]
+    },
+    {
+      "id": "lucas-simplification-g10-i58",
+      "category": "lucas-sts-regression",
+      "mode": "diagnostic-search",
+      "fen": "4r1k1/2r2ppp/2nq1n2/1BbppP2/Q7/2P1BN1P/5PP1/RR4K1 w - - 0 1",
+      "depths": [5, 6, 8],
+      "expected": { "depth": 5, "moves": ["e3c5"], "strict": false },
+      "lucas": { "group": "Simplification", "item": 58, "oldMove": "e3c5", "newMove": "c3c4", "delta": -10 },
+      "source": "analysis-runs/lucas-sts-20260916-comparison/lucas-sts-item-comparison.csv",
+      "tags": ["lucas", "simplification", "regression"]
+    },
+    {
+      "id": "lucas-simplification-g10-i66",
+      "category": "lucas-sts-regression",
+      "mode": "diagnostic-search",
+      "fen": "5rk1/8/3p3p/p1qP2p1/Rrb1P3/3p1P2/1P1Q1RP1/3N2K1 w - - 0 1",
+      "depths": [5, 6, 8],
+      "expected": { "depth": 5, "moves": ["a4b4"], "strict": false },
+      "lucas": { "group": "Simplification", "item": 66, "oldMove": "a4b4", "newMove": "a4a1", "delta": -10 },
+      "source": "analysis-runs/lucas-sts-20260916-comparison/lucas-sts-item-comparison.csv",
+      "tags": ["lucas", "simplification", "regression"]
     }
   ]
 }

@@ -35,7 +35,32 @@ test("diagnostic anchor suite has stable ids and required coverage", () => {
         "sentinel-queen-rook-mate",
         "sentinel-quiet-defense",
         "sentinel-promotion-race",
-        "sentinel-attacking-conversion"
+        "sentinel-attacking-conversion",
+        "arena-shallowblue-3sec-rxa7",
+        "arena-shallowblue-3sec-kb8",
+        "arena-shallowblue-3sec-kd7",
+        "arena-shallowblue-3sec-ka5",
+        "arena-shallowblue-3sec-qxa6",
+        "arena-shallowblue-5min-g4",
+        "arena-shallowblue-5min-ree1",
+        "arena-shallowblue-5min-rxh4",
+        "arena-shallowblue-5min-rh2",
+        "lucas-pawn-center-g13-i31",
+        "lucas-pawn-center-g13-i38",
+        "lucas-pawn-center-g13-i43",
+        "lucas-pawn-center-g13-i58",
+        "lucas-open-files-g2-i3",
+        "lucas-open-files-g2-i4",
+        "lucas-open-files-g2-i9",
+        "lucas-open-files-g2-i12",
+        "lucas-square-vacancy-g4-i40",
+        "lucas-square-vacancy-g4-i73",
+        "lucas-square-vacancy-g4-i75",
+        "lucas-square-vacancy-g4-i96",
+        "lucas-simplification-g10-i14",
+        "lucas-simplification-g10-i35",
+        "lucas-simplification-g10-i58",
+        "lucas-simplification-g10-i66"
     ];
 
     for (const id of requiredIds) {

@@ -1,0 +1,9 @@
+[Event "Swing Miner Mixed Swings Fixture"]
+[Site "?"]
+[Date "2026.09.15"]
+[Round "1"]
+[White "Coach"]
+[Black "Stockfish"]
+[Result "*"]
+
+1. e4 {+M20} e5 {-M20} 2. Nf3 {+12.00} Nf6 {-11.00} 3. Bc4 {+7.00} *
