@@ -9,6 +9,7 @@ param(
     [int]$Games = 200,
     [int]$Concurrency = 4,
     [int]$SecondsPerMove = 1,
+    [int]$CuteChessMargin = 1000,
     [int]$StockfishElo = 2000,
     [int]$Seed = 26071521,
     [ValidateRange(1, 512)]
@@ -106,6 +107,8 @@ $arguments =
         "$Concurrency",
         "-SecondsPerMove",
         "$SecondsPerMove",
+        "-CuteChessMargin",
+        "$CuteChessMargin",
         "-StockfishElo",
         "$StockfishElo",
         "-Seed",
@@ -114,8 +117,6 @@ $arguments =
         "$CoachHashMB",
         "-OpponentHashMB",
         "$OpponentHashMB",
-        "-BookPath",
-        $BookPath,
         "-BookDepth",
         "$BookDepth",
         "-ResultDirectory",
@@ -128,6 +129,10 @@ $arguments =
 
 if (-not [string]::IsNullOrWhiteSpace($CandidatePath)) {
     $arguments += @("-CandidatePath", $CandidatePath)
+}
+
+if (-not [string]::IsNullOrWhiteSpace($BookPath)) {
+    $arguments += @("-BookPath", $BookPath)
 }
 
 if (-not [string]::IsNullOrWhiteSpace($PgnOutputPath)) {
