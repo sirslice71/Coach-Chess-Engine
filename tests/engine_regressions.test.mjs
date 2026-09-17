@@ -1355,6 +1355,52 @@ test("move ordering direct-check rays use one aligned direction", () => {
 
 });
 
+test("move ordering detects discovered checks without moving the board", () => {
+
+    const fileDiscovery =
+        createEngine("4k3/8/8/8/8/8/4N3/4R2K w - - 0 1");
+
+    const fileOrdering =
+        new MoveOrdering(fileDiscovery.board);
+
+    const knightDiscovery =
+        fileDiscovery.legalMoveGenerator
+            .generateMoves()
+            .find(move => moveToUci(move) === "e2g3");
+
+    assert.ok(knightDiscovery);
+    assert.equal(fileOrdering.givesCheck(knightDiscovery), true);
+
+    const blockedFile =
+        createEngine("4k3/8/8/8/8/8/4P3/4R2K w - - 0 1");
+
+    const blockedFileOrdering =
+        new MoveOrdering(blockedFile.board);
+
+    const stillBlocked =
+        blockedFile.legalMoveGenerator
+            .generateMoves()
+            .find(move => moveToUci(move) === "e2e3");
+
+    assert.ok(stillBlocked);
+    assert.equal(blockedFileOrdering.givesCheck(stillBlocked), false);
+
+    const diagonalDiscovery =
+        createEngine("7k/8/8/8/8/2N5/1B6/4K3 w - - 0 1");
+
+    const diagonalOrdering =
+        new MoveOrdering(diagonalDiscovery.board);
+
+    const diagonalMove =
+        diagonalDiscovery.legalMoveGenerator
+            .generateMoves()
+            .find(move => moveToUci(move) === "c3d5");
+
+    assert.ok(diagonalMove);
+    assert.equal(diagonalOrdering.givesCheck(diagonalMove), true);
+
+});
+
 test("static evaluation stays White-relative regardless of side to move", () => {
 
     const whiteUpQueenWhiteToMove =

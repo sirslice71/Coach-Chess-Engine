@@ -387,14 +387,11 @@ export default class MoveOrdering {
     // gives check, used only to bias move ordering. It detects
     // DIRECT checks (the moving/promoted piece itself attacking
     // the enemy king from its new square) for knight, pawn,
-    // bishop, rook, and queen moves. It deliberately does NOT
-    // detect discovered checks -- that would require knowing
-    // whether vacating the origin square unmasks an attack from
-    // a different piece, which is materially more work than a
-    // per-move geometry check. Since this only feeds a move-
-    // ordering bonus (not search correctness), an occasional
-    // missed discovered check just means that move is ordered
-    // like any other quiet move -- never a correctness issue.
+    // bishop, rook, and queen moves, plus cheap discovered
+    // checks where vacating the origin square opens a friendly
+    // bishop/rook/queen ray to the enemy king. Since this only
+    // feeds a move-ordering bonus (not search correctness), the
+    // detector stays board-mutation-free and conservative.
     //----------------------------------
 
     givesCheck(move) {
@@ -420,19 +417,23 @@ export default class MoveOrdering {
 
         if (pieceType === 2) {
 
-            return this.isKnightHop(
+            if (this.isKnightHop(
 
                 move.toSquare,
 
                 enemyKingSquare
 
-            );
+            )) {
+
+                return true;
+
+            }
 
         }
 
         if (pieceType === 1) {
 
-            return this.isPawnAttack(
+            if (this.isPawnAttack(
 
                 move.toSquare,
 
@@ -440,7 +441,11 @@ export default class MoveOrdering {
 
                 movingWhite
 
-            );
+            )) {
+
+                return true;
+
+            }
 
         }
 
@@ -454,7 +459,7 @@ export default class MoveOrdering {
 
         ) {
 
-            return this.rayConnects(
+            if (this.rayConnects(
 
                 move.toSquare,
 
@@ -462,12 +467,208 @@ export default class MoveOrdering {
 
                 pieceType
 
-            );
+            )) {
+
+                return true;
+
+            }
+
+        }
+
+        if (this.givesDiscoveredCheck(move, enemyKingSquare)) {
+
+            return true;
 
         }
 
         // King moves cannot give direct check.
         return false;
+
+    }
+
+    givesDiscoveredCheck(move, enemyKingSquare) {
+
+        const direction =
+            this.rayDirectionFromKing(
+                enemyKingSquare,
+                move.fromSquare
+            );
+
+        if (direction === 0) {
+
+            return false;
+
+        }
+
+        if (
+            this.squareBlocksRay(
+                enemyKingSquare,
+                move.toSquare,
+                direction,
+                move.fromSquare
+            )
+        ) {
+
+            return false;
+
+        }
+
+        let current =
+            enemyKingSquare + direction;
+
+        while (current !== move.fromSquare) {
+
+            if (
+                current < 0 ||
+                current > 63 ||
+                !this.stepIsValid(
+                    current - direction,
+                    current,
+                    direction
+                ) ||
+                this.board.pieceAt(current) !== 0
+            ) {
+
+                return false;
+
+            }
+
+            current += direction;
+
+        }
+
+        current += direction;
+
+        while (
+            current >= 0 &&
+            current <= 63 &&
+            this.stepIsValid(
+                current - direction,
+                current,
+                direction
+            )
+        ) {
+
+            const piece =
+                this.board.pieceAt(current);
+
+            if (piece === 0) {
+
+                current += direction;
+                continue;
+
+            }
+
+            if ((piece > 0) !== (move.piece > 0)) {
+
+                return false;
+
+            }
+
+            return this.sliderAttacksAlongDirection(
+                piece,
+                direction
+            );
+
+        }
+
+        return false;
+
+    }
+
+    rayDirectionFromKing(kingSquare, blockerSquare) {
+
+        const kingRank = kingSquare >> 3;
+        const kingFile = kingSquare & 7;
+        const blockerRank = blockerSquare >> 3;
+        const blockerFile = blockerSquare & 7;
+        const rankDelta = blockerRank - kingRank;
+        const fileDelta = blockerFile - kingFile;
+
+        if (rankDelta === 0 && fileDelta !== 0) {
+            return fileDelta > 0 ? 1 : -1;
+        }
+
+        if (fileDelta === 0 && rankDelta !== 0) {
+            return rankDelta > 0 ? 8 : -8;
+        }
+
+        if (
+            Math.abs(rankDelta) === Math.abs(fileDelta) &&
+            rankDelta !== 0
+        ) {
+
+            if (rankDelta > 0) {
+                return fileDelta > 0 ? 9 : 7;
+            }
+
+            return fileDelta > 0 ? -7 : -9;
+
+        }
+
+        return 0;
+
+    }
+
+    squareBlocksRay(kingSquare, square, direction, stopSquare) {
+
+        let current =
+            kingSquare + direction;
+
+        while (current !== stopSquare) {
+
+            if (
+                current < 0 ||
+                current > 63 ||
+                !this.stepIsValid(
+                    current - direction,
+                    current,
+                    direction
+                )
+            ) {
+
+                return false;
+
+            }
+
+            if (current === square) {
+
+                return true;
+
+            }
+
+            current += direction;
+
+        }
+
+        return false;
+
+    }
+
+    sliderAttacksAlongDirection(piece, direction) {
+
+        const pieceType =
+            Math.abs(piece);
+
+        if (pieceType === 5) {
+
+            return true;
+
+        }
+
+        const orthogonal =
+            direction === -1 ||
+            direction === 1 ||
+            direction === -8 ||
+            direction === 8;
+
+        if (orthogonal) {
+
+            return pieceType === 4;
+
+        }
+
+        return pieceType === 3;
 
     }
 
@@ -620,18 +821,7 @@ export default class MoveOrdering {
             const currentRank = current >> 3;
             const currentFile = current & 7;
 
-            const stepIsValid =
-
-                (direction === -1 && currentRank === previousRank && currentFile === previousFile - 1) ||
-                (direction === 1  && currentRank === previousRank && currentFile === previousFile + 1) ||
-                (direction === -8 && currentFile === previousFile && currentRank === previousRank - 1) ||
-                (direction === 8  && currentFile === previousFile && currentRank === previousRank + 1) ||
-                (direction === -9 && currentRank === previousRank - 1 && currentFile === previousFile - 1) ||
-                (direction === -7 && currentRank === previousRank - 1 && currentFile === previousFile + 1) ||
-                (direction === 7  && currentRank === previousRank + 1 && currentFile === previousFile - 1) ||
-                (direction === 9  && currentRank === previousRank + 1 && currentFile === previousFile + 1);
-
-            if (!stepIsValid) {
+            if (!this.stepIsValid(previous, current, direction)) {
 
                 return false;
 
@@ -650,6 +840,27 @@ export default class MoveOrdering {
             }
 
         }
+
+    }
+
+    stepIsValid(previous, current, direction) {
+
+        const previousRank = previous >> 3;
+        const previousFile = previous & 7;
+
+        const currentRank = current >> 3;
+        const currentFile = current & 7;
+
+        return (
+            (direction === -1 && currentRank === previousRank && currentFile === previousFile - 1) ||
+            (direction === 1  && currentRank === previousRank && currentFile === previousFile + 1) ||
+            (direction === -8 && currentFile === previousFile && currentRank === previousRank - 1) ||
+            (direction === 8  && currentFile === previousFile && currentRank === previousRank + 1) ||
+            (direction === -9 && currentRank === previousRank - 1 && currentFile === previousFile - 1) ||
+            (direction === -7 && currentRank === previousRank - 1 && currentFile === previousFile + 1) ||
+            (direction === 7  && currentRank === previousRank + 1 && currentFile === previousFile - 1) ||
+            (direction === 9  && currentRank === previousRank + 1 && currentFile === previousFile + 1)
+        );
 
     }
 
