@@ -960,7 +960,7 @@ const MINED_STOCKFISH_2400_HUNDRED_GAME_REGRESSIONS = [
         current: [
             {
                 depth: 6,
-                notation: "e8-g6",
+                notation: "b7-a7",
                 evaluation: "5.84"
             },
             {
@@ -984,7 +984,7 @@ const MINED_STOCKFISH_2400_HUNDRED_GAME_REGRESSIONS = [
         current: [
             {
                 depth: 6,
-                notation: "c3-c7",
+                notation: "d6-c7",
                 evaluation: "5.84"
             },
             {
@@ -1289,7 +1289,7 @@ const MINED_STOCKFISH_2400_PURE_PAWN_TIE_MATCH_REGRESSIONS = [
             {
                 depth: 9,
                 notation: "d7-f6",
-                evaluation: "-12.10"
+                evaluation: "-12.18"
             }
         ]
     },
@@ -1317,6 +1317,147 @@ const MINED_STOCKFISH_2400_REGRESSIONS = [
     ...MINED_STOCKFISH_2400_HASH32_REGRESSIONS,
     ...MINED_STOCKFISH_2400_SWING_ANALYSIS_REGRESSIONS,
     ...MINED_STOCKFISH_2400_BOOK_SWING_REGRESSIONS
+];
+
+const ARENA_091726_ENDGAME_SWING_REGRESSIONS = [
+    {
+        label: "20260917 current-vs-9d0 game6 after axb6",
+        source: "Arena current Coach [001] vs Coach 9d0a8c3 [002]",
+        fen: "8/3k2p1/Pp3p2/2KB1P1P/8/7P/8/8 w - - 0 49",
+        coachPlayed: "c5-d4",
+        target: "c5-b6",
+        theme: "king-pawn race conversion / passed-pawn blocker",
+        current: [
+            {
+                depth: 8,
+                notation: "c5-d4",
+                evaluation: "15.97"
+            }
+        ]
+    },
+    {
+        label: "20260917 current-vs-9d0 game8 before Kg8",
+        source: "Arena current Coach [001] vs Coach 9d0a8c3 [002]",
+        fen: "5k2/8/2r1pBP1/4P1K1/6B1/8/8/8 b - - 8 126",
+        coachPlayed: "c6-b6",
+        target: "c6-a6",
+        theme: "rook-pawn endgame / passed-pawn stopper",
+        current: [
+            {
+                depth: 8,
+                notation: "c6-b6",
+                evaluation: "5.54"
+            }
+        ]
+    },
+    {
+        label: "20260917 current-vs-9d0 game8 after Kg8",
+        source: "Arena current Coach [001] vs Coach 9d0a8c3 [002]",
+        fen: "6k1/8/2r1pBP1/4P1K1/6B1/8/8/8 w - - 9 127",
+        coachPlayed: "g5-h6",
+        target: "g4-h3",
+        theme: "rook-pawn endgame / quiet king-bishop coordination",
+        current: [
+            {
+                depth: 8,
+                notation: "g5-h6",
+                evaluation: "5.54"
+            }
+        ]
+    },
+    {
+        label: "20260917 9d0-vs-current game5 before b5",
+        source: "Arena current Coach [001] vs Coach 9d0a8c3 [002]",
+        fen: "5k2/2R5/1pP5/4K1R1/2r2PP1/8/8/8 b - - 0 52",
+        coachPlayed: "c4-d4",
+        target: "c4-c5",
+        theme: "rook-pawn mate defense / checking distance",
+        current: [
+            {
+                depth: 8,
+                notation: "c4-d4",
+                evaluation: "999.94"
+            }
+        ]
+    },
+    {
+        label: "20260917 9d0-vs-current game5 after b5",
+        source: "Arena current Coach [001] vs Coach 9d0a8c3 [002]",
+        fen: "5k2/2R5/2P5/1p2K1R1/2r2PP1/8/8/8 w - - 0 53",
+        coachPlayed: "e5-f6",
+        target: "c7-c8",
+        theme: "rook-pawn mate conversion / quiet promotion support",
+        current: [
+            {
+                depth: 8,
+                notation: "e5-f6",
+                evaluation: "999.89"
+            }
+        ]
+    },
+    {
+        label: "20260917 current-vs-ShallowBlue game7 before b3",
+        source: "Arena current Coach [001] vs Shallowblue_x86-64",
+        fen: "6k1/6pp/3p4/3b4/3P3P/P4p2/KP6/1N2r3 w - - 2 35",
+        coachPlayed: "a2-a1",
+        target: "b2-b3",
+        theme: "minor-piece mate-net defense / pawn shelter",
+        current: [
+            {
+                depth: 8,
+                notation: "a2-a1",
+                evaluation: "-999.92"
+            }
+        ]
+    },
+    {
+        label: "20260917 current-vs-ShallowBlue game9 after Ka2",
+        source: "Arena current Coach [001] vs Shallowblue_x86-64",
+        fen: "8/6R1/7p/2P5/1Pn5/1r1k4/K4b2/8 b - - 3 58",
+        coachPlayed: "d3-c2",
+        target: "b3-a3",
+        theme: "rook-minor mate-net conversion / king containment",
+        current: [
+            {
+                depth: 8,
+                notation: "d3-c2",
+                evaluation: "-999.93"
+            }
+        ]
+    }
+];
+
+const ARENA_091726_OPENING_FORK_REGRESSIONS = [
+    {
+        label: "20260917 current-vs-ShallowBlue round2 before e4 fork trap",
+        source: "Arena current Coach [001] vs Shallowblue_x86-64",
+        fen: "r1bq1rk1/p1p2pp1/1pn1pb1p/3p4/2PP4/2N1PN2/PPQ2PPP/R3KB1R w KQ - 2 10",
+        coachPlayed: "e3-e4",
+        target: "f1-d3",
+        theme: "opening fork trap / root tie move ordering",
+        current: [
+            {
+                depth: 8,
+                notation: "f1-d3",
+                evaluation: "0.65"
+            }
+        ]
+    },
+    {
+        label: "20260917 current-vs-ShallowBlue round2 after Nxd4 fork trap",
+        source: "Arena current Coach [001] vs Shallowblue_x86-64",
+        fen: "r1bq1rk1/p1p2pp1/1p2pb1p/3p4/2PnP3/2N2N2/PPQ2PPP/R3KB1R w KQ - 0 11",
+        coachPlayed: "e4-e5",
+        target: "f3-d4",
+        theme: "opening fork trap / knight recapture defense",
+        current: [
+            {
+                depth: 8,
+                notation: "f3-d4",
+                evaluation: "-0.95"
+            }
+        ]
+    }
 ];
 
 test("move ordering direct-check rays use one aligned direction", () => {
@@ -1844,6 +1985,132 @@ test("pure-pawn tie 100g high-priority targets preserve current depth snapshots"
             })),
             position.current,
             `${position.label} current behavior changed; review whether the mate-conversion target is now fixed or needs a new baseline.`
+        );
+
+    }
+
+});
+
+test("Arena 20260917 endgame swing targets keep played and reference moves legal", () => {
+
+    for (const position of ARENA_091726_ENDGAME_SWING_REGRESSIONS) {
+
+        const {
+            board,
+            legalMoveGenerator
+        } = createEngine(position.fen);
+
+        assert.equal(
+            FEN.export(board),
+            position.fen,
+            `${position.label} should round-trip through FEN import/export`
+        );
+
+        const legalMoveNotations =
+            new Set(
+                legalMoveGenerator
+                    .generateMoves()
+                    .map(move => move.toString())
+            );
+
+        assert.ok(
+            legalMoveNotations.has(position.coachPlayed),
+            `${position.label} should keep Coach move ${position.coachPlayed} legal`
+        );
+
+        assert.ok(
+            legalMoveNotations.has(position.target),
+            `${position.label} should keep reference move ${position.target} legal`
+        );
+
+    }
+
+});
+
+test("Arena 20260917 endgame swing targets preserve current depth snapshots", () => {
+
+    for (const position of ARENA_091726_ENDGAME_SWING_REGRESSIONS) {
+
+        const depths =
+            position.current.map(entry => entry.depth);
+
+        const results =
+            searchBestMovesByDepth(
+                position.fen,
+                depths
+            );
+
+        assert.deepEqual(
+            results.map(({ depth, notation, evaluation }) => ({
+                depth,
+                notation,
+                evaluation
+            })),
+            position.current,
+            `${position.label} current behavior changed; review whether the Arena endgame target is now fixed or needs a new baseline.`
+        );
+
+    }
+
+});
+
+test("Arena 20260917 opening fork targets keep played and reference moves legal", () => {
+
+    for (const position of ARENA_091726_OPENING_FORK_REGRESSIONS) {
+
+        const {
+            board,
+            legalMoveGenerator
+        } = createEngine(position.fen);
+
+        assert.equal(
+            FEN.export(board),
+            position.fen,
+            `${position.label} should round-trip through FEN import/export`
+        );
+
+        const legalMoveNotations =
+            new Set(
+                legalMoveGenerator
+                    .generateMoves()
+                    .map(move => move.toString())
+            );
+
+        assert.ok(
+            legalMoveNotations.has(position.coachPlayed),
+            `${position.label} should keep Coach move ${position.coachPlayed} legal`
+        );
+
+        assert.ok(
+            legalMoveNotations.has(position.target),
+            `${position.label} should keep reference move ${position.target} legal`
+        );
+
+    }
+
+});
+
+test("Arena 20260917 opening fork targets preserve current depth snapshots", () => {
+
+    for (const position of ARENA_091726_OPENING_FORK_REGRESSIONS) {
+
+        const depths =
+            position.current.map(entry => entry.depth);
+
+        const results =
+            searchBestMovesByDepth(
+                position.fen,
+                depths
+            );
+
+        assert.deepEqual(
+            results.map(({ depth, notation, evaluation }) => ({
+                depth,
+                notation,
+                evaluation
+            })),
+            position.current,
+            `${position.label} current behavior changed; review whether the Arena opening-fork target is now fixed or needs a new baseline.`
         );
 
     }
