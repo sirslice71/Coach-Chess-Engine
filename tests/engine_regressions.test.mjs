@@ -1264,6 +1264,123 @@ const MINED_STOCKFISH_2400_BOOK_SWING_REGRESSIONS = [
     }
 ];
 
+const MINED_STOCKFISH_2400_ROLLBACK_SWING_REGRESSIONS = [
+    {
+        label: "rollback SF2400 game36 ply114 before g3",
+        fen: "8/8/8/3n4/4k1p1/8/3K1Bp1/8 b - - 3 57",
+        coachPlayed: "g4-g3",
+        target: "d5-f4",
+        theme: "minor-pawn endgame conversion / mate-preservation",
+        current: [
+            {
+                depth: 6,
+                notation: "d5-f4",
+                evaluation: "-6.10"
+            },
+            {
+                depth: 8,
+                notation: "e4-f3",
+                evaluation: "-6.20"
+            }
+        ]
+    },
+    {
+        label: "rollback SF2400 game5 ply145 before e5",
+        fen: "8/4k3/8/1nPP1P2/4P2p/3K3P/B5P1/8 w - - 3 73",
+        coachPlayed: "e4-e5",
+        target: "e4-e5",
+        theme: "passed-pawn mate-score preservation",
+        current: [
+            {
+                depth: 6,
+                notation: "e4-e5",
+                evaluation: "12.58"
+            },
+            {
+                depth: 8,
+                notation: "e4-e5",
+                evaluation: "13.43"
+            }
+        ]
+    },
+    {
+        label: "rollback SF2400 game19 ply111 before e8Q",
+        fen: "8/3QP1bk/2p2q2/1p5p/4P3/1P2R3/4K1PP/8 w - - 0 56",
+        coachPlayed: "e7-e8",
+        target: "e7-e8",
+        theme: "promotion mate-score preservation",
+        current: [
+            {
+                depth: 6,
+                notation: "e7-e8",
+                evaluation: "13.92"
+            },
+            {
+                depth: 8,
+                notation: "e7-e8",
+                evaluation: "14.71"
+            }
+        ]
+    },
+    {
+        label: "rollback SF2400 game25 ply39 before Bxf7",
+        fen: "1rk5/pp3pbp/2pR1N2/2q5/2B1PQ2/7P/PPP2P1P/2K4R w - - 1 20",
+        coachPlayed: "c4-f7",
+        target: "d6-d7",
+        theme: "queen-rook-bishop mate-score preservation",
+        current: [
+            {
+                depth: 6,
+                notation: "d6-d7",
+                evaluation: "17.13"
+            },
+            {
+                depth: 8,
+                notation: "d6-d7",
+                evaluation: "25.13"
+            }
+        ]
+    },
+    {
+        label: "rollback SF2400 game25 ply43 before Rd7",
+        fen: "1r6/pk4bp/2pRBN2/1pq5/4PQ2/7P/PPP2P1P/2K4R w - - 2 22",
+        coachPlayed: "d6-d7",
+        target: "d6-d7",
+        theme: "queen-rook-bishop mate-score preservation",
+        current: [
+            {
+                depth: 6,
+                notation: "d6-d7",
+                evaluation: "17.31"
+            },
+            {
+                depth: 8,
+                notation: "d6-d7",
+                evaluation: "17.35"
+            }
+        ]
+    },
+    {
+        label: "rollback SF2400 game36 ply116 before g1Q",
+        fen: "8/8/8/3n4/4k3/6B1/3K2p1/8 b - - 0 58",
+        coachPlayed: "g2-g1",
+        target: "g2-g1",
+        theme: "promotion mate-score preservation",
+        current: [
+            {
+                depth: 6,
+                notation: "g2-g1",
+                evaluation: "-14.01"
+            },
+            {
+                depth: 8,
+                notation: "g2-g1",
+                evaluation: "-999.89"
+            }
+        ]
+    }
+];
+
 const MINED_STOCKFISH_2400_PURE_PAWN_TIE_MATCH_REGRESSIONS = [
     {
         label: "pure-pawn tie 100g game87 ply249 before Re8",
@@ -1316,7 +1433,8 @@ const MINED_STOCKFISH_2400_REGRESSIONS = [
     ...MINED_STOCKFISH_2400_HUNDRED_GAME_REGRESSIONS,
     ...MINED_STOCKFISH_2400_HASH32_REGRESSIONS,
     ...MINED_STOCKFISH_2400_SWING_ANALYSIS_REGRESSIONS,
-    ...MINED_STOCKFISH_2400_BOOK_SWING_REGRESSIONS
+    ...MINED_STOCKFISH_2400_BOOK_SWING_REGRESSIONS,
+    ...MINED_STOCKFISH_2400_ROLLBACK_SWING_REGRESSIONS
 ];
 
 const ARENA_091726_ENDGAME_SWING_REGRESSIONS = [
