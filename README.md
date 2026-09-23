@@ -47,6 +47,5 @@ run-tests.cmd
 Deep historical search sentinels in `tests\engine_regressions.test.mjs` are skipped by default. Enable them only for intentional long-running checks:
 
 ```cmd
-set RUN_SLOW_ENGINE_REGRESSIONS=1
-node --test tests\engine_regressions.test.mjs
+run-slow-tests.cmd
 ```
