@@ -29,3 +29,24 @@ Setup and current limitations are documented in [`js/docs/UCI.md`](js/docs/UCI.m
 ## Development
 
 Read [`js/AGENTS.md`](js/AGENTS.md) before making significant changes. Coach prioritizes correctness, reliability, architecture, measurability, performance, playing strength, and explainability—in that order.
+
+### Tests
+
+Run a single test file with Node's built-in test runner:
+
+```cmd
+node --test tests\engine_regressions.test.mjs
+```
+
+Run every test file on Windows:
+
+```cmd
+for %f in (tests\*.test.mjs) do node --test %f
+```
+
+Deep historical search sentinels in `tests\engine_regressions.test.mjs` are skipped by default. Enable them only for intentional long-running checks:
+
+```cmd
+set RUN_SLOW_ENGINE_REGRESSIONS=1
+node --test tests\engine_regressions.test.mjs
+```
