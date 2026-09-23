@@ -1274,18 +1274,12 @@ export default class Search {
                 ? performance.now()
                 : 0;
 
-        const rootPicker =
-            this.createMovePicker(
-
+        this.moveOrdering.order(
             moves,
-
             [-1, -1],
-
             ttMove,
-
             this.history
-
-            );
+        );
 
         if (this.profileEnabled) {
 
@@ -1300,8 +1294,9 @@ export default class Search {
         //----------------------------------
 
         let move;
+        let rootMoveIndex = 0;
 
-        while ((move = rootPicker.next()) !== null) {
+        while ((move = moves[rootMoveIndex++]) !== undefined) {
 
             this.checkSearchDeadline();
 
