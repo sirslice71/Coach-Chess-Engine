@@ -55,3 +55,9 @@ To run only matching slow sentinels, pass a Node test-name pattern:
 ```cmd
 run-slow-tests.cmd root-score shape
 ```
+
+To run only matching position labels inside the slow snapshot sentinels, use `/position`:
+
+```cmd
+run-slow-tests.cmd /position Kd4
+```

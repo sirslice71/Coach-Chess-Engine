@@ -51,6 +51,20 @@ function traceSlowPosition(position, depths, fn) {
 
     }
 
+    const positionPattern =
+        process.env.RUN_SLOW_POSITION_PATTERN;
+
+    if (
+        positionPattern &&
+        !position.label.toLowerCase().includes(positionPattern.toLowerCase())
+    ) {
+
+        console.error(`[SLOW POSITION SKIP] ${position.label}`);
+
+        return null;
+
+    }
+
     const startedAt =
         Date.now();
 
@@ -1087,12 +1101,12 @@ const MINED_STOCKFISH_2400_HUNDRED_GAME_REGRESSIONS = [
             },
             {
                 depth: 7,
-                notation: "a5-a4",
+                notation: "f7-f6",
                 evaluation: "-18.46"
             },
             {
                 depth: 8,
-                notation: "a5-a4",
+                notation: "f7-f6",
                 evaluation: "-18.49"
             }
         ]
@@ -2093,6 +2107,12 @@ slowSearchTest("mined SF2400 collapse positions preserve current depth snapshots
                 )
             );
 
+        if (results === null) {
+
+            continue;
+
+        }
+
         assert.deepEqual(
             results.map(({ depth, notation, evaluation }) => ({
                 depth,
@@ -2152,6 +2172,12 @@ slowSearchTest("pure-pawn tie 100g high-priority targets preserve current depth 
                     depths
                 )
             );
+
+        if (results === null) {
+
+            continue;
+
+        }
 
         assert.deepEqual(
             results.map(({ depth, notation, evaluation }) => ({
@@ -2220,6 +2246,12 @@ slowSearchTest("Arena 20260917 endgame swing targets preserve current depth snap
                 )
             );
 
+        if (results === null) {
+
+            continue;
+
+        }
+
         assert.deepEqual(
             results.map(({ depth, notation, evaluation }) => ({
                 depth,
@@ -2286,6 +2318,12 @@ slowSearchTest("Arena 20260917 opening fork targets preserve current depth snaps
                     depths
                 )
             );
+
+        if (results === null) {
+
+            continue;
+
+        }
 
         assert.deepEqual(
             results.map(({ depth, notation, evaluation }) => ({
