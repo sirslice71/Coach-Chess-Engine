@@ -17,13 +17,14 @@ if "%~1"=="" (
 exit /b %errorlevel%
 
 :position_filter
-if "%~2"=="" (
-    echo Usage: run-slow-tests.cmd /position "label text"
-    exit /b 1
-)
+if "%~2"=="" goto position_usage
 
 echo Filtering slow positions with label pattern: %~2
-set RUN_SLOW_POSITION_PATTERN=%~2
+set "RUN_SLOW_POSITION_PATTERN=%~2"
 set RUN_SLOW_ENGINE_REGRESSIONS=1
 node --test --test-name-pattern="preserve current depth snapshots" tests\engine_regressions.test.mjs
 exit /b %errorlevel%
+
+:position_usage
+echo Usage: run-slow-tests.cmd /position "label text"
+exit /b 1
