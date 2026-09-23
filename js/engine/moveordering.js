@@ -108,6 +108,161 @@ export default class MoveOrdering {
 
     }
 
+    stagedPicker(
+
+        moves,
+
+        killers = [-1, -1],
+
+        ttMove = null,
+
+        history = null,
+
+        evasionMode = false
+
+    ) {
+
+        const ttMoves = [];
+        const forcingMoves = [];
+        const priorityQuiets = [];
+        const quietMoves = [];
+
+        for (const move of moves) {
+
+            if (
+                ttMove &&
+                move.key === ttMove.key
+            ) {
+
+                move.score = 1000000;
+                ttMoves.push(move);
+                continue;
+
+            }
+
+            if (move.isCapture() || move.isPromotion()) {
+                forcingMoves.push(move);
+                continue;
+            }
+
+            if (
+                move.key === killers[0] ||
+                move.key === killers[1] ||
+                (
+                    evasionMode &&
+                    Math.abs(move.piece) === 6
+                )
+            ) {
+                priorityQuiets.push(move);
+                continue;
+            }
+
+            quietMoves.push(move);
+
+        }
+
+        const buckets = [
+            {
+                moves: ttMoves,
+                scored: true
+            },
+            {
+                moves: forcingMoves,
+                scored: false
+            },
+            {
+                moves: priorityQuiets,
+                scored: false
+            },
+            {
+                moves: quietMoves,
+                scored: false
+            }
+        ];
+
+        let bucketIndex = 0;
+        let moveIndex = 0;
+
+        const prepareBucket = bucket => {
+
+            if (bucket.scored) {
+                return;
+            }
+
+            this.scoreAndSort(
+                bucket.moves,
+                killers,
+                null,
+                history,
+                evasionMode
+            );
+
+            bucket.scored = true;
+
+        };
+
+        return {
+
+            next: () => {
+
+                while (bucketIndex < buckets.length) {
+
+                    const bucket =
+                        buckets[bucketIndex];
+
+                    prepareBucket(bucket);
+
+                    if (moveIndex < bucket.moves.length) {
+                        return bucket.moves[moveIndex++];
+                    }
+
+                    bucketIndex++;
+                    moveIndex = 0;
+
+                }
+
+                return null;
+
+            }
+
+        };
+
+    }
+
+    scoreAndSort(
+
+        moves,
+
+        killers = [-1, -1],
+
+        ttMove = null,
+
+        history = null,
+
+        evasionMode = false
+
+    ) {
+
+        for (const move of moves) {
+
+            this.scoreMove(
+                move,
+                killers,
+                ttMove,
+                history,
+                evasionMode
+            );
+
+        }
+
+        moves.sort(
+            (a, b) =>
+                (b.score - a.score) ||
+                this.compareMoveIdentity(a, b)
+        );
+
+    }
+
     scoreMove(
 
         move,

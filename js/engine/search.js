@@ -321,6 +321,10 @@ export class SearchTimeout extends Error {}
 
 export default class Search {
 
+    static STAGED_MOVE_ORDERING =
+        typeof process === "undefined" ||
+        process.env?.COACH_STAGED_MOVE_ORDERING !== "0";
+
     constructor(board, legalMoveGenerator, evaluation) {
 
         this.board = board;
@@ -1270,7 +1274,8 @@ export default class Search {
                 ? performance.now()
                 : 0;
 
-        this.moveOrdering.order(
+        const rootPicker =
+            this.createMovePicker(
 
             moves,
 
@@ -1280,7 +1285,7 @@ export default class Search {
 
             this.history
 
-        );
+            );
 
         if (this.profileEnabled) {
 
@@ -1294,7 +1299,9 @@ export default class Search {
         // Search Root
         //----------------------------------
 
-        for (const move of moves) {
+        let move;
+
+        while ((move = rootPicker.next()) !== null) {
 
             this.checkSearchDeadline();
 
@@ -1778,7 +1785,13 @@ export default class Search {
 
         const killers = this.getKillers(ply);
 
-        this.moveOrdering.order(moves, killers, ttMove, this.history);
+        const movePicker =
+            this.createMovePicker(
+            moves,
+            killers,
+            ttMove,
+            this.history
+        );
 
         if (this.profileEnabled) {
 
@@ -1813,7 +1826,9 @@ export default class Search {
 
         let moveIndex = 0;
 
-            for (const move of moves) {
+            let move;
+
+            while ((move = movePicker.next()) !== null) {
 
                 //----------------------------------
                 // Make Move
@@ -2305,7 +2320,8 @@ export default class Search {
 
         if (inCheck) {
 
-            this.moveOrdering.order(
+            const movePicker =
+                this.createMovePicker(
 
                 moves,
 
@@ -2317,99 +2333,190 @@ export default class Search {
 
                 true
 
-            );
+                );
+
+            for (
+                let move = movePicker.next();
+                move !== null;
+                move = movePicker.next()
+            ) {
+
+                const score =
+                    this.searchQuiescenceMove(
+                        move,
+                        alpha,
+                        beta,
+                        ply,
+                        qPly,
+                        inCheck
+                    );
+
+                if (score >= beta) {
+                    return beta;
+                }
+
+                if (score > alpha) {
+                    alpha = score;
+                }
+
+            }
+
+            return alpha;
 
         }
         else {
 
-            this.moveOrdering.order(
+            const movePicker =
+                this.createMovePicker(
 
                 moves
 
             );
 
-        }
-
-        for (const move of moves) {
-
-            //----------------------------------
-            // SEE Capture Pruning
-            //
-            // Only when NOT in check. Never prunes promotions,
-            // even capture-promotions, regardless of SEE. Only
-            // skips captures clearly losing more than half a
-            // pawn (see QSEARCH_SEE_PRUNE_THRESHOLD comment).
-            //----------------------------------
-
-            if (
-
-                !inCheck &&
-
-                move.isCapture() &&
-
-                !move.isPromotion() &&
-
-                move.seeScore !== undefined &&
-
-                move.seeScore < QSEARCH_SEE_PRUNE_THRESHOLD
-
+            for (
+                let move = movePicker.next();
+                move !== null;
+                move = movePicker.next()
             ) {
 
-                continue;
-
-            }
-
-            this.board.makeMove(move);
-
-            let score;
-
-            //----------------------------------
-            // try/finally so board.undoMove() always runs even if
-            // this.quiescence() throws SearchTimeout partway
-            // through -- see the matching comment in negamax()'s
-            // move loop above for why an unmatched makeMove() here
-            // corrupts this.board for the rest of the search call.
-            //----------------------------------
-
-            try {
-
-                score =
-
-                    -this.quiescence(
-
-                        -beta,
-
-                        -alpha,
-
-                        ply + 1,
-
-                        qPly + 1
-
+                const score =
+                    this.searchQuiescenceMove(
+                        move,
+                        alpha,
+                        beta,
+                        ply,
+                        qPly,
+                        inCheck
                     );
 
-            }
+                if (score >= beta) {
+                    return beta;
+                }
 
-            finally {
-
-                this.board.undoMove();
-
-            }
-
-            if (score >= beta) {
-
-                return beta;
+                if (score > alpha) {
+                    alpha = score;
+                }
 
             }
 
-            if (score > alpha) {
-
-                alpha = score;
-
-            }
+            return alpha;
 
         }
 
-        return alpha;
+    }
+
+    searchQuiescenceMove(
+        move,
+        alpha,
+        beta,
+        ply,
+        qPly,
+        inCheck
+    ) {
+
+        //----------------------------------
+        // SEE Capture Pruning
+        //
+        // Only when NOT in check. Never prunes promotions,
+        // even capture-promotions, regardless of SEE. Only
+        // skips captures clearly losing more than half a
+        // pawn (see QSEARCH_SEE_PRUNE_THRESHOLD comment).
+        //----------------------------------
+
+        if (
+
+            !inCheck &&
+
+            move.isCapture() &&
+
+            !move.isPromotion() &&
+
+            move.seeScore !== undefined &&
+
+            move.seeScore < QSEARCH_SEE_PRUNE_THRESHOLD
+
+        ) {
+
+            return alpha;
+
+        }
+
+        this.board.makeMove(move);
+
+        let score;
+
+        //----------------------------------
+        // try/finally so board.undoMove() always runs even if
+        // this.quiescence() throws SearchTimeout partway
+        // through -- see the matching comment in negamax()'s
+        // move loop above for why an unmatched makeMove() here
+        // corrupts this.board for the rest of the search call.
+        //----------------------------------
+
+        try {
+
+            score =
+
+                -this.quiescence(
+
+                    -beta,
+
+                    -alpha,
+
+                    ply + 1,
+
+                    qPly + 1
+
+                );
+
+        }
+
+        finally {
+
+            this.board.undoMove();
+
+        }
+
+        return score;
+
+    }
+
+    createMovePicker(
+        moves,
+        killers = [-1, -1],
+        ttMove = null,
+        history = null,
+        evasionMode = false
+    ) {
+
+        if (Search.STAGED_MOVE_ORDERING) {
+
+            return this.moveOrdering.stagedPicker(
+                moves,
+                killers,
+                ttMove,
+                history,
+                evasionMode
+            );
+
+        }
+
+        this.moveOrdering.order(
+            moves,
+            killers,
+            ttMove,
+            history,
+            evasionMode
+        );
+
+        let index = 0;
+
+        return {
+            next: () =>
+                index < moves.length
+                    ? moves[index++]
+                    : null
+        };
 
     }
 
