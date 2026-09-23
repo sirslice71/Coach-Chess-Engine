@@ -4105,6 +4105,91 @@ test("promotion siblings have unique move keys while non-promotions keep the his
 
 });
 
+test("root move diagnostics expose exact UCI promotion identities", () => {
+
+    const result =
+        searchBestMove(
+            "8/8/8/3n4/4k3/6B1/3K2p1/8 b - - 0 58",
+            1
+        );
+
+    const promotionUci =
+        result.rootMoves
+            .filter(rootMove => rootMove.notation === "g2-g1")
+            .map(rootMove => rootMove.uci)
+            .sort();
+
+    assert.deepEqual(
+        promotionUci,
+        ["g2g1b", "g2g1n", "g2g1q", "g2g1r"]
+    );
+
+});
+
+test("verified root tie replacement updates root table and TT consistently", () => {
+
+    const {
+        board,
+        search,
+        legalMoveGenerator
+    } = createEngine(
+        "4k3/8/8/8/8/8/8/4K3 w - - 0 1"
+    );
+
+    const tiedMoves =
+        legalMoveGenerator
+            .generateMoves()
+            .slice(0, 2);
+
+    assert.equal(tiedMoves.length, 2);
+
+    const originalNegamax =
+        search.negamax;
+
+    const scores =
+        [-500, -650];
+
+    search.negamax = () => scores.shift();
+
+    try {
+
+        const result =
+            search.verifyRootTie(
+                6,
+                {
+                    bestMove: tiedMoves[0],
+                    bestScore: 500,
+                    rootMoves: tiedMoves.map(move => ({
+                        move,
+                        notation: move.toString(),
+                        uci: moveToUci(move),
+                        score: 500
+                    }))
+                }
+            );
+
+        assert.equal(result.bestMove.key, tiedMoves[1].key);
+        assert.equal(result.bestScore, 650);
+        assert.equal(result.rootMoves[0].move.key, tiedMoves[1].key);
+        assert.equal(result.rootMoves[0].score, 650);
+        assert.equal(result.rootMoves[0].verified, true);
+
+        const ttEntry =
+            search.tt.probe(board.hashKey);
+
+        assert.ok(ttEntry);
+        assert.equal(ttEntry.move.key, tiedMoves[1].key);
+
+    }
+
+    finally {
+
+        search.negamax = originalNegamax;
+
+    }
+
+});
+
 test("TT move ordering matches the exact quiet and capture promotion piece", () => {
 
     for (const {

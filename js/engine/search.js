@@ -607,10 +607,41 @@ export default class Search {
             bestVerified.score !== result.bestScore
         ) {
 
+            const verifiedRootMoves =
+                result.rootMoves
+                    .map(rootMove =>
+                        rootMove.move.key === bestVerified.rootMove.move.key
+                            ? {
+                                ...rootMove,
+                                score: bestVerified.score,
+                                verified: true
+                            }
+                            : rootMove
+                    )
+                    .sort((a, b) =>
+                        b.score - a.score
+                    );
+
+            if (!this.hasRepetitionHistory()) {
+
+                this.tt.store(
+                    this.board.hashKey,
+                    depth,
+                    scoreToTT(
+                        bestVerified.score,
+                        0
+                    ),
+                    TTFlag.EXACT,
+                    bestVerified.rootMove.move
+                );
+
+            }
+
             return {
                 ...result,
                 bestMove: bestVerified.rootMove.move,
-                bestScore: bestVerified.score
+                bestScore: bestVerified.score,
+                rootMoves: verifiedRootMoves
             };
 
         }
@@ -1009,6 +1040,7 @@ export default class Search {
                             {
                                 move: fallbackMove,
                                 notation: fallbackMove.toString(),
+                                uci: moveToLabUci(fallbackMove),
                                 score: 0
                             }
                         ]
@@ -1118,6 +1150,14 @@ export default class Search {
                 result.bestMove
 
                     ? result.bestMove.toString()
+
+                    : null,
+
+            uci:
+
+                result.bestMove
+
+                    ? moveToLabUci(result.bestMove)
 
                     : null,
 
@@ -1317,6 +1357,8 @@ export default class Search {
                 move,
 
                 notation: move.toString(),
+
+                uci: moveToLabUci(move),
 
                 score
 
