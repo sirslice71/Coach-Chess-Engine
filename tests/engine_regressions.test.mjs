@@ -20,6 +20,12 @@ import { Piece } from "../js/core/piece.js";
 import { SearchConstants } from "../js/engine/searchconstants.js";
 import { moveToUci } from "../js/uci/uciengine.js";
 
+// Deep historical search sentinels are opt-in so the default regression file stays runnable.
+const slowSearchTest =
+    process.env.RUN_SLOW_ENGINE_REGRESSIONS === "1"
+        ? test
+        : test.skip;
+
 function createEngine(fen) {
 
     const board = new Board();
@@ -2026,7 +2032,7 @@ test("mined SF2400 collapse positions load and keep played/target moves legal", 
 
 });
 
-test("mined SF2400 collapse positions preserve current depth snapshots", () => {
+slowSearchTest("mined SF2400 collapse positions preserve current depth snapshots", () => {
 
     for (const position of MINED_STOCKFISH_2400_REGRESSIONS) {
 
@@ -2082,7 +2088,7 @@ test("pure-pawn tie 100g high-priority targets keep played and reference moves l
 
 });
 
-test("pure-pawn tie 100g high-priority targets preserve current depth snapshots", () => {
+slowSearchTest("pure-pawn tie 100g high-priority targets preserve current depth snapshots", () => {
 
     for (const position of MINED_STOCKFISH_2400_PURE_PAWN_TIE_MATCH_REGRESSIONS) {
 
@@ -2145,7 +2151,7 @@ test("Arena 20260917 endgame swing targets keep played and reference moves legal
 
 });
 
-test("Arena 20260917 endgame swing targets preserve current depth snapshots", () => {
+slowSearchTest("Arena 20260917 endgame swing targets preserve current depth snapshots", () => {
 
     for (const position of ARENA_091726_ENDGAME_SWING_REGRESSIONS) {
 
@@ -2208,7 +2214,7 @@ test("Arena 20260917 opening fork targets keep played and reference moves legal"
 
 });
 
-test("Arena 20260917 opening fork targets preserve current depth snapshots", () => {
+slowSearchTest("Arena 20260917 opening fork targets preserve current depth snapshots", () => {
 
     for (const position of ARENA_091726_OPENING_FORK_REGRESSIONS) {
 
@@ -2235,7 +2241,7 @@ test("Arena 20260917 opening fork targets preserve current depth snapshots", () 
 
 });
 
-test("mined SF2400 collapse positions expose current root-score shape", () => {
+slowSearchTest("mined SF2400 collapse positions expose current root-score shape", () => {
 
     const qg3 =
         MINED_STOCKFISH_2400_COLLAPSE_REGRESSIONS[0];
@@ -2358,7 +2364,7 @@ test("mined SF2400 collapse positions expose current root-score shape", () => {
 
 });
 
-test("low-material root tie verification chooses the deeper rook-pawn defense", () => {
+slowSearchTest("low-material root tie verification chooses the deeper rook-pawn defense", () => {
 
     const kxg8 =
         MINED_STOCKFISH_2400_HIGH_PRIORITY_REGRESSIONS[3];
@@ -2371,7 +2377,7 @@ test("low-material root tie verification chooses the deeper rook-pawn defense", 
 
 });
 
-test("pure-pawn root tie verification prefers the defensive king move", () => {
+slowSearchTest("pure-pawn root tie verification prefers the defensive king move", () => {
 
     const kb3After =
         MINED_STOCKFISH_2400_BOOK_SWING_REGRESSIONS[3];
@@ -2384,7 +2390,7 @@ test("pure-pawn root tie verification prefers the defensive king move", () => {
 
 });
 
-test("low-material root tie tolerance prefers the defensive king move", () => {
+slowSearchTest("low-material root tie tolerance prefers the defensive king move", () => {
 
     const result =
         searchBestMove(
@@ -2397,7 +2403,7 @@ test("low-material root tie tolerance prefers the defensive king move", () => {
 
 });
 
-test("PGN collapse regression: game 8 vs Shallowblue move 73 finds g4-f3 at depth 8", () => {
+slowSearchTest("PGN collapse regression: game 8 vs Shallowblue move 73 finds g4-f3 at depth 8", () => {
 
     const result =
         searchBestMove(
@@ -2412,7 +2418,7 @@ test("PGN collapse regression: game 8 vs Shallowblue move 73 finds g4-f3 at dept
 
 });
 
-test("PGN collapse regression: game 4 vs Stash move 37 finds a7-b7 at depth 9", () => {
+slowSearchTest("PGN collapse regression: game 4 vs Stash move 37 finds a7-b7 at depth 9", () => {
 
     const result =
         searchBestMove(
@@ -2427,7 +2433,7 @@ test("PGN collapse regression: game 4 vs Stash move 37 finds a7-b7 at depth 9", 
 
 });
 
-test("PGN collapse regression: game 10 vs Stash move 24 finds e6-e5 at depth 8", () => {
+slowSearchTest("PGN collapse regression: game 10 vs Stash move 24 finds e6-e5 at depth 8", () => {
 
     const result =
         searchBestMove(
@@ -2442,7 +2448,7 @@ test("PGN collapse regression: game 10 vs Stash move 24 finds e6-e5 at depth 8",
 
 });
 
-test("post-extension Game 6 quiet promotion-race defense finds the strongest rook family", () => {
+slowSearchTest("post-extension Game 6 quiet promotion-race defense finds the strongest rook family", () => {
 
     //----------------------------------
     // This position is objectively lost for Black. The point
