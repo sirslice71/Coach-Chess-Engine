@@ -2124,7 +2124,21 @@ export default class Evaluation {
             ? this.board.whitePieces
             : this.board.blackPieces;
 
-        if (defenderPieces.rooks.length === 0) {
+        const nonPawnMaterial =
+            this.nonPawnMaterialCount();
+
+        const hasStopperPiece =
+            defenderPieces.rooks.length > 0 ||
+            (
+                nonPawnMaterial <= 2 &&
+                (
+                    defenderPieces.pawns.length > 0 ||
+                    defenderPieces.knights.length > 0 ||
+                    defenderPieces.bishops.length > 0
+                )
+            );
+
+        if (!hasStopperPiece) {
             return 0;
         }
 
@@ -2179,6 +2193,21 @@ export default class Evaluation {
         }
 
         return white ? score : -score;
+
+    }
+
+    nonPawnMaterialCount() {
+
+        return (
+            this.board.whitePieces.knights.length +
+            this.board.whitePieces.bishops.length +
+            this.board.whitePieces.rooks.length +
+            this.board.whitePieces.queens.length +
+            this.board.blackPieces.knights.length +
+            this.board.blackPieces.bishops.length +
+            this.board.blackPieces.rooks.length +
+            this.board.blackPieces.queens.length
+        );
 
     }
 

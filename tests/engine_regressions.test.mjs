@@ -1339,12 +1339,12 @@ const MINED_STOCKFISH_2400_ROLLBACK_SWING_REGRESSIONS = [
             {
                 depth: 6,
                 notation: "d5-f4",
-                evaluation: "-6.10"
+                evaluation: "-5.77"
             },
             {
                 depth: 8,
                 notation: "e4-f3",
-                evaluation: "-6.20"
+                evaluation: "-5.82"
             }
         ]
     },
@@ -1358,12 +1358,12 @@ const MINED_STOCKFISH_2400_ROLLBACK_SWING_REGRESSIONS = [
             {
                 depth: 6,
                 notation: "e4-e5",
-                evaluation: "12.58"
+                evaluation: "12.32"
             },
             {
                 depth: 8,
                 notation: "e4-e5",
-                evaluation: "13.43"
+                evaluation: "12.95"
             }
         ]
     },
@@ -4026,6 +4026,34 @@ test("Coach Lab exposes pawn promotion terms without mutating board state", () =
         typeof detailed.delta.stopperQuality,
         "number",
         "detailed lab should compute a numeric stopper quality delta"
+    );
+
+});
+
+test("minor-piece defenders contribute passed-pawn stopper quality", () => {
+
+    const fen =
+        "8/8/8/3n4/4k1p1/8/3K1Bp1/8 b - - 3 57";
+
+    const {
+        search
+    } = createEngine(fen);
+
+    const lab =
+        withMutedConsole(() =>
+            search.lab("e4-f3", 1)
+        );
+
+    assert.ok(lab);
+
+    assert.ok(
+        lab.before.eval.pawns.stopperQuality > 0,
+        `expected White bishop stopper resources to discount Black passers, got ${lab.before.eval.pawns.stopperQuality}`
+    );
+
+    assert.ok(
+        lab.after.eval.pawns.stopperQuality > 0,
+        `expected stopper quality to remain active after e4-f3, got ${lab.after.eval.pawns.stopperQuality}`
     );
 
 });
