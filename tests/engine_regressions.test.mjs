@@ -23,7 +23,24 @@ import { moveToUci } from "../js/uci/uciengine.js";
 // Deep historical search sentinels are opt-in so the default regression file stays runnable.
 const slowSearchTest =
     process.env.RUN_SLOW_ENGINE_REGRESSIONS === "1"
-        ? test
+        ? (name, fn) => test(name, async (t) => {
+            const startedAt =
+                Date.now();
+
+            console.error(`[SLOW START] ${name}`);
+
+            try {
+
+                return await fn(t);
+
+            }
+
+            finally {
+
+                console.error(`[SLOW END] ${name} ${Date.now() - startedAt}ms`);
+
+            }
+        })
         : test.skip;
 
 function createEngine(fen) {
