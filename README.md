@@ -49,3 +49,9 @@ Deep historical search sentinels in `tests\engine_regressions.test.mjs` are skip
 ```cmd
 run-slow-tests.cmd
 ```
+
+To run only matching slow sentinels, pass a Node test-name pattern:
+
+```cmd
+run-slow-tests.cmd root-score shape
+```
