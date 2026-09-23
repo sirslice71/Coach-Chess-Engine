@@ -43,6 +43,33 @@ const slowSearchTest =
         })
         : test.skip;
 
+function traceSlowPosition(position, depths, fn) {
+
+    if (process.env.RUN_SLOW_ENGINE_REGRESSIONS !== "1") {
+
+        return fn();
+
+    }
+
+    const startedAt =
+        Date.now();
+
+    console.error(`[SLOW POSITION START] ${position.label} depths=${depths.join(",")}`);
+
+    try {
+
+        return fn();
+
+    }
+
+    finally {
+
+        console.error(`[SLOW POSITION END] ${position.label} ${Date.now() - startedAt}ms`);
+
+    }
+
+}
+
 function createEngine(fen) {
 
     const board = new Board();
@@ -2057,9 +2084,13 @@ slowSearchTest("mined SF2400 collapse positions preserve current depth snapshots
             position.current.map(entry => entry.depth);
 
         const results =
-            searchBestMovesByDepth(
-                position.fen,
-                depths
+            traceSlowPosition(
+                position,
+                depths,
+                () => searchBestMovesByDepth(
+                    position.fen,
+                    depths
+                )
             );
 
         assert.deepEqual(
@@ -2113,9 +2144,13 @@ slowSearchTest("pure-pawn tie 100g high-priority targets preserve current depth 
             position.current.map(entry => entry.depth);
 
         const results =
-            searchBestMovesByDepth(
-                position.fen,
-                depths
+            traceSlowPosition(
+                position,
+                depths,
+                () => searchBestMovesByDepth(
+                    position.fen,
+                    depths
+                )
             );
 
         assert.deepEqual(
@@ -2176,9 +2211,13 @@ slowSearchTest("Arena 20260917 endgame swing targets preserve current depth snap
             position.current.map(entry => entry.depth);
 
         const results =
-            searchBestMovesByDepth(
-                position.fen,
-                depths
+            traceSlowPosition(
+                position,
+                depths,
+                () => searchBestMovesByDepth(
+                    position.fen,
+                    depths
+                )
             );
 
         assert.deepEqual(
@@ -2239,9 +2278,13 @@ slowSearchTest("Arena 20260917 opening fork targets preserve current depth snaps
             position.current.map(entry => entry.depth);
 
         const results =
-            searchBestMovesByDepth(
-                position.fen,
-                depths
+            traceSlowPosition(
+                position,
+                depths,
+                () => searchBestMovesByDepth(
+                    position.fen,
+                    depths
+                )
             );
 
         assert.deepEqual(
