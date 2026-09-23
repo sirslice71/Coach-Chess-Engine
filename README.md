@@ -41,7 +41,7 @@ node --test tests\engine_regressions.test.mjs
 Run every test file on Windows:
 
 ```cmd
-for %f in (tests\*.test.mjs) do node --test %f
+run-tests.cmd
 ```
 
 Deep historical search sentinels in `tests\engine_regressions.test.mjs` are skipped by default. Enable them only for intentional long-running checks:
