@@ -1376,13 +1376,13 @@ const MINED_STOCKFISH_2400_ROLLBACK_SWING_REGRESSIONS = [
         current: [
             {
                 depth: 6,
-                notation: "e7-e8",
-                evaluation: "13.92"
+                notation: "d7-f5",
+                evaluation: "15.21"
             },
             {
                 depth: 8,
-                notation: "e7-e8",
-                evaluation: "14.71"
+                notation: "d7-f5",
+                evaluation: "999.87"
             }
         ]
     },

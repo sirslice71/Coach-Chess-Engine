@@ -51,6 +51,23 @@ test("root tie verification covers queen-rich low-piece endings", () => {
 
 });
 
+test("advanced-pawn quiet queen check is searched before promotion", () => {
+
+    const search =
+        createSearch(
+            "8/3QP1bk/2p2q2/1p5p/4P3/1P2R3/4K1PP/8 w - - 0 56"
+        );
+
+    const result =
+        search.bestMove(6, { quiet: true });
+
+    assert.equal(
+        moveToUci(result.move),
+        "d7f5"
+    );
+
+});
+
 test("sparse rook-pawn root tie rollback preserves stable pawn push", () => {
 
     const search =

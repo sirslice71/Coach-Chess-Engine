@@ -301,6 +301,45 @@ const REVERSE_FUTILITY_MARGIN = 300;
 
 const MAX_CHECK_EXTENSIONS = 1;
 
+//----------------------------------
+// Root forcing-check search
+//
+// Quiet checking moves can be the shortest route to a forced mate
+// but lose root-order priority to promotions and captures. A root-
+// only boost searches those forcing checks early without changing
+// move ordering inside the tree. The paired root-only extension
+// gives the checked child enough depth to prove medium mates without
+// globally increasing check-extension budget at every node.
+//----------------------------------
+
+const ROOT_CHECK_ORDER_BONUS = 48000;
+const ROOT_CHECK_EXTENSION = 3;
+const ROOT_CHECK_MAX_REPLIES = 8;
+
+function sideHasPawnOnSeventh(board, sideToMove) {
+
+    const pawn =
+        sideToMove > 0
+            ? Piece.WP
+            : Piece.BP;
+
+    const start =
+        sideToMove > 0
+            ? 8
+            : 48;
+
+    for (let square = start; square < start + 8; square++) {
+
+        if (board.pieceAt(square) === pawn) {
+            return true;
+        }
+
+    }
+
+    return false;
+
+}
+
 const CHECK_EXTENSION_MAX_DEPTH = 3;
 
 const ROOT_TIE_VERIFY_MIN_DEPTH = 6;
@@ -1281,6 +1320,60 @@ export default class Search {
             this.history
         );
 
+        const rootHasPawnOnSeventh =
+            sideHasPawnOnSeventh(
+                this.board,
+                this.board.sideToMove
+            );
+
+        let rootForcingCheckMoveKey = null;
+        let rootQuietCheckCount = 0;
+
+        if (rootHasPawnOnSeventh) {
+
+            for (const move of moves) {
+
+                if (
+                    !move.isCapture() &&
+                    !move.isPromotion() &&
+                    this.moveOrdering.givesCheck(move)
+                ) {
+
+                    rootQuietCheckCount++;
+                    rootForcingCheckMoveKey = move.key;
+
+                    if (rootQuietCheckCount > 1) {
+                        rootForcingCheckMoveKey = null;
+                        break;
+                    }
+
+                }
+
+            }
+
+        }
+
+        if (
+            ROOT_CHECK_ORDER_BONUS > 0 &&
+            rootForcingCheckMoveKey !== null
+        ) {
+
+            for (const move of moves) {
+
+                if (move.key === rootForcingCheckMoveKey) {
+                    move.score += ROOT_CHECK_ORDER_BONUS;
+                }
+
+            }
+
+            moves.sort(
+                (a, b) =>
+                    (b.score - a.score) ||
+                    this.moveOrdering.compareMoveIdentity(a, b)
+            );
+
+        }
+
         if (this.profileEnabled) {
 
             this.orderTime +=
@@ -1319,9 +1412,32 @@ export default class Search {
 
             try {
 
+                const rootGivesCheck =
+                    this.board.isInCheck();
+
+                const rootQuietCheck =
+                    rootGivesCheck &&
+                    move.key === rootForcingCheckMoveKey &&
+                    !move.isCapture() &&
+                    !move.isPromotion();
+
+                const rootCheckReplyCount =
+                    rootQuietCheck
+                        ? this.legalMoveGenerator.generateMoves().length
+                        : Infinity;
+
+                const childDepth =
+                    depth - 1 +
+                    (
+                        rootQuietCheck &&
+                        rootCheckReplyCount <= ROOT_CHECK_MAX_REPLIES
+                            ? ROOT_CHECK_EXTENSION
+                            : 0
+                    );
+
                 score = -this.negamax(
 
-                    depth - 1,
+                    childDepth,
 
                     -beta,
 
