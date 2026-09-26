@@ -202,6 +202,14 @@ Set-Location "<USERPROFILE>\OneDrive\Desktop\Coach Current"
     -CandidatePath "<USERPROFILE>\OneDrive\Desktop\Coach Candidates\Coach King List In Place"
 ```
 
+Opening-book note: Sir Slice's local Rodent Polyglot book is expected at
+`<USERPROFILE>\Downloads\rodent.bin`. Keep that path in mind for future
+matches, but do not pass it to the current PowerShell wrapper as-is: the
+wrapper rejects `.bin` books and currently accepts only PGN or EPD opening
+suites through `-BookPath`. To use `rodent.bin`, either run CuteChess directly
+with Polyglot support or add wrapper support for `.bin` before using it in
+automated Coach matches.
+
 Benchmark-only example:
 
 ```powershell

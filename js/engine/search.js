@@ -316,6 +316,10 @@ const ROOT_CHECK_ORDER_BONUS = 48000;
 const ROOT_CHECK_EXTENSION = 3;
 const ROOT_CHECK_MAX_REPLIES = 8;
 
+const ROOT_BARE_KING_ROOK_PAWN_MIN_DEPTH = 8;
+const ROOT_BARE_KING_ROOK_PAWN_MAX_MOVES = 5;
+const ROOT_BARE_KING_ROOK_PAWN_EXTENSION = 1;
+
 function sideHasPawnOnSeventh(board, sideToMove) {
 
     const pawn =
@@ -830,6 +834,43 @@ export default class Search {
 
     }
 
+    isBareKingRookPawnConversionRoot(moves) {
+
+        if (moves.length > ROOT_BARE_KING_ROOK_PAWN_MAX_MOVES) {
+            return false;
+        }
+
+        const sidePieces =
+            this.board.sideToMove > 0
+                ? this.board.whitePieces
+                : this.board.blackPieces;
+
+        const opponentPieces =
+            this.board.sideToMove > 0
+                ? this.board.blackPieces
+                : this.board.whitePieces;
+
+        const sideNonKingMaterial =
+            sidePieces.pawns.length +
+            sidePieces.knights.length +
+            sidePieces.bishops.length +
+            sidePieces.rooks.length +
+            sidePieces.queens.length;
+
+        if (sideNonKingMaterial !== 0) {
+            return false;
+        }
+
+        return (
+            opponentPieces.rooks.length === 1 &&
+            opponentPieces.pawns.length > 0 &&
+            opponentPieces.knights.length === 0 &&
+            opponentPieces.bishops.length === 0 &&
+            opponentPieces.queens.length === 0
+        );
+
+    }
+
     canReverseFutilityPrune(depth, alpha, beta, isRoot, inCheck) {
 
         return (
@@ -1326,6 +1367,10 @@ export default class Search {
                 this.board.sideToMove
             );
 
+        const rootBareKingRookPawnConversion =
+            depth >= ROOT_BARE_KING_ROOK_PAWN_MIN_DEPTH &&
+            this.isBareKingRookPawnConversionRoot(moves);
+
         let rootForcingCheckMoveKey = null;
         let rootQuietCheckCount = 0;
 
@@ -1432,6 +1477,11 @@ export default class Search {
                         rootQuietCheck &&
                         rootCheckReplyCount <= ROOT_CHECK_MAX_REPLIES
                             ? ROOT_CHECK_EXTENSION
+                            : 0
+                    ) +
+                    (
+                        rootBareKingRookPawnConversion
+                            ? ROOT_BARE_KING_ROOK_PAWN_EXTENSION
                             : 0
                     );
 

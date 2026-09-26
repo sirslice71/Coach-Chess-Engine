@@ -2475,6 +2475,18 @@ slowSearchTest("low-material root tie verification chooses the deeper rook-pawn 
 
 });
 
+test("bare-king rook-pawn root extension finds the defensive opposition move", () => {
+
+    const result =
+        searchBestMove(
+            "8/8/4k3/2K1p2p/8/5r2/8/8 w - - 4 76",
+            8
+        );
+
+    assert.equal(result.notation, "c5-c4");
+
+});
+
 slowSearchTest("pure-pawn root tie verification prefers the defensive king move", () => {
 
     const kb3After =
