@@ -1425,7 +1425,8 @@ export class UciSession {
                                     64,
                                     {
                                         deadlineMs,
-                                        quiet: true
+                                        quiet: true,
+                                        rootPlateauEarlyStop: true
                                     }
                                 )
                             ),

@@ -374,6 +374,47 @@ test("an extremely tight clock still returns a legal bestmove with a valid compl
 });
 
 //----------------------------------
+// 14. Clock-based root plateau early stop: repeated slow early-core
+// evidence showed broad same-score root plateaus burning seconds
+// without differentiating moves. The opt-in stop is deadline-only,
+// so fixed-depth and fixed-movetime probes remain unchanged.
+//----------------------------------
+test("root plateau early stop is opt-in and deadline-only", () => {
+
+    const plateauFen =
+        "r1b1k2r/1pp1qppp/p1p5/8/4n3/2PN4/PPP1QPPP/R1B2RK1 b kq - 3 11";
+
+    const withoutDeadline =
+        createEngineCore(plateauFen)
+            .search
+            .bestMove(
+                8,
+                {
+                    quiet: true,
+                    rootPlateauEarlyStop: true
+                }
+            );
+
+    assert.equal(withoutDeadline.depth, 8);
+
+    const withDeadline =
+        createEngineCore(plateauFen)
+            .search
+            .bestMove(
+                8,
+                {
+                    quiet: true,
+                    deadlineMs: performance.now() + 30000,
+                    rootPlateauEarlyStop: true
+                }
+            );
+
+    assert.equal(withDeadline.depth, 7);
+    assert.equal(withDeadline.uci, "c8f5");
+
+});
+
+//----------------------------------
 // Functional: requested vs actual elapsed time for a realistic
 // clock-based go, confirming the candidate's allocation is honored
 // by the real search (not just the pure allocateMoveTime formula).

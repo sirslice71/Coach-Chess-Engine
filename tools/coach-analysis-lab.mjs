@@ -130,6 +130,10 @@ function usage() {
         "  --coach-side white|black|both|auto  Which side's moves to extract; \"auto\" infers per game (default: auto)",
         "  --target-player \"<name>\"            Only analyze games/moves for this player; overrides --coach-side",
         "  --extract all|annotated|blunders    Extraction strictness (default: annotated)",
+        "  --max-per-game <n>                  Cap extracted positions per game before the file-wide cap",
+        "  --min-move <n>                      In PGN mode, ignore candidate moves before this fullmove",
+        "  --max-move <n>                      In PGN mode, ignore candidate moves after this fullmove",
+        "  --sample-every <n>                  In PGN mode, keep every nth candidate after filters",
         "  --max-positions <n>                 Cap total extracted positions across the whole file",
         "",
         "Other:",
@@ -162,6 +166,10 @@ function parseCliArguments(argv) {
         coachSide: DEFAULT_COACH_SIDE,
         extractMode: DEFAULT_EXTRACT_MODE,
         maxPositions: null,
+        maxPositionsPerGame: null,
+        pgnMinMove: null,
+        pgnMaxMove: null,
+        pgnSampleEvery: null,
         targetPlayer: null
     };
 
@@ -209,6 +217,22 @@ function parseCliArguments(argv) {
 
             case "--max-positions":
                 options.maxPositions = Number.parseInt(next(), 10);
+                break;
+
+            case "--max-per-game":
+                options.maxPositionsPerGame = Number.parseInt(next(), 10);
+                break;
+
+            case "--min-move":
+                options.pgnMinMove = Number.parseInt(next(), 10);
+                break;
+
+            case "--max-move":
+                options.pgnMaxMove = Number.parseInt(next(), 10);
+                break;
+
+            case "--sample-every":
+                options.pgnSampleEvery = Number.parseInt(next(), 10);
                 break;
 
             case "--label":
@@ -311,6 +335,42 @@ function validateOptions(options) {
         (!Number.isInteger(options.maxPositions) || options.maxPositions <= 0)
     ) {
         throw new Error("--max-positions must be a positive integer");
+    }
+
+    if (
+        options.maxPositionsPerGame !== null &&
+        (!Number.isInteger(options.maxPositionsPerGame) || options.maxPositionsPerGame <= 0)
+    ) {
+        throw new Error("--max-per-game must be a positive integer");
+    }
+
+    if (
+        options.pgnMinMove !== null &&
+        (!Number.isInteger(options.pgnMinMove) || options.pgnMinMove <= 0)
+    ) {
+        throw new Error("--min-move must be a positive integer");
+    }
+
+    if (
+        options.pgnMaxMove !== null &&
+        (!Number.isInteger(options.pgnMaxMove) || options.pgnMaxMove <= 0)
+    ) {
+        throw new Error("--max-move must be a positive integer");
+    }
+
+    if (
+        options.pgnMinMove !== null &&
+        options.pgnMaxMove !== null &&
+        options.pgnMinMove > options.pgnMaxMove
+    ) {
+        throw new Error("--min-move must be less than or equal to --max-move");
+    }
+
+    if (
+        options.pgnSampleEvery !== null &&
+        (!Number.isInteger(options.pgnSampleEvery) || options.pgnSampleEvery <= 0)
+    ) {
+        throw new Error("--sample-every must be a positive integer");
     }
 
     if (options.movetimeMs !== null && options.depth !== null) {
@@ -1932,7 +1992,14 @@ function annotationSeverity(entry) {
 // after engine analysis, using severity + comparison data.
 //----------------------------------
 
-function selectPgnCandidates(replayedMainline, coachSide, extractMode, maxPositions, labelPrefix = "") {
+function selectPgnCandidates(
+    replayedMainline,
+    coachSide,
+    extractMode,
+    maxPositions,
+    labelPrefix = "",
+    filters = {}
+) {
 
     const sideMatches = entry => {
 
@@ -1942,9 +2009,31 @@ function selectPgnCandidates(replayedMainline, coachSide, extractMode, maxPositi
 
     };
 
-    const selected = replayedMainline
+    const moveMatches = entry => {
+
+        if (filters.minMove !== null && entry.moveNumber < filters.minMove) {
+            return false;
+        }
+
+        if (filters.maxMove !== null && entry.moveNumber > filters.maxMove) {
+            return false;
+        }
+
+        return true;
+
+    };
+
+    const selectedBeforeSampling = replayedMainline
         .filter(sideMatches)
+        .filter(moveMatches)
         .filter(entry => matchesExtractMode(entry, extractMode));
+
+    const sampleEvery = filters.sampleEvery || null;
+
+    const selected =
+        sampleEvery !== null
+            ? selectedBeforeSampling.filter((_, index) => index % sampleEvery === 0)
+            : selectedBeforeSampling;
 
     const capped =
         maxPositions !== null
@@ -3446,8 +3535,13 @@ async function main() {
                 replayed,
                 resolvedCoachSide,
                 options.extractMode,
-                null,
-                `game${game.gameIndex}-`
+                options.maxPositionsPerGame,
+                `game${game.gameIndex}-`,
+                {
+                    minMove: options.pgnMinMove,
+                    maxMove: options.pgnMaxMove,
+                    sampleEvery: options.pgnSampleEvery
+                }
             );
 
             for (const candidate of gameCandidates) {
@@ -3758,6 +3852,10 @@ async function main() {
             coachSide: options.coachSide,
             extractMode: options.extractMode,
             maxPositions: options.maxPositions,
+            maxPositionsPerGame: options.maxPositionsPerGame,
+            pgnMinMove: options.pgnMinMove,
+            pgnMaxMove: options.pgnMaxMove,
+            pgnSampleEvery: options.pgnSampleEvery,
             limit: options.limit
         },
         pgnSource,

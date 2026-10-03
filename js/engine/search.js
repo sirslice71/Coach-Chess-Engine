@@ -18,6 +18,10 @@ import {
 
 const MAX_Q_PLY = 16;
 
+const ROOT_PLATEAU_EARLY_STOP_MIN_DEPTH = 7;
+const ROOT_PLATEAU_EARLY_STOP_MIN_TIED_ROWS = 8;
+const ROOT_PLATEAU_EARLY_STOP_MAX_BAND_CP = 0;
+
 function promotionSuffix(piece) {
 
     switch (Math.abs(piece)) {
@@ -341,6 +345,50 @@ function sideHasPawnOnSeventh(board, sideToMove) {
     }
 
     return false;
+
+}
+
+function countRootScoreTies(rootMoves, score) {
+
+    return rootMoves.filter(row => row.score === score).length;
+
+}
+
+function isNonMateRootPlateau(rootMoves) {
+
+    if (
+        !Array.isArray(rootMoves) ||
+        rootMoves.length < ROOT_PLATEAU_EARLY_STOP_MIN_TIED_ROWS
+    ) {
+        return false;
+    }
+
+    const topRows =
+        rootMoves.slice(0, ROOT_PLATEAU_EARLY_STOP_MIN_TIED_ROWS);
+
+    const topScore =
+        topRows[0].score;
+
+    if (Math.abs(topScore) >= SearchConstants.MATE_THRESHOLD) {
+        return false;
+    }
+
+    if (
+        topRows.some(row =>
+            Math.abs(row.score) >= SearchConstants.MATE_THRESHOLD
+        )
+    ) {
+        return false;
+    }
+
+    const band =
+        topRows[0].score - topRows.at(-1).score;
+
+    return (
+        band <= ROOT_PLATEAU_EARLY_STOP_MAX_BAND_CP &&
+        countRootScoreTies(rootMoves, topScore) >=
+            ROOT_PLATEAU_EARLY_STOP_MIN_TIED_ROWS
+    );
 
 }
 
@@ -923,6 +971,7 @@ export default class Search {
         let completedDepth = 0;
 
         let previousScore = 0;
+        let previousRootPlateauBestKey = null;
 
         const fallbackMove =
             this.pickFallbackMove();
@@ -1065,6 +1114,28 @@ export default class Search {
 
             previousScore = result.bestScore;
             completedDepth = depth;
+
+            if (
+                options.rootPlateauEarlyStop === true &&
+                this.searchDeadlineMs !== null &&
+                completedDepth >= ROOT_PLATEAU_EARLY_STOP_MIN_DEPTH - 1 &&
+                result.bestMove &&
+                isNonMateRootPlateau(result.rootMoves)
+            ) {
+
+                if (
+                    completedDepth >= ROOT_PLATEAU_EARLY_STOP_MIN_DEPTH &&
+                    previousRootPlateauBestKey === result.bestMove.key
+                ) {
+                    break;
+                }
+
+                previousRootPlateauBestKey = result.bestMove.key;
+
+            }
+            else {
+                previousRootPlateauBestKey = null;
+            }
 
             const iterationTime =
 
