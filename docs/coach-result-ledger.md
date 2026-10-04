@@ -601,3 +601,180 @@
 - Match analysis: `candidate-smoke-decision.md` classified this as `smoke-nonregression-ready-for-review`; stable SF19/root-triage candidates: 0. Time/depth improved clock safety: average move time 3.47s, P90 7.3s, lowest estimated clock 29.38s, and only 1 low-clock low-depth move.
 - Decision: Accepted narrowly because the same-control 20-game smoke beat the baseline gate and the time/depth evidence shows the intended clock-safety improvement. Treat as a smoke acceptance, not proof of broad strength, because the color split remains lopsided and swings are still present.
 - Next targets: Commit this candidate if final diff review is clean. Next improvement loop should focus on Coach-as-Black/endgame swing families from this run, especially `game4-ply108-a3`, `game2-ply122-Kc8`, `game12-ply118-Kf8`, `game18-ply146-Rf7`, and related entered-losing-mate king/pawn endings.
+
+## 2026-10-03 - Accepted-Run Black Endgame Swing Audit
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\black-endgame-swing-audit-20261003`
+- Source: accepted root plateau early-stop run `analysis-runs\candidate-root-plateau-earlystop-shallowblue1618-20g-5m0-20261003`.
+- Targets: top Coach-as-Black/endgame swing decision points from the accepted run, including `game4-ply108-a3`, `game2-ply122-Kc8`, `game12-ply118-Kf8`, `game18-ply146-Rf7`, and related low-material king/pawn entries.
+- Triage: bounded depths 4,6,8,10,12 over 18 before-position FENs initially showed mostly `mate-horizon-flip`, `mate-table`, and `all-tied`. A longer depth-12 rerun with 15s per position resolved the high-severity mate-horizon rows into `mate-table=12` and `all-tied=6`.
+- Reference child-search: `reference-child-search-d7-top40` audited 38 high-diff SF19 rows from the accepted run and found 0 candidates; every row failed `gap<100`, and 4 also had the reference move outside Coach's top 24 root rows.
+- Decision: No code candidate from this accepted-run Black/endgame evidence. The severe losing-mate swings are already mate-table positions at deeper search, while the non-mate rows are broad ties or child-search unsupported SF19 disagreements.
+- Next targets: Gather fresh evidence from the current `7fc0fb1` baseline before patching. Prefer another paired ShallowBlue 1618 5+0 run, then mine specifically for Coach-as-Black losses and positions where Coach child search, root rows, and SF19 all support the same alternative move.
+
+## 2026-10-03 - Late Winning Conversion Floor Candidate
+
+- Status: rejected
+- Commit: n/a
+- Run: `analysis-runs\candidate-late-winning-conversion-floor-shallowblue1618-20g-5m0-20261003-clean20`
+- Candidate: add a narrow-looking UCI clock allocation floor for late low-material winning conversion positions after fresh evidence showed `game4-ply132-g4-before` (`8/2p5/8/3k2p1/3P4/8/3K4/5q2 b - - 1 66`) needed about 5.5s to finish the depth-7 mate jump from `g5g4` to `d5d4`.
+- Baseline: accepted root plateau early-stop gate `12 - 7 - 1 [0.625] 20`.
+- Local evidence: fixed-depth depth 7 chose `d5d4` mate while UCI clock search at `btime=65000/80000` chose `g5g4`; with `btime=120000` UCI chose `d5d4`. The candidate sentinel made the FEN choose `d5d4`.
+- Tests: candidate passed `node --check js\uci\uciengine.js`, `node --test tests\time_management_candidate.test.mjs` (16/16 while active), `node --test tests\uci.test.mjs` (45/45), `node --test tests\engine_regressions.test.mjs` (64/64, 67 skipped), and `stability-short` exact identity against `7fc0fb1` with 0 mismatches and about 0.052% slower overall.
+- Result: Coach vs ShallowBlue 1618 clean 20-game smoke: `6 - 11 - 3 [0.375] 20`; White `4 - 3 - 3 [0.550]`, Black `2 - 8 - 0 [0.200]`.
+- Match analysis: `candidate-smoke-decision.md` classified `reject-smoke-regression`; stable candidates: 0. Average depth 7.46, average move time 2.91s, P90 6.7s, lowest estimated Coach clock 2.54s, and low-clock low-depth moves 30.
+- Decision: Rejected because the smoke regressed far below the accepted 0.625 gate and worsened practical late-clock behavior despite fixing the sentinel.
+- Known-bad idea: Do not add a broad late winning-conversion budget floor, even with static eval/material/capture gates, as a standalone fix.
+- Next targets: Keep mining for a local condition that preserves clock safety, and prefer fixing incomplete clock-iteration publication or a truly local mate-jump guard over generalized extra time.
+
+## 2026-10-03 - Rejected Smoke Follow-up Probes
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\candidate-late-winning-conversion-floor-shallowblue1618-20g-5m0-20261003-clean20`
+- Evidence: failed candidate smoke scored `6 - 11 - 3 [0.375] 20` and produced 39 swings, 30 low-clock low-depth moves, and 0 stable SF19/root-triage candidates.
+- Direct probes: `game4-ply106-Kxd7-before` was a flat tied rook/pawn ending through depth 12. `game16-ply112-g5-before` and `game16-ply114-hxg5-before` kept the played pawn moves as deeper bests through depth 12, so they do not support an eval or root-ordering fix.
+- Queen-vs-king sweep: `game10/game12/game18-ply132-Ke7-before` (`8/8/4k3/7Q/3K4/8/8/8 b - - 0 66`) under clock search returned centipawn `e6f6` at `btime=15000/30000/45000`, then mate-class `e6e7` from about `btime=60000` onward. Fixed-depth probes show the row becomes mate-table by depth 9-12.
+- Decision: Do not make a queen-vs-bare-king time/depth guard from this evidence. The deeper result only proves all choices are losing mate, so extra time would improve reporting accuracy more than game outcome and risks repeating the broad time-floor regression.
+- Next targets: Prefer fresh evidence where a deeper local probe changes from a losing played move to a materially better or drawing alternative, with SF19/root-child support. Avoid patching all-tied rows, all-losing mate tables, and deeper-best-equals-played rows.
+
+## 2026-10-03 - Late-Endgame Disagreement Follow-up
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\fresh-evidence-rootplateau-baseline-shallowblue1618-20g-5m0-pgnsuite-20261003b`
+- Source: late swing FEN batch from the fresh root-plateau baseline run, especially high-severity post-move-60 centipawn drops that were outside the original SF19 pipeline move window.
+- Evidence: `late-endgame-disagreement-followup-sf19-d12\20261003-180019` found three Coach/SF19 depth-12 disagreements: `game9-ply145-Kg3-before`, `game18-ply148-Ke5-before`, and `game10-ply122-Kb6-before`. `game14-ply188-g5-before` timed out for Coach at depth 12.
+- Child verification: `late-endgame-child-verify-d10` kept only `game18-ply148-Ke5-before` (`e6e5` vs `e6e7`, child gap 495cp). At child depth 12 the same row still kept but narrowed to an 88cp gap; `game9-ply145-Kg3-before` failed the child-gap gate and `game10-ply122-Kb6-before` was a child-search tie.
+- Higher reference check: Stockfish 19 depth 24 preferred `e6f5` for `game18-ply148-Ke5-before`, not the earlier depth-12 `e6e7`; `game10-ply122-Kb6-before` became mate-losing at SF depth 24; `game9-ply145-Kg3-before` stayed `g2f2`.
+- Candidate tried and reverted: a narrow-looking bare-king rook-pawn verifier window for near-tied root moves, intended to verify `e6e7/e6f5` instead of `e6e5`, did not change the sentinel in the desired way and still selected a different tied king move in internal debug. No code kept.
+- Decision: No accepted candidate from this evidence. The best row exposed a real weakness family but not a stable patch target: preferred moves varied with reference depth and Coach's own root/child verification did not converge cleanly.
+- Next targets: Continue mining late-endgame rows, but require stronger convergence before patching: same reference move at higher depth, Coach child-search support with a larger stable gap, and a root-verifier change that demonstrably switches the sentinel without relying on broad near-tie policy.
+
+## 2026-10-03 - Unique Late Swing Triage Follow-up
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\fresh-evidence-rootplateau-baseline-shallowblue1618-20g-5m0-pgnsuite-20261003b`
+- Source: unique before-position set from the fresh baseline run's top centipawn drops plus the known mate-score-change row: `unique-centipawn-before-plus-matescore.fens`.
+- Triage: `unique-centipawn-before-triage-d6-12` over depths 6,8,10,12 produced class counts `candidate-review=1`, `early-spread-then-tie=2`, `mate-horizon-flip=4`, and `all-tied=4`.
+- Rejected rows: `game7-ply149-Kxh3-before`, `game18-ply152-Kf7-before`, `game9-ply145-Kg3-before`, and `game18-ply148-Ke5-before` were all-tied at depth 12. `game18-ply164-Kd3-before` and `game10-ply122-Kb6-before` widened early but collapsed to broad ties by depth 12. `game18-ply166-Ke2-before`, `game18-ply162-Ke4-before`, `game14-ply188-g5-before`, and `game4-ply132-g4-before` became mate-table/mate-horizon rows, so they remain diagnostic only.
+- Best surviving row: `game18-ply150-Kf6-before` (`4R3/K7/2p5/2P1k3/2P5/2P5/8/8 b - - 2 75`) was the only `candidate-review` row. Coach root rows at depths 10/12/14/16 show `e5f4/e5f5` scoring ahead of the played/report-best `e5f6`, but the reported best stayed `e5f6`.
+- Reference check: Stockfish 19 depth 16 also chose `e5f6` with a 363cp eval disagreement but best-move agreement, so this does not pass the convergence gate for a patch target.
+- Decision: No code candidate from this narrowed late-swing set. Treat the `game18-ply150` root-row/report-best mismatch as a possible diagnostic artifact only; do not patch unless a future row also has stable SF19 best-move disagreement and Coach child-search support.
+- Next targets: Current accepted/fresh evidence is close to exhausted under the stricter gate. The next useful evidence should be a fresh paired 20-game ShallowBlue 1618 5+0 run from commit `7fc0fb1`, then mine late Coach-as-Black/endgame rows with the unique-before triage filter before trying another patch.
+
+## 2026-10-03 - Accepted-Run Unique Swing Before Triage
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\candidate-root-plateau-earlystop-shallowblue1618-20g-5m0-20261003`
+- Source: accepted root plateau early-stop smoke (`12 - 7 - 1 [0.625] 20`) top swing packet. Created `unique-swing-before.fens` from the 20 unique before-positions across entered-losing-mate, centipawn-drop, and mate-score-change rows.
+- Triage: `unique-swing-before-triage-d6-12` across depths 6,8,10,12 produced class counts `mate-horizon-flip=10`, `all-tied=6`, `mate-table=3`, `early-spread-then-tie=1`, and `candidate-review=0`.
+- Entered-mate rows: `game4-ply108-a3-before`, `game4-ply112-Ka2-before`, `game4-ply110-Ka1-before`, `game2-ply122-Kc8-before`, `game12-ply118-Kf8-before`, `game2-ply124-Kb8-before`, `game2-ply126-cxb6-before`, `game18-ply142-Kh6-before`, `game16-ply156-Kb2-before`, and `game1-ply107-d7-before` were mate-horizon flips by the deepest completed search. `game18-ply146-Rf7-before`, `game16-ply162-Kd2-before`, and `game18-ply144-Kh5-before` were mate-table rows.
+- Centipawn rows: `game16-ply148-Ke3-before`, `game12-ply112-g5-before`, `game12-ply110-Kf7-before`, `game16-ply144-Kg5-before`, `game9-ply97-f6-before`, and `game12-ply116-g4-before` were all-tied at depth 12. `game12-ply114-hxg5-before` widened briefly at depth 8 but collapsed to a broad tie by depth 12.
+- Decision: No code candidate from the accepted-run unique-before swing packet. This reinforces that the scary accepted-run Black/endgame swings are either already mate-table/mate-horizon rows or broad ties under deeper Coach search.
+- Next targets: Do not keep patching this accepted-run packet directly. Gather fresh paired `5+0` ShallowBlue 1618 evidence, then run the unique-before triage plus SF19/child-search convergence gate on new late Coach-as-Black/endgame losses before changing search, eval, or time management.
+
+## 2026-10-04 - Compact Late Endgame Floor Candidate
+
+- Status: rejected
+- Commit: n/a
+- Run: `analysis-runs\candidate-compact-endgame-floor-shallowblue1618-20g-5m0-20261004a`
+- Source: accepted run `game16-ply148-Ke3-before` (`8/R4p2/2K2P2/2P2P2/5k2/2B5/8/8 b - - 4 74`) from `analysis-runs\candidate-root-plateau-earlystop-shallowblue1618-20g-5m0-20261003`.
+- Evidence: SF19 depth 20 preferred `f4e4` over Coach's played `f4e3`; Coach child-search verifier kept the row at child depth 10 with a 69cp gap. Actual match move used depth 9, 2.9s, allocated 2.93s, estimated clock before 70.47s, material 1210, legal moves 7, captures 1, fullmove 74.
+- Candidate: add a narrow 6000ms clock allocation floor only when no explicit `movestogo` is supplied, remaining time is at least 60000ms, material is at most 1500, fullmove is at least 70, side is not in check, legal moves are 2-8, and captures are at most 1. Existing percentage-of-clock cap still applies.
+- Local sentinel: UCI clock search at the actual-ish `70470ms` clock now chooses `f4e4`; baseline chose `f4e3`. Fixed-depth/fixed-movetime paths are unchanged.
+- Tests: `node --check js\uci\uciengine.js`; `node --test tests\time_management_candidate.test.mjs`; `node --test tests\uci.test.mjs`; `node --test tests\engine_regressions.test.mjs`; `node --test tests\candidate_smoke_preflight.test.mjs tests\evaluate_candidate_smoke.test.mjs tests\coach_time_depth_summary.test.mjs`; `stability-short` fixed-depth benchmark exact identity OK on 4/4 primary positions, with timing `0.063%` slower overall (`candidate run: negative` only because it is not a speedup, not because identity changed).
+- Result: Coach vs ShallowBlue 1618: `8 - 10 - 2 [0.450] 20`; Coach as White `1 - 9 - 0 [0.100]`, Coach as Black `7 - 1 - 2 [0.800]`.
+- Match analysis: `candidate-smoke-decision.md` classified `reject-smoke-regression` versus the accepted `12 - 7 - 1 [0.625] 20` gate. Time/depth summary: average depth 8.06, average move time 2.86s, P90 6.5s, lowest estimated Coach clock 8.39s. Swing mining found 53 swings from 1596 scored Coach moves: 12 entered-losing-mate selections, 12 centipawn-drop selections, and 2 mate-score-change selections.
+- Decision: Rejected because the 20-game ShallowBlue 1618 5+0 smoke regressed well below the accepted gate despite the local sentinel and fixed-depth stability identity passing.
+- Known-bad idea: Do not add a compact late-endgame clock floor as a standalone fix, even with low-material/fullmove/legal-move/capture gates. It fixed `game16-ply148-Ke3-before` locally but hurt the live 5+0 smoke, especially Coach as White.
+- Next targets: Revert the active clock-floor code and mine the failed smoke for fresh targets. Highest-signal follow-up starts with the repeated Coach-as-White king/pawn/queen late endgame losses and the game18 black mate-score-change rows, but require root-depth and reference checks before any patch.
+
+## 2026-10-04 - Compact Floor Rejected-Smoke Follow-up
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\candidate-compact-endgame-floor-shallowblue1618-20g-5m0-20261004a`
+- Evidence: Direct swing triage over `swing-mining\coach-swing-targets.fens` produced class counts `candidate-review=4`, `early-spread-then-tie=5`, `mate-horizon-flip=31`, `all-tied=10`, and `mate-table=2`.
+- Broad SF19 pipeline attempt: `sf19-pipeline-m16-90-d8` was stopped after the root triage spent 67 rows on repeated opening/middlegame duplicates; every completed row was `all-tied` or narrow-tie/broad-tie, so it did not expose a fresh patch target.
+- Candidate-review rows: `game1-ply97-Kf1-after` was after the losing move and is diagnostic only. Actionable before-move rows were `game15-ply171-Kc6-before`, `game3-ply203-Kh4-before`, and `game18-ply132-Ke2-before`.
+- Root-depth follow-up: `game15-ply171-Kc6-before` crossed into a mate-class table/tie by depth 8-10 (`c5d6`/`c5c6` tied at `-999.90` by depth 10; depth 12 was stopped after running too long). `game3-ply203-Kh4-before` stayed on the played move through depth 10 and became losing mate-class by depth 12. `game18-ply132-Ke2-before` became an all-winning mate table by depth 12 after `e3e2` first separated at depth 10.
+- Decision: No replacement candidate from this failed smoke. The surviving rows are mate-horizon or table artifacts rather than stable non-mate move-quality misses. Do not patch from this run without fresh reference child-search evidence.
+- Next targets: Return to the accepted root plateau early-stop baseline evidence and search for a non-mate centipawn target with stable root spread plus SF19/child-search support, or gather a fresh paired baseline ShallowBlue 1618 5+0 run rather than extending late-endgame time floors.
+
+## 2026-10-04 - Fresh Baseline ShallowBlue Evidence Run A
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\fresh-evidence-shallowblue1618-20g-5m0-20261004a`
+- Result: Coach vs ShallowBlue 1618: `5 - 11 - 4 [0.350] 20`; Coach as White `2 - 4 - 4 [0.400]`, Coach as Black `3 - 7 - 0 [0.300]`.
+- Time/depth: average depth 7.82, average move time 2.82s, P90 6.6s, lowest estimated Coach clock 28.78s. Early-core moves 11-15 still include repeated 14-17s searches, but this run did not produce a safe timing candidate.
+- Swing mining: 38 swings from 1453 scored Coach moves; selected FEN counts were 14 entered-losing-mate, 16 centipawn-drop, and 3 mate-score-change records. A unique-before file with 33 positions was written to `unique-swing-before.fens`.
+- Unique-before triage: `unique-before-triage-d681012` produced class counts `candidate-review=1`, `early-spread-then-tie=6`, `mate-horizon-flip=14`, and `all-tied=12`.
+- Triage survivor: `game16-ply188-Kh8-before` (`6k1/8/4p1BP/4K3/5P2/5P2/8/8 b - - 0 94`) stayed as `candidate-review` through depth 12, but depth 14 made `g8h8` and `g8f8` both losing mate-class. SF19 depth 16 chose `g8f8`, while Coach chose `g8h8`, but both were mate -7 with 0cp practical gap.
+- SF19/child-search sweep: SF19 depth-12 comparison over the 33 unique-before rows fed `reference-child-search-d10`, which kept one apparent candidate, `game15-ply91-Kc1-before` (`8/6p1/8/2p2p2/p3bP2/P2pP2k/1P1K4/8 w - - 0 46`): Coach/root `d2c1`, SF19 `d2e1`, child-depth-10 gap 183cp.
+- Equal-depth verifier audit: `reference-child-search-d12` rechecked the same 9 high-diff rows at child depth 12 and kept 0 candidates. `game15-ply91-Kc1-before` collapsed to `gap=0cp` (`d2c1` vs `d2e1`). Manual instrumentation showed that before root-tie verification six root moves tied at `-1156`; full child verification at depth 12 scored `d2c1=-1374`, `d2c3=-1379`, `b2b4=-99984`, `d2d1=-1374`, `b2b3=-99984`, and `d2e1=-1374`. So `Ke1` was not better than `Kc1` at equal depth.
+- Decision: No candidate accepted from this fresh evidence run. The only child-search keeper was a depth-mismatch false positive, and the only triage survivor was same-outcome losing mate. Do not patch root-tie selection from this run.
+- Next targets: Current accepted-run plus fresh-run evidence remains dominated by mate-horizon, broad-tie, and equal-depth root-verification artifacts. A next goal should likely shift from hand-mining ShallowBlue swing rows to improving the automated candidate filter so child verification uses equal-depth rechecks before surfacing keepers, or gather a materially different evidence source.
+
+## 2026-10-04 - Reference Child-Search Confirmation Gate
+
+- Status: diagnostic-tooling
+- Commit: n/a
+- Tooling: `tools\verify-reference-child-search.mjs`
+- Motivation: Fresh evidence run A produced a false keeper at `game15-ply91-Kc1-before` when child verification used depth 10 against an SF19 depth-12 comparison. Equal-depth verification at depth 12 collapsed the apparent `183cp` gap to `0cp`.
+- Change: the verifier now defaults `--confirm-child-depth` to `analysis`, infers the maximum Coach/SF analysis depth when available, and reruns coach/reference child searches only for rows that initially pass the keep filter and need a deeper confirmation. Rows whose confirmation gap falls below `--min-gap` are rejected with `confirm-gap<...@dN`. `--confirm-child-depth off` disables the extra guard when reproducing older artifacts.
+- Verification: `node --check tools\verify-reference-child-search.mjs`; `node --test tests\reference_child_search_verifier.test.mjs`; reran the previous depth-10 fresh-run command to `reference-child-search-d10-confirmed`, which now reports 0 candidates and rejects `game15-ply91-Kc1-before` with `confirm-gap<100@d12`.
+- Decision: Keep this stricter filter before surfacing future Coach candidates. It prevents depth-mismatch false positives without changing engine search behavior.
+- Next targets: Re-run future candidate mining through the confirmed verifier first. Only patch Coach when a row survives unique-before triage, SF19 comparison, and confirmed child-search at the analysis depth.
+
+## 2026-10-04 - Accepted-Run Confirmed Child-Search Rescan
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\candidate-root-plateau-earlystop-shallowblue1618-20g-5m0-20261003`
+- Tooling: confirmed child-search verifier from `tools\verify-reference-child-search.mjs`.
+- Broad SF19 rescan: `sf19-pipeline-m16-60-d8\20261003-114818\reference-child-search-d8-confirmed` audited 24 accepted-run SF19 disagreements and kept 0 candidates. Rejections were dominated by `gap<100=24` and `reference-not-in-top-12=16`.
+- Ke3 special rescan: `sf19-ke3-child-verify-d10-confirm-d12` rejected `game16-ply148-Ke3-before`; the old child-depth-10 gap was 69cp, but confirmation depth 12 reduced the gap to 28cp (`f4e3` vs `f4e4`), below the 50cp threshold. This supports treating the rejected compact endgame floor as a depth-mismatch false positive rather than a robust move-quality target.
+- Edge special rescan: `sf19-edge-child-verify-d8-confirm-d12` audited `game16-ply148-Ke3-before` and `game12-ply114-hxg5-before`; both rejected, with gaps 14cp and -109cp.
+- Unique-before SF19 rescan: `sf19-unique-before-d12\20261004-022852` compared the accepted run's 20 unique swing-before positions at SF19 depth 12; 14 positions completed and 6 hard rows failed. Confirmed child-search over the 7 completed SF19 disagreements kept 0 candidates. The largest non-mate rows, `game16-ply144-Kg5-before` and `game12-ply114-hxg5-before`, rejected with gaps -191cp and -65cp.
+- Decision: No accepted-run SF19/reference-child candidate survives the confirmed gate. The accepted-run Coach-as-Black/endgame evidence is currently exhausted for a safe narrow patch under the active constraints.
+- Next targets: Either collect a materially different evidence source or improve search-mining automation further. Do not build another candidate from the accepted-run Ke3/hxg5 family unless a future deeper reference/child-search pass produces a confirmed gap.
+
+## 2026-10-04 - Analysis Pipeline Confirmed Child-Search Integration
+
+- Status: diagnostic-tooling
+- Commit: n/a
+- Tooling: `tools\analyze-match-pipeline.mjs`, `tools\verify-reference-child-search.mjs`
+- Change: the match analysis pipeline now runs `tools\verify-reference-child-search.mjs` automatically after SF19 analysis results exist, writing `reference-child-search-d<childDepth>-confirmed` under the SF19 analysis run. Defaults are `--child-depth 10`, `--child-min-gap 100`, `--child-root-limit 12`, `--child-max-ms-per-child 10000`, and `--confirm-child-depth analysis`.
+- Verification: `node --check tools\analyze-match-pipeline.mjs`; `node --check tools\verify-reference-child-search.mjs`; `node --test tests\analyze_match_pipeline_args.test.mjs`; `node --test tests\reference_child_search_verifier.test.mjs`.
+- Decision: keep the confirmed verifier inside the standard pipeline so future candidate mining surfaces equal-depth-confirmed disagreements instead of depth-mismatch false positives.
+- Next targets: run the improved pipeline on fresh/non-exhausted evidence, then only probe or patch rows that survive the confirmed child-search artifact.
+
+## 2026-10-04 - Fresh Evidence Broad Pipeline Pass A
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\fresh-evidence-shallowblue1618-20g-5m0-20261004a`
+- Pipeline: `sf19-pipeline-m16-90-d8\20261004-030842` over 80 sampled Coach positions from moves 16-90, both colors, using SF19 depth 8 and the confirmed child-search verifier.
+- Confirmed child-search: `reference-child-search-d8-confirmed` audited 14 high-diff rows and kept 0 candidates. All 14 rejected on `gap<100`; 2 also had `reference-not-in-top-12`.
+- Root triage/stable selector: 80/80 rows rejected as `all-tied`; stable selector kept 0 candidates. Rejections were dominated by `deepest=broad-tie=79`, `band<50=80`, and `topTies>3=79`.
+- Decision: no code candidate from this broad early/middlegame sampled pass. The apparent SF19 eval differences collapse under Coach root triage and child-search, so do not patch from these Qd4/f3/Kg1/Nc8/Kf8 families.
+- Next targets: avoid spending more cycles on repeated sampled opening rows. Move candidate discovery toward deduplicated late-loss/swing positions or a materially different evidence source with confirmed child gaps.
+
+## 2026-10-04 - Fresh Evidence Swing-Target SF19 Pass
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\fresh-evidence-shallowblue1618-20g-5m0-20261004a`
+- Source: `swing-mining\coach-swing-targets.fens`, 46 targeted before/after positions from entered-losing-mate, centipawn-drop, and mate-score-change swings.
+- SF19 pass: `sf19-swing-targets-d10\20261004-032837` analyzed 45/46 positions at depth 10; `game9-ply129-Rxf1-before` failed. Best-move agreement was 23/45; 10 rows were marked as Coach strongly optimistic with a different best move.
+- Confirmed child-search: `reference-child-search-d8-confirmed` audited 19 high-diff rows and kept 0 candidates. Rejections were `mate-root-score=10`, `gap<100=18`, and `reference-not-in-top-12=2`.
+- Triage: `swing-targets-triage-d6810` class counts were `candidate-review=11`, `early-spread-then-tie=8`, `mate-horizon-flip=16`, and `all-tied=11`.
+- Stable selector cross-check: `stable-swing-selector` surfaced three apparent rows, but all failed confirmed child/probe review: `game16-ply186-Kg8-before` had child gap `-57cp` and became mate-class at Coach depth 12; `game11-ply115-Ke3-after` had child gap `-86cp` and deeper Coach search kept/favored Coach's `g2h3`; `game12-ply100-f4-before` had only an `81cp` child gap and became equal/tied by Coach depth 12.
+- Decision: no code candidate from the fresh swing-target packet. Do not patch these Kg8/Ke3/f4 rows without new evidence; the confirmed child/probe checks show they are mate-horizon, broad-tie, or selector false-positive cases.
+- Next targets: the current fresh ShallowBlue 1618 5+0 evidence has no confirmed patch path under the active gate. Consider either a new materially different match/evidence source or a tooling improvement that filters stable-selector output against confirmed child-search results before presenting candidates.

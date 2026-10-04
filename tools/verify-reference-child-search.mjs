@@ -2,7 +2,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const DEFAULT_REPO = process.cwd();
 const MATE_THRESHOLD = 90000;
@@ -12,7 +12,8 @@ function usage() {
         "Usage: node tools/verify-reference-child-search.mjs " +
         "--analysis <coach-analysis-lab results.json> [--repo <Coach repo>] " +
         "[--child-depth 7] [--max-positions <n>] [--min-diff <cp>] " +
-        "[--min-gap <cp>] [--root-limit <n>] [--max-ms-per-child <ms>] [--out <dir>]"
+        "[--min-gap <cp>] [--root-limit <n>] [--max-ms-per-child <ms>] " +
+        "[--confirm-child-depth <n|analysis|off>] [--out <dir>]"
     );
 }
 
@@ -26,6 +27,7 @@ function parseArgs(argv) {
         minGap: 100,
         rootLimit: 16,
         maxMsPerChild: null,
+        confirmChildDepth: "analysis",
         out: null
     };
 
@@ -55,6 +57,19 @@ function parseArgs(argv) {
         }
         else if (token === "--max-ms-per-child") {
             args.maxMsPerChild = Number.parseInt(argv[++index], 10);
+        }
+        else if (token === "--confirm-child-depth") {
+            const value = argv[++index];
+
+            if (value === "analysis") {
+                args.confirmChildDepth = "analysis";
+            }
+            else if (value === "off") {
+                args.confirmChildDepth = null;
+            }
+            else {
+                args.confirmChildDepth = Number.parseInt(value, 10);
+            }
         }
         else if (token === "--out") {
             args.out = argv[++index];
@@ -88,6 +103,17 @@ function parseArgs(argv) {
         )
     ) {
         throw new Error("--max-ms-per-child must be a positive integer");
+    }
+
+    if (
+        args.confirmChildDepth !== null &&
+        args.confirmChildDepth !== "analysis" &&
+        (
+            !Number.isInteger(args.confirmChildDepth) ||
+            args.confirmChildDepth <= 0
+        )
+    ) {
+        throw new Error("--confirm-child-depth must be a positive integer, analysis, or off");
     }
 
     return args;
@@ -267,6 +293,27 @@ function childSearchForMove({
     };
 }
 
+function inferConfirmChildDepth(args, position) {
+    if (args.confirmChildDepth === null) {
+        return null;
+    }
+
+    if (Number.isInteger(args.confirmChildDepth)) {
+        return args.confirmChildDepth;
+    }
+
+    const depths = [
+        position.coach?.depth,
+        position.reference?.depth
+    ].filter(Number.isInteger);
+
+    if (depths.length === 0) {
+        return args.childDepth;
+    }
+
+    return Math.max(args.childDepth, ...depths);
+}
+
 function classify(args, item) {
     const reasons = [];
 
@@ -292,6 +339,29 @@ function classify(args, item) {
 
     if (item.gapCp === null || item.gapCp < args.minGap) {
         reasons.push(`gap<${args.minGap}`);
+    }
+
+    if (item.confirmation) {
+        if (item.confirmation.coachChild.error) {
+            reasons.push(
+                `confirm-coach-child-error:${item.confirmation.coachChild.error}`
+            );
+        }
+
+        if (item.confirmation.referenceChild.error) {
+            reasons.push(
+                `confirm-reference-child-error:${item.confirmation.referenceChild.error}`
+            );
+        }
+
+        if (
+            item.confirmation.gapCp === null ||
+            item.confirmation.gapCp < args.minGap
+        ) {
+            reasons.push(
+                `confirm-gap<${args.minGap}@d${item.confirmation.childDepth}`
+            );
+        }
     }
 
     if (
@@ -356,7 +426,7 @@ async function analyzePosition(row, args, uciModule) {
                 coachChild.childRootSideScore
             : null;
 
-    const item = {
+    let item = {
         label: position.label,
         fen,
         diffCp,
@@ -380,8 +450,57 @@ async function analyzePosition(row, args, uciModule) {
         gapCp
     };
 
-    const classification =
+    let classification =
         classify(args, item);
+
+    const confirmChildDepth =
+        inferConfirmChildDepth(args, position);
+
+    if (
+        classification.keep &&
+        confirmChildDepth !== null &&
+        confirmChildDepth > args.childDepth
+    ) {
+        const confirmCoachChild =
+            childSearchForMove({
+                fen,
+                moveUci: coachMove,
+                rootSideToMove,
+                childDepth: confirmChildDepth,
+                maxMsPerChild: args.maxMsPerChild,
+                uciModule
+            });
+
+        const confirmReferenceChild =
+            childSearchForMove({
+                fen,
+                moveUci: referenceMove,
+                rootSideToMove,
+                childDepth: confirmChildDepth,
+                maxMsPerChild: args.maxMsPerChild,
+                uciModule
+            });
+
+        const confirmGapCp =
+            Number.isFinite(confirmCoachChild.childRootSideScore) &&
+            Number.isFinite(confirmReferenceChild.childRootSideScore)
+                ? confirmReferenceChild.childRootSideScore -
+                    confirmCoachChild.childRootSideScore
+                : null;
+
+        item = {
+            ...item,
+            confirmation: {
+                childDepth: confirmChildDepth,
+                coachChild: confirmCoachChild,
+                referenceChild: confirmReferenceChild,
+                gapCp: confirmGapCp
+            }
+        };
+
+        classification =
+            classify(args, item);
+    }
 
     return {
         ...item,
@@ -425,6 +544,9 @@ function buildMarkdown(args, payload) {
         args.maxMsPerChild === null
             ? "- Max ms per child: none"
             : `- Max ms per child: ${args.maxMsPerChild}`,
+        args.confirmChildDepth === null
+            ? "- Confirm child depth: off"
+            : `- Confirm child depth: ${args.confirmChildDepth}`,
         `- Candidates: ${payload.summary.candidates}`,
         `- Audited: ${payload.summary.audited}`,
         `- Rejection counts: ${formatCounts(payload.summary.rejectionCounts) || "none"}`,
@@ -526,8 +648,20 @@ async function main() {
     }
 }
 
-main().catch(error => {
-    usage();
-    console.error(error.stack || error.message);
-    process.exit(1);
-});
+const isMain =
+    process.argv[1] &&
+    path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isMain) {
+    main().catch(error => {
+        usage();
+        console.error(error.stack || error.message);
+        process.exit(1);
+    });
+}
+
+export {
+    classify,
+    inferConfirmChildDepth,
+    parseArgs
+};

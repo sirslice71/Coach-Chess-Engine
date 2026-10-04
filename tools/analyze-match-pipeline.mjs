@@ -14,7 +14,9 @@ function usage() {
         "Usage: node tools/analyze-match-pipeline.mjs --run <analysis-runs\\match-folder> " +
         "[--stockfish <path>] [--player Coach] [--reuse-existing] [--analysis-run <dir>] " +
         "[--sf-depth 8] [--min-move 16] [--max-move 60] [--sample-every 2] " +
-        "[--max-per-game 8] [--max-positions 160] [--triage-max-ms-per-depth <ms>]"
+        "[--max-per-game 8] [--max-positions 160] [--triage-max-ms-per-depth <ms>] " +
+        "[--child-depth 10] [--child-min-gap 100] [--child-root-limit 12] " +
+        "[--child-max-ms-per-child 10000] [--confirm-child-depth <n|analysis|off>]"
     );
 }
 
@@ -36,7 +38,12 @@ function parseArgs(argv) {
         minBand: 50,
         maxTopTies: 3,
         maxMateRows: 0,
-        triageMaxMsPerDepth: 5000
+        triageMaxMsPerDepth: 5000,
+        childDepth: 10,
+        childMinGap: 100,
+        childRootLimit: 12,
+        childMaxMsPerChild: 10000,
+        confirmChildDepth: "analysis"
     };
 
     for (let index = 0; index < argv.length; index += 1) {
@@ -59,6 +66,11 @@ function parseArgs(argv) {
         else if (token === "--max-top-ties") args.maxTopTies = numberArg(token, argv[++index]);
         else if (token === "--max-mate-rows") args.maxMateRows = numberArg(token, argv[++index]);
         else if (token === "--triage-max-ms-per-depth") args.triageMaxMsPerDepth = numberArg(token, argv[++index]);
+        else if (token === "--child-depth") args.childDepth = numberArg(token, argv[++index]);
+        else if (token === "--child-min-gap") args.childMinGap = numberArg(token, argv[++index]);
+        else if (token === "--child-root-limit") args.childRootLimit = numberArg(token, argv[++index]);
+        else if (token === "--child-max-ms-per-child") args.childMaxMsPerChild = numberArg(token, argv[++index]);
+        else if (token === "--confirm-child-depth") args.confirmChildDepth = argv[++index];
         else throw new Error(`Unknown argument: ${token}`);
     }
 
@@ -262,6 +274,9 @@ function main() {
 
     const resultsJson = path.join(analysisRun, "results.json");
     const candidatesFen = path.join(analysisRun, "candidate-regressions.fens");
+    const childSearchDir =
+        path.join(analysisRun, `reference-child-search-d${args.childDepth}-confirmed`);
+    const childSearchJson = path.join(childSearchDir, "reference-child-search.json");
     const triageDir = path.join(analysisRun, "fen-triage-d468");
     const triageJson = path.join(triageDir, "fen-triage.json");
     const rankedDir = path.join(analysisRun, "ranked-triage");
@@ -275,6 +290,38 @@ function main() {
 
     if (!fs.existsSync(candidatesFen)) {
         throw new Error(`Missing candidate FEN file: ${candidatesFen}`);
+    }
+
+    if (shouldRun(args, [childSearchJson])) {
+        runCommand(
+            commandLog,
+            "confirmed-reference-child-search",
+            "node",
+            [
+                "tools\\verify-reference-child-search.mjs",
+                "--analysis",
+                relative(cwd, resultsJson),
+                "--repo",
+                cwd,
+                "--child-depth",
+                String(args.childDepth),
+                "--max-positions",
+                String(args.maxPositions),
+                "--min-diff",
+                String(args.minDiff),
+                "--min-gap",
+                String(args.childMinGap),
+                "--root-limit",
+                String(args.childRootLimit),
+                "--max-ms-per-child",
+                String(args.childMaxMsPerChild),
+                "--confirm-child-depth",
+                String(args.confirmChildDepth),
+                "--out",
+                relative(cwd, childSearchDir)
+            ],
+            { cwd }
+        );
     }
 
     if (shouldRun(args, [triageJson])) {
@@ -377,6 +424,7 @@ function main() {
             timeDepth: relative(cwd, path.join(timeDir, "coach-time-depth-summary.md")),
             analysisRun: relative(cwd, analysisRun),
             resultsJson: relative(cwd, resultsJson),
+            confirmedChildSearch: relative(cwd, path.join(childSearchDir, "reference-child-search.md")),
             triage: relative(cwd, path.join(triageDir, "fen-triage.md")),
             ranked: relative(cwd, path.join(rankedDir, "ranked-candidates.md")),
             stable: relative(cwd, path.join(stableDir, "stable-candidates.md")),

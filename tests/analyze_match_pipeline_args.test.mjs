@@ -21,3 +21,38 @@ test("analysis pipeline root triage command includes per-depth timeout", async (
     );
 
 });
+
+test("analysis pipeline runs confirmed reference child-search verifier", async () => {
+
+    const source =
+        await readFile(
+            "tools/analyze-match-pipeline.mjs",
+            "utf8"
+        );
+
+    assert.match(
+        source,
+        /childDepth:\s*10/
+    );
+
+    assert.match(
+        source,
+        /confirmChildDepth:\s*"analysis"/
+    );
+
+    assert.match(
+        source,
+        /"tools\\\\verify-reference-child-search\.mjs"/
+    );
+
+    assert.match(
+        source,
+        /"--confirm-child-depth",\s*String\(args\.confirmChildDepth\)/
+    );
+
+    assert.match(
+        source,
+        /reference-child-search-d\$\{args\.childDepth\}-confirmed/
+    );
+
+});
