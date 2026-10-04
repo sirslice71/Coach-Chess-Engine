@@ -7,6 +7,7 @@ function usage() {
     console.error(
         "Usage: node tools/select-stable-candidates.mjs " +
         "--triage <fen-triage.json> [--analysis <results.json>] [--out <dir>] " +
+        "[--confirmed-child-search <reference-child-search.json>] " +
         "[--min-diff <cp>] [--min-band <cp>] [--max-top-ties <n>] " +
         "[--max-mate-rows <n>] [--require-ref-disagree]"
     );
@@ -16,6 +17,7 @@ function parseArgs(argv) {
     const args = {
         triage: null,
         analysis: null,
+        confirmedChildSearch: null,
         out: null,
         minDiff: 150,
         minBand: 50,
@@ -32,6 +34,9 @@ function parseArgs(argv) {
         }
         else if (token === "--analysis") {
             args.analysis = argv[++index];
+        }
+        else if (token === "--confirmed-child-search") {
+            args.confirmedChildSearch = argv[++index];
         }
         else if (token === "--out") {
             args.out = argv[++index];
@@ -122,7 +127,34 @@ function buildAnalysisMap(analysis) {
     return { byKey, byFen };
 }
 
+function buildConfirmedChildMap(confirmedChildSearch) {
+    const byKey = new Map();
+    const byFen = new Map();
+
+    for (const row of confirmedChildSearch?.rows || []) {
+        byKey.set(keyFor(row.label, row.fen), row);
+
+        if (!byFen.has(row.fen)) {
+            byFen.set(row.fen, []);
+        }
+
+        byFen.get(row.fen).push(row);
+    }
+
+    return { byKey, byFen };
+}
+
 function matchingAnalysis(item, maps) {
+    if (!maps) {
+        return null;
+    }
+
+    return maps.byKey.get(keyFor(item.label, item.fen)) ||
+        (maps.byFen.get(item.fen) || [])[0] ||
+        null;
+}
+
+function matchingConfirmedChild(item, maps) {
     if (!maps) {
         return null;
     }
@@ -149,7 +181,7 @@ function deepestSummary(item) {
     };
 }
 
-function rejectionReasons(args, triageItem, analysisPosition, deepest) {
+function rejectionReasons(args, triageItem, analysisPosition, deepest, confirmedChild) {
     const reasons = [];
 
     if (triageItem.classification !== "candidate-review") {
@@ -190,6 +222,20 @@ function rejectionReasons(args, triageItem, analysisPosition, deepest) {
         reasons.push("missingAnalysis");
     }
 
+    if (args.confirmedChildSearch) {
+        if (!confirmedChild) {
+            reasons.push("missingConfirmedChild");
+        }
+        else if (!confirmedChild.keep) {
+            const suffix =
+                (confirmedChild.reasons || []).length > 0
+                    ? `:${confirmedChild.reasons.join("+")}`
+                    : "";
+
+            reasons.push(`confirmedChildRejected${suffix}`);
+        }
+    }
+
     return reasons;
 }
 
@@ -201,15 +247,19 @@ function candidateScore(candidate) {
     return diff + band - tiePenalty;
 }
 
-function selectCandidates(args, triage, analysis) {
+function selectCandidates(args, triage, analysis, confirmedChildSearch) {
     const maps = analysis ? buildAnalysisMap(analysis) : null;
+    const confirmedMaps =
+        confirmedChildSearch ? buildConfirmedChildMap(confirmedChildSearch) : null;
     const kept = [];
     const rejected = [];
 
     for (const item of triage.results || []) {
         const analysisPosition = matchingAnalysis(item, maps);
+        const confirmedChild = matchingConfirmedChild(item, confirmedMaps);
         const deepest = deepestSummary(item);
-        const reasons = rejectionReasons(args, item, analysisPosition, deepest);
+        const reasons =
+            rejectionReasons(args, item, analysisPosition, deepest, confirmedChild);
         const diffCp = analysisPosition ? absoluteDiff(analysisPosition) : null;
 
         const record = {
@@ -223,6 +273,15 @@ function selectCandidates(args, triage, analysis) {
             bestMoveAgree: analysisPosition?.comparison?.bestMoveAgree ?? null,
             coachScore: analysisPosition?.coach?.score ?? null,
             referenceScore: analysisPosition?.reference?.score ?? null,
+            confirmedChild: confirmedChild
+                ? {
+                    keep: confirmedChild.keep,
+                    reasons: confirmedChild.reasons || [],
+                    gapCp: confirmedChild.gapCp ?? null,
+                    coachMove: confirmedChild.coachMove ?? null,
+                    referenceMove: confirmedChild.referenceMove ?? null
+                }
+                : null,
             reasons
         };
 
@@ -267,6 +326,7 @@ function buildMarkdown(args, payload) {
         "",
         `- Triage: \`${args.triage}\``,
         `- Analysis: ${args.analysis ? `\`${args.analysis}\`` : "n/a"}`,
+        `- Confirmed child-search: ${args.confirmedChildSearch ? `\`${args.confirmedChildSearch}\`` : "n/a"}`,
         `- Minimum eval diff: ${args.minDiff}cp`,
         `- Minimum deepest band: ${args.minBand}cp`,
         `- Maximum top ties: ${args.maxTopTies}`,
@@ -278,8 +338,8 @@ function buildMarkdown(args, payload) {
         "",
         "## Stable Candidates",
         "",
-        "| Rank | Label | Diff | Coach | Ref | D | Band | Ties | Mate rows | FEN |",
-        "| ---: | --- | ---: | --- | --- | ---: | ---: | ---: | ---: | --- |"
+        "| Rank | Label | Diff | Coach | Ref | Child gap | D | Band | Ties | Mate rows | FEN |",
+        "| ---: | --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |"
     ];
 
     for (const [index, item] of payload.stableCandidates.entries()) {
@@ -293,6 +353,7 @@ function buildMarkdown(args, payload) {
             item.referenceBest
                 ? `${item.referenceBest} ${scoreText(item.referenceScore)}`
                 : "n/a",
+            item.confirmedChild?.gapCp ?? "",
             item.deepest?.depth ?? "",
             item.deepest?.band ?? "",
             item.deepest?.topTies ?? "",
@@ -305,8 +366,8 @@ function buildMarkdown(args, payload) {
         "",
         "## Top Rejections",
         "",
-        "| Label | Class | D | Band | Ties | Mate rows | Reasons | FEN |",
-        "| --- | --- | ---: | ---: | ---: | ---: | --- | --- |"
+        "| Label | Class | D | Band | Ties | Mate rows | Child gap | Reasons | FEN |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- |"
     );
 
     for (const item of payload.rejected.slice(0, 40)) {
@@ -317,6 +378,7 @@ function buildMarkdown(args, payload) {
             item.deepest?.band ?? "",
             item.deepest?.topTies ?? "",
             item.deepest?.mateRows ?? "",
+            item.confirmedChild?.gapCp ?? "",
             escapeMarkdown(item.reasons.join(", ")),
             `\`${item.fen}\``
         ].join(" | ").replace(/^/, "| ").replace(/$/, " |"));
@@ -329,7 +391,10 @@ function main() {
     const args = parseArgs(process.argv.slice(2));
     const triage = readJson(args.triage);
     const analysis = args.analysis ? readJson(args.analysis) : null;
-    const { kept, rejected } = selectCandidates(args, triage, analysis);
+    const confirmedChildSearch =
+        args.confirmedChildSearch ? readJson(args.confirmedChildSearch) : null;
+    const { kept, rejected } =
+        selectCandidates(args, triage, analysis, confirmedChildSearch);
 
     const rejectionCounts = countsBy(
         rejected.flatMap(item => item.reasons),

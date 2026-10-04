@@ -55,4 +55,9 @@ test("analysis pipeline runs confirmed reference child-search verifier", async (
         /reference-child-search-d\$\{args\.childDepth\}-confirmed/
     );
 
+    assert.match(
+        source,
+        /"--confirmed-child-search",\s*relative\(cwd,\s*childSearchJson\)/
+    );
+
 });

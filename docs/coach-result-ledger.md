@@ -778,3 +778,14 @@
 - Stable selector cross-check: `stable-swing-selector` surfaced three apparent rows, but all failed confirmed child/probe review: `game16-ply186-Kg8-before` had child gap `-57cp` and became mate-class at Coach depth 12; `game11-ply115-Ke3-after` had child gap `-86cp` and deeper Coach search kept/favored Coach's `g2h3`; `game12-ply100-f4-before` had only an `81cp` child gap and became equal/tied by Coach depth 12.
 - Decision: no code candidate from the fresh swing-target packet. Do not patch these Kg8/Ke3/f4 rows without new evidence; the confirmed child/probe checks show they are mate-horizon, broad-tie, or selector false-positive cases.
 - Next targets: the current fresh ShallowBlue 1618 5+0 evidence has no confirmed patch path under the active gate. Consider either a new materially different match/evidence source or a tooling improvement that filters stable-selector output against confirmed child-search results before presenting candidates.
+
+## 2026-10-04 - Stable Selector Confirmed-Child Filter
+
+- Status: diagnostic-tooling
+- Commit: n/a
+- Tooling: `tools\select-stable-candidates.mjs`, `tools\analyze-match-pipeline.mjs`
+- Change: stable candidate selection now accepts `--confirmed-child-search <reference-child-search.json>` and rejects rows that confirmed child-search already rejected, carrying child gap and rejection reasons into `stable-candidates.json` and `stable-candidates.md`. The standard match analysis pipeline passes its generated confirmed child-search artifact into the stable selector automatically.
+- Verification: `node --check tools\select-stable-candidates.mjs`; `node --check tools\analyze-match-pipeline.mjs`; `node --test tests\select_stable_candidates.test.mjs tests\analyze_match_pipeline_args.test.mjs tests\reference_child_search_verifier.test.mjs`.
+- Evidence rerun: `analysis-runs\fresh-evidence-shallowblue1618-20g-5m0-20261004a\sf19-swing-targets-d10\20261004-032837\stable-swing-selector-confirmed` selected 0 stable candidates. The previous selector survivors `game16-ply186-Kg8-before`, `game11-ply115-Ke3-after`, and `game12-ply100-f4-before` are now rejected with `confirmedChildRejected:gap<100` and child gaps `-57cp`, `-86cp`, and `81cp`.
+- Decision: keep the confirmed-child filter in stable selection. This prevents selector false positives from being handed off as patch candidates when equal-depth child confirmation already rejected them.
+- Next targets: with accepted-run and fresh-run ShallowBlue swing evidence exhausted under the confirmed gate, gather a materially different evidence source or a new match before proposing an engine patch.

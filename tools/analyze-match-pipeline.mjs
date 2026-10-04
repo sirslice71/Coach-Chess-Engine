@@ -357,6 +357,8 @@ function main() {
                 relative(cwd, resultsJson),
                 "--triage",
                 relative(cwd, triageJson),
+                "--confirmed-child-search",
+                relative(cwd, childSearchJson),
                 "--min-diff",
                 String(args.minDiff),
                 "--out",
