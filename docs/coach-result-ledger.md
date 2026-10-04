@@ -789,3 +789,19 @@
 - Evidence rerun: `analysis-runs\fresh-evidence-shallowblue1618-20g-5m0-20261004a\sf19-swing-targets-d10\20261004-032837\stable-swing-selector-confirmed` selected 0 stable candidates. The previous selector survivors `game16-ply186-Kg8-before`, `game11-ply115-Ke3-after`, and `game12-ply100-f4-before` are now rejected with `confirmedChildRejected:gap<100` and child gaps `-57cp`, `-86cp`, and `81cp`.
 - Decision: keep the confirmed-child filter in stable selection. This prevents selector false positives from being handed off as patch candidates when equal-depth child confirmation already rejected them.
 - Next targets: with accepted-run and fresh-run ShallowBlue swing evidence exhausted under the confirmed gate, gather a materially different evidence source or a new match before proposing an engine patch.
+
+## 2026-10-04 - Fresh Evidence ShallowBlue 1618 Run B
+
+- Status: diagnostic
+- Commit: `28400a7`
+- Run: `analysis-runs\fresh-evidence-shallowblue1618-20g-5m0-20261004b`
+- Result: Coach vs ShallowBlue 1618: `2 - 14 - 4 [0.200] 20`; Coach as White `2 - 5 - 3 [0.350]`, Coach as Black `0 - 9 - 1 [0.050]`.
+- Time/depth: average depth 7.74, average move time 3.07s, P90 6.8s, lowest estimated Coach clock 32.42s. Early-core moves 11-15 again contained repeated 14-17s searches, but there was no low-clock crisis.
+- Swing mining: 46 swings from 1374 scored Coach moves. Selected FEN counts were 10 entered-losing-mate and 10 centipawn-drop records, producing 40 before/after FEN lines; no mate-score-change rows were selected.
+- Broad pipeline: `sf19-pipeline-m16-90-d8\20261004-073654` over 80 sampled positions kept 0 confirmed child-search candidates and 0 stable candidates. The largest fresh sampled row, `game14-before-24...Ncb6`, rejected with child gap `-34cp` and all-tied root triage.
+- Swing-target SF19 pass: `sf19-swing-targets-d10\20261004-075330` analyzed 36/40 targeted swing positions; 4 hard rows failed. Confirmed child-search audited 16 high-diff rows and kept 0 candidates. Rejections were `gap<100=16`, `mate-root-score=8`, and `reference-not-in-top-12=2`.
+- Swing-target stable selector: `stable-swing-selector-confirmed` selected 0 stable candidates. Coach-only triage rows such as `game10-ply110-Kd8-before`, `game13-ply131-Kf3-after`, `game15-ply155-Ka2-before`, and the repeated `game10-ply100-f4-before` were rejected because of confirmed-child rejection, SF best-move agreement, mate rows, low band, or missing confirmed support.
+- Tooling fix: while processing this run, `tools\analyze-match-pipeline.mjs` was corrected so `--confirmed-child-search` is passed only to `tools\select-stable-candidates.mjs`, not to `tools\rank-triage-candidates.mjs`. `tests\analyze_match_pipeline_args.test.mjs` now guards that command placement.
+- Verification: `node --check tools\analyze-match-pipeline.mjs`; `node --test tests\analyze_match_pipeline_args.test.mjs tests\select_stable_candidates.test.mjs tests\reference_child_search_verifier.test.mjs`.
+- Decision: no engine candidate from this new evidence source. The bad match is dominated by mate-horizon/table rows and broad-tie or child-search-unsupported SF disagreements rather than a confirmed non-mate patch target.
+- Next targets: do not patch from Run B. If continuing, use a materially different evidence source, such as a targeted SF19 diagnostic match or a different opening/evidence policy, rather than another identical ShallowBlue sampled-opening pass.

@@ -60,4 +60,20 @@ test("analysis pipeline runs confirmed reference child-search verifier", async (
         /"--confirmed-child-search",\s*relative\(cwd,\s*childSearchJson\)/
     );
 
+    const rankStart = source.indexOf('"rank-triage",\n            "node"');
+    const stableStart = source.indexOf('"stable-selector",\n            "node"');
+    const confirmedStart = source.indexOf('"--confirmed-child-search"');
+
+    assert.ok(rankStart >= 0, "rank-triage command should exist");
+    assert.ok(stableStart >= 0, "stable-selector command should exist");
+    assert.ok(confirmedStart >= 0, "confirmed child-search argument should exist");
+    assert.ok(
+        confirmedStart > stableStart,
+        "confirmed child-search should be passed to stable-selector, not rank-triage"
+    );
+    assert.ok(
+        rankStart < stableStart,
+        "rank-triage should run before stable-selector"
+    );
+
 });
