@@ -805,3 +805,671 @@
 - Verification: `node --check tools\analyze-match-pipeline.mjs`; `node --test tests\analyze_match_pipeline_args.test.mjs tests\select_stable_candidates.test.mjs tests\reference_child_search_verifier.test.mjs`.
 - Decision: no engine candidate from this new evidence source. The bad match is dominated by mate-horizon/table rows and broad-tie or child-search-unsupported SF disagreements rather than a confirmed non-mate patch target.
 - Next targets: do not patch from Run B. If continuing, use a materially different evidence source, such as a targeted SF19 diagnostic match or a different opening/evidence policy, rather than another identical ShallowBlue sampled-opening pass.
+
+## 2026-10-04 - SF19 Anchor Diagnostic Packet
+
+- Status: diagnostic
+- Commit: `2b70704`
+- Run: `analysis-runs\sf19-anchor-diagnostics-20261004`
+- Source: 22 non-ShallowBlue diagnostic anchors from `tests\data\diagnostic_anchors.json`: 6 early-minor Stockfish-reference openings plus 16 Lucas STS regression positions. Strict sentinels, equivalence controls, and ShallowBlue-derived arena anchors were excluded.
+- SF19 comparison: `sf19-anchor-d10\20261004-094925` completed 19/22 positions at depth 10; 3 hard rows timed out. Best-move agreement was 9/19, average non-mate eval gap 68cp, and there were 0 mate-score disagreements.
+- Best apparent target: `lucas-square-vacancy-g4-i75` (`b3qbk1/B6p/1QNp2p1/3Pp3/2P2p2/5P1P/6P1/6K1 w - - 0 1`) had Coach `b6c7` 60cp versus SF19 `c6d8` 233cp, a 173cp non-mate gap.
+- Confirmed child-search: `reference-child-search-d8-confirmed` audited the only row above 150cp and kept 0 candidates. `lucas-square-vacancy-g4-i75` rejected with child gap `-31cp`; Coach child scores were `b6c7=55` and `c6d8=24`, with the SF19 move ranked 11th.
+- Coach root triage: `anchor-triage-d681012` classified all 22 positions as `all-tied`. The `lucas-square-vacancy-g4-i75` row had deepest band 6cp with 18 top ties and timed at completed depth 8.
+- Decision: no engine candidate from this anchor packet. The new non-ShallowBlue source produced one tempting SF19 disagreement, but Coach's equal-depth child search and root triage show it is another plateau/tie artifact rather than a confirmed missing move.
+- Next targets: pivot to an SF19-from-anchor or SF19 opening-policy match where the anchor positions seed played games, then mine actual Coach move failures after the positions evolve. Do not patch directly from `lucas-square-vacancy-g4-i75` unless future evidence produces a confirmed child-search gap.
+
+## 2026-10-04 - SF19 Anchor-Opening Match
+
+- Status: diagnostic
+- Commit: `2b70704`
+- Run: `analysis-runs\sf19-anchor-openings-sf19-2400-44g-st1-20261004`
+- Setup: 44 paired games, 4 concurrent, fixed `st=1`, `-repeat`, SF19 limited to 2400 Elo, seeded from 22 non-ShallowBlue anchor EPD positions generated from early-minor and Lucas STS diagnostic anchors.
+- Result: Coach vs Stockfish 19 2400: `4 - 35 - 5 [0.148] 44`; Coach as White `3 - 17 - 2 [0.182]`, Coach as Black `1 - 18 - 3 [0.114]`.
+- Swing mining: 108 swings from 2141 scored Coach moves; selected 9 entered-losing-mate and 16 centipawn-drop records, producing 50 before/after FEN lines.
+- Swing-target SF19 pass: `sf19-swing-targets-d10\20261004-103451` analyzed 42/50 FENs. Confirmed child-search audited 23 high-diff rows and kept 1 after-position, `game14-ply160-Kf8-after`, with child gap 766cp.
+- After-position audit: `game14-ply160-Kf8-after` (`5k2/8/7P/5K2/8/4B3/2p5/8 w - - 7 81`) was not a valid Coach move target. The actual before-position where Coach chose `80...Kf8` (`8/5k2/7P/5K2/8/4B3/2p5/8 b - - 6 80`) still had `Kf8` as best or tied-best through depth 12, with all black moves losing badly.
+- Before-move sampled pipeline: `sf19-pipeline-m8-120-d8\20261004-111426` analyzed 119/120 sampled Coach decision positions; confirmed child-search audited 39 high-diff rows and kept 0 candidates. Stable selector selected 0 candidates.
+- Before-move wide pass: `sf19-pipeline-wide-m8-120-d8\20261004-132209` analyzed 237/240 Coach decision positions; confirmed child-search audited 81 high-diff rows and kept 0 candidates.
+- Decision: no engine candidate from the anchor-opening evidence source. The match produced many SF19 disagreement rows, but actual Coach decision points collapsed under equal-depth child-search into gap-under-100, broad-tie/root-plateau, mate-table, or reference-move-not-supported cases.
+- Next targets: do not patch from this anchor-opening run. If continuing in a future goal, prefer improving candidate mining automation or a new evidence family that is not dominated by root plateaus and same-move eval-scale gaps.
+
+## 2026-10-05 - Decision Candidate Selector
+
+- Status: diagnostic-tooling
+- Commit: n/a
+- Tooling: `tools\select-decision-candidates.mjs`
+- Motivation: recent SF19 and ShallowBlue mining kept surfacing rows that were not safe patch targets: after-position artifacts, same-move eval-scale gaps, mate-class rows, root plateaus, and SF/reference disagreements that failed confirmed child-search.
+- Change: added an analysis-first selector that starts from Coach analysis positions, optionally requires confirmed child-search support and triage support, filters labels with `--require-label-regex` / `--exclude-label-regex`, rejects mate-class scores, same-move rows, child gaps below threshold, root-tie-heavy rows, and can keep only the first valid candidate per game with `--first-per-game`.
+- Verification: `node --check tools\select-decision-candidates.mjs`; `node --test tests\select_decision_candidates.test.mjs tests\select_stable_candidates.test.mjs tests\reference_child_search_verifier.test.mjs`.
+- Evidence rerun: applied the selector to the SF19 anchor-opening narrow before-move pipeline, wide before-move pipeline, and swing-target packet. All three selected 0 decision candidates:
+  - `sf19-pipeline-m8-120-d8\20261004-111426\decision-candidates-before-confirmed`: 0/120.
+  - `sf19-pipeline-wide-m8-120-d8\20261004-132209\decision-candidates-before-confirmed`: 0/240.
+  - `sf19-swing-targets-d10\20261004-103451\decision-candidates-before-confirmed`: 0/50.
+- Decision: keep this selector as the handoff gate before making engine candidates. It confirms the current SF19 anchor-opening evidence has no clean non-mate Coach before-move failure that survives the active goal's confirmed-child standard.
+- Next targets: continue the active goal with a materially different evidence generator or a deeper diagnostic that creates true first-divergence before-move rows. A good next loop is to build or run a paired SF19 diagnostic set that samples Coach's first disagreement from each anchor game at higher Coach/reference depth, then feed only those rows through this selector.
+
+## 2026-10-05 - First-Disagreement SF19 Diagnostic
+
+- Status: diagnostic-tooling
+- Commit: n/a
+- Tooling: `tools\extract-first-disagreements.mjs`
+- Motivation: broad sampled analysis kept mixing late/noisy rows with same-move eval gaps. The active goal needed a cleaner evidence generator that starts at the earliest non-mate Coach/SF19 move disagreement per game.
+- Change: added a first-disagreement extractor that reads `coach-analysis-lab` results, filters by label, eval gap, same-move agreement, and mate-class scores, then writes `first-disagreements.json`, `first-disagreements.fens`, and `first-disagreements.md`. It can cap selected disagreements per game.
+- Verification: `node --check tools\extract-first-disagreements.mjs`; `node --test tests\extract_first_disagreements.test.mjs tests\select_decision_candidates.test.mjs tests\select_stable_candidates.test.mjs tests\reference_child_search_verifier.test.mjs`.
+- Evidence packet: `analysis-runs\sf19-anchor-openings-sf19-2400-44g-st1-20261004\first-disagreements-wide-d8` selected 24 first disagreements from the 240-row wide SF19 depth-8 pass. Rejections were `refMoveAgrees=131`, `diff<150=71`, `gameLimit>1=53`, `mateAnalysisScore=20`, and 3 analysis failures.
+- Deeper follow-up: `first-disagreements-d10\20261004-184701` analyzed the 24-row packet at Coach/SF19 depth 10: 22 analyzed, 2 failed, best-move agreement 8/22, average non-mate eval gap 265cp, mate-score disagreements 0, and 6 high-priority different-best-move rows where Coach was at least 100cp more optimistic/pessimistic.
+- Confirmed child-search: `reference-child-search-d8-confirmed` audited 11 high-diff different-move rows and kept 0 candidates. All 11 rejected with `gap<100`; 3 also had `reference-not-in-top-12`. Notably every reported child gap was negative, so Coach's own equal-depth child search did not support the SF19 move as better.
+- Decision selector: `decision-candidates-before-confirmed` selected 0/24 decision candidates. Rejections included `missingConfirmedChild=13`, `confirmedChildRejected:gap<100=8`, `confirmedChildRejected:reference-not-in-top-12+gap<100=3`, `childGap<100=11`, and `rootTies>3=9`.
+- Decision: no engine candidate from the first-disagreement SF19 diagnostic. The deeper packet produced real-looking non-mate SF19 move disagreements, but they still collapse under Coach's confirmed child-search gate, so they are not safe patch targets.
+- Next targets: stop mining this anchor-opening run for engine patches. The next improvement loop should use a new evidence family or a diagnostic that compares Coach child-search outcomes against an external child-search/reference, because Coach's own child-search currently rejects the SF19 alternatives even when root depth-10 evals differ by 200-400cp.
+
+## 2026-10-05 - External SF19 Child-Search Diagnostic
+
+- Status: diagnostic-tooling
+- Commit: n/a
+- Tooling: `tools\verify-external-child-search.mjs`
+- Motivation: the confirmed Coach child-search gate rejected every SF19 first-disagreement row, but that left an open question: whether SF19 still prefers its branch after each candidate move, or whether the disagreement was only a root-analysis artifact. This tool asks SF19 to evaluate the child position after Coach's move and after SF19's move, then scores the gap from the original root side's perspective.
+- Change: added an external child-search verifier with a minimal UCI client, legal child-FEN generation through Coach move legality, root-side score normalization, JSON/Markdown output, and focused tests for score-perspective handling and keeper classification.
+- Verification: `node --check tools\verify-external-child-search.mjs`; `node --test tests\external_child_search_verifier.test.mjs tests\extract_first_disagreements.test.mjs tests\select_decision_candidates.test.mjs tests\select_stable_candidates.test.mjs tests\reference_child_search_verifier.test.mjs`.
+- Evidence run: applied to `first-disagreements-d10\20261004-184701\results.json` with SF19 at depth 10 and depth 12:
+  - `external-child-search-d10`: audited 11 rows, kept 3 external candidates: `game3-before-8.Nxe5` gap 458cp (`d7b6` vs `d7e5`), `game19-before-8.Re1` gap 303cp (`c2e4` vs `d1d2`), and `game8-before-9...Ne4` gap 155cp (`a1a3` vs `d2e4`).
+  - `external-child-search-d12`: audited 11 rows, kept 4 external candidates: `game3-before-8.Nxe5` gap 602cp, `game19-before-8.Re1` gap 350cp, `game9-before-8.Bf8` gap 103cp (`f6e4` vs `h5h4`), and `game20-before-9...Qe5` gap 110cp (`d4e5` vs `d4e3`). The previous `game8` external gap collapsed to 56cp.
+- Coach root-depth probes:
+  - `game3-before-8.Nxe5`: Coach root table is a broad tie through depth 12; SF19's `d7e5` is tied with Coach's `d7b6` and many alternatives by depths 7-12.
+  - `game19-before-8.Re1`: broad tied root family through depth 11; SF19's `d1d2` is tied in the same plateau when it appears. Depth 12 was stopped after running too long.
+  - `game9-before-8.Bf8`: broad tied root family through depth 11; SF19's `h5h4` appears tied by depth 9-11.
+  - `game20-before-9...Qe5`: Coach root table stays a flat queen-move family through depth 11; SF19's `d4e3` is not in the top 12, but no Coach root gap isolates why because the root scores remain tied.
+- Decision: no engine candidate accepted from the external-child diagnostic. The tool found a better evidence signal than Coach-only child search, but root probes still classify the rows as plateau/tie families rather than clean non-mate Coach move-selection failures. Avoid patching broad root-tie policy from this evidence because similar broad root changes have previously hurt ShallowBlue 5+0 strength.
+- Next targets: external child-search is now useful as an upstream evidence filter, but a code candidate still needs a row where Coach root probing exposes a narrow mechanism. Continue with either a new evidence source or a diagnostic specifically aimed at why Coach's root tables collapse many tactically distinct SF19-backed moves into identical scores.
+
+## 2026-10-05 - Root-Bound Pair Diagnostic
+
+- Status: diagnostic-tooling
+- Commit: n/a
+- Tooling: `tools\diagnose-root-bound-pairs.mjs`
+- Motivation: `external-child-search-d12` found four SF19-backed alternatives, but Coach root probes still showed broad tied root tables. The next question was whether Coach's published root tie hid a Coach full-window child-search gap, or whether Coach's child search itself disagreed with SF19.
+- Change: added a targeted pair diagnostic that reads Coach/SF analysis rows, optionally filters to external-child keepers, runs Coach root search at a chosen depth, then full-window child-searches only the Coach move and SF/reference move at `depth-1`. It reports root gap, Coach child gap, external SF19 child gap, and classifies `bound-like-root-tie` versus `coach-child-disagrees-with-external`.
+- Verification: `node --check tools\diagnose-root-bound-pairs.mjs`; `node --test tests\root_bound_pairs.test.mjs tests\external_child_search_verifier.test.mjs tests\extract_first_disagreements.test.mjs tests\select_decision_candidates.test.mjs tests\select_stable_candidates.test.mjs tests\reference_child_search_verifier.test.mjs`.
+- Full plateau sanity check: `tools\explain-root-plateau.mjs` on the strongest external row, `game3-before-8.Nxe5`, at depth 8 showed a true broad root plateau: root band `0cp`, static side band `446cp`, child-search band `805cp`, 8 top ties, and 7 bound-like top ties. However, for the specific Coach-vs-SF move pair, Coach child-search still preferred Coach's `d7b6` over SF19's `d7e5` (`childGap=-76cp`).
+- Pair diagnostic: `root-bound-pairs-d8` audited the four `external-child-search-d12` keepers and found 0 bound-like root ties for the Coach-vs-SF move pairs. All four had `childBand<100`, `root-and-child-flat`, and `coach-child-disagrees-with-external`:
+  - `game3-before-8.Nxe5`: root gap `0cp`, Coach child gap `-76cp`, external SF19 child gap `602cp`.
+  - `game19-before-8.Re1`: root gap `0cp`, Coach child gap `-85cp`, external SF19 child gap `350cp`.
+  - `game9-before-8.Bf8`: root gap `4cp`, Coach child gap `-59cp`, external SF19 child gap `103cp`.
+  - `game20-before-9...Qe5`: root gap `0cp`, Coach child gap `-28cp`, external SF19 child gap `110cp`.
+- Decision: no engine candidate accepted. This evidence does not satisfy the active gate requiring equal-depth Coach child-search confirmation with a real gap. The promising rows are now classified as external-only SF19 disagreements, not Coach-confirmed missing moves.
+- Next targets: do not patch from these four rows. If continuing, seek a new evidence source that produces Coach-confirmed child gaps, or deliberately start a separate eval/search-calibration investigation into why Coach child-search disagrees with SF19 on these tactical early positions. That second path should be treated as exploratory and must not bypass the ShallowBlue 5+0 smoke gate.
+
+## 2026-10-05 - Confirmed-Child Corpus Keeper Audit
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\corpus-confirmed-keeper-audit-20261005`
+- Motivation: before launching a new evidence source, scan existing `analysis-runs` artifacts for any historical `reference-child-search.json` rows with `keep=true` that might predate the stricter current gates.
+- Scan result: found five historical keepers across the corpus: `game16-ply148-Ke3-before`, `game18-ply148-Ke5-before` at depth 10 and depth 12, `game15-ply91-Kc1-before`, and `game14-ply160-Kf8-after`.
+- Current-gate audit:
+  - `game16-ply148-Ke3-before`: rejected; historical gap 69cp is below the active 100cp gate, and later confirmation collapsed further (`confirm-gap<50@d12`, edge gap 14cp).
+  - `game18-ply148-Ke5-before`: rejected; depth-10 gap 495cp collapsed to 88cp at depth 12, below the active 100cp gate. Current decision selector selected 0 candidates.
+  - `game15-ply91-Kc1-before`: rejected; depth-10 gap 183cp collapsed to 0cp at equal-depth d12 and `reference-child-search-d10-confirmed` rejects with `confirm-gap<100@d12`.
+  - `game14-ply160-Kf8-after`: rejected; after-position artifact rather than a Coach decision point. Current decision selector with `--exclude-label-regex -after` selected 0 candidates.
+- Verification: current decision selector reruns selected 0 candidates for the `Ke5` and `Kf8-after` keeper paths; the other stale keepers have explicit confirmed-depth rejection artifacts already in the run folders.
+- Decision: no existing corpus keeper survives the active goal's current gates. Do not patch from these stale `keep=true` rows.
+- Next targets: move to a genuinely new evidence source or an exploratory calibration pass; the existing confirmed-child corpus is exhausted for narrow candidate selection.
+
+## 2026-10-05 - Large-Gap Child-Search Corpus Audit
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\corpus-large-gap-child-audit-20261005`
+- Motivation: the previous corpus scan only checked historical `keep=true` rows. This pass scanned all existing `reference-child-search.json` artifacts for any row with `gapCp >= 100`, including rows rejected for mate, confirmation, or root-support reasons.
+- Scan result: only 7 large-gap rows exist in the corpus. Reason counts were `mate-root-score=2`, historical `KEEP=3`, `confirm-gap<100@d10=1`, and `confirm-gap<100@d12=1`.
+- Current-gate audit:
+  - `game25-ply143-Kb2-after` and `game9-ply131-Kh4-after`: rejected mate-root after-position/table artifacts.
+  - `game14-ply160-Kf8-after`: rejected after-position artifact, not a Coach decision point.
+  - `game18-ply148-Ke5-before`: rejected because d10 gap 495cp collapses to 88cp at d12.
+  - `game14-ply162-Kf7-after`: rejected after-position plus `confirm-gap<100@d10`.
+  - `game15-ply91-Kc1-before`: rejected because d10 gap 183cp collapses to 0cp at equal-depth d12; confirmed artifact already says `confirm-gap<100@d12`.
+- Decision: no large-gap child-search row in the existing corpus survives the active goal's gates. The existing analysis-runs corpus is exhausted for candidate discovery under confirmed Coach child-search requirements.
+- Next targets: proceed only with a genuinely new evidence source or a separate exploratory calibration investigation; do not keep re-auditing the same corpus for child-gap candidates.
+
+## 2026-10-05 - Lucas STS Miss Packet Diagnostic
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\lucas-sts-miss-packet-20261005`
+- Motivation: after exhausting ShallowBlue/SF19 match-derived child-gap artifacts, try a genuinely different local evidence source: Lucas STS suite positions where current Coach scored poorly in the worst regression categories.
+- Packet: 48 current-Coach low-score misses from `analysis-runs\lucas-sts-20260916-comparison\lucas-sts-comparison.json`, focused on Pawn Play in the Center, Open Files and Diagonals, Square Vacancy, Simplification, Undermining, Advancement of f/g/h Pawns, Re-Capturing, and Advancement of a/b/c Pawns.
+- SF19 comparison: `sf19-d8\20261004-194607` analyzed 48/48 at depth 8. Best-move agreement was 14/48, average absolute eval difference 104cp, largest eval diff 410cp at `lucas-g1-i4-Undermining`, mate disagreements 0, Coach mate scores 0.
+- Confirmed child-search: `reference-child-search-d8-confirmed` audited 6 high-diff different-move rows and kept 0 candidates. Rejections were `gap<100=6` and `reference-not-in-top-12=2`.
+- Largest collapsed rows: `lucas-g2-i69-Open-Files-and-Diagonals` gap 33cp, `lucas-g4-i31-Square-Vacancy` gap -1cp, `lucas-g1-i49-Undermining` gap -7cp, `lucas-g1-i38-Undermining` gap -17cp, `lucas-g6-i15-Re-Capturing` gap -14cp, and `lucas-g1-i83-Undermining` gap -31cp.
+- Decision: no engine candidate from the Lucas STS packet. This was clean non-mate evidence, but it repeated the current pattern: SF19 root disagreements do not survive equal-depth Coach child-search confirmation.
+- Next targets: Coach-confirmed child-gap evidence remains absent across match-derived, anchor-opening, corpus, and STS sources. Further candidate work likely needs either a new played-match evidence source or an explicit exploratory calibration project to understand Coach-vs-SF child-search divergence before patching.
+
+## 2026-10-05 - Lucas STS Best-Move Policy Check
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\lucas-sts-miss-packet-20261005\sts-best-reference-d8`
+- Motivation: the first Lucas STS packet used SF19's root best move as the reference and kept 0 candidates. This check tests whether the Lucas STS suite's own preferred move, rather than SF19's chosen move, produces a Coach-confirmed child gap.
+- Method: built a synthetic `coach-analysis-lab`-compatible `results.json` from the 48-position Lucas STS miss packet. Each row keeps Coach's actual depth-8 move, but replaces the reference move with the first move from the STS `best_moves` field. Rows where Coach already matched the STS best were excluded.
+- Result: 33 Coach-vs-STS-best rows audited by `tools\verify-reference-child-search.mjs` at child depth 8. Candidates kept: 0. Rejections were `gap<100=33` and `reference-not-in-top-16=8`.
+- Largest gaps: the best STS-favoring Coach child gap was only 77cp at `lucas-g4-i73-Square-Vacancy-stsbest`; other top gaps were 36cp, 33cp, 21cp, 14cp, 11cp, and 10cp.
+- Decision: no engine candidate from the STS-best policy. Even when the reference move is the suite's preferred move, Coach's own child-search does not produce a >=100cp confirmed gap.
+- Next targets: this further supports treating the current blocker as evidence-policy/search-calibration rather than a ready patch target. Do not create an engine candidate from STS rows unless future deeper Coach child-search or match evidence exposes a real confirmed gap.
+
+## 2026-10-05 - Lucas STS Best-Move Depth-10 Follow-Up
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\lucas-sts-miss-packet-20261005\sts-best-reference-d10-followup`
+- Motivation: the STS-best policy check had one near-threshold row at 77cp (`lucas-g4-i73-Square-Vacancy-stsbest`). Recheck the strongest eight STS-best rows at deeper Coach child depth 10 before declaring the policy exhausted.
+- Result: audited 8 rows at child depth 10, kept 0 candidates. All rejected with `gap<100`.
+- Depth behavior: the prior top row, `lucas-g4-i73-Square-Vacancy-stsbest`, fell from 77cp at child depth 8 to 4cp at child depth 10. The largest depth-10 gap was only 51cp at `lucas-g10-i58-Simplification-stsbest`.
+- Decision: deeper Coach child-search confirms the STS-best near misses are not candidates under the active gate.
+- Next targets: STS-based candidate discovery is exhausted under current gates. Further progress needs a new played evidence source or a deliberately separate calibration effort, not another STS child-gap pass.
+
+## 2026-10-05 - Active Goal Pivot
+
+- Status: goal-policy
+- Commit: n/a
+- Baseline: current published head `2b70704`; preserve the accepted ShallowBlue 1618 5+0 smoke baseline `12 - 7 - 1 [0.625]`.
+- Exhausted sources: identical ShallowBlue sampled-opening passes, SF19 anchor-opening first-disagreement rows, existing corpus confirmed-child keepers, large-gap child-search corpus rows, Lucas STS SF19-reference rows, and Lucas STS suite-best rows.
+- Active loop: do not run another identical sampled-opening candidate-fishing pass. Prefer a materially different evidence source or calibration diagnostic, especially a targeted SF19 diagnostic set or a different opening/evidence policy that creates clean before-move, non-mate Coach decision rows.
+- Candidate gate: only patch when a row survives SF19/reference comparison, Coach root-depth probing, and equal-depth Coach child-search confirmation with a real gap. External-only SF19 disagreement is useful upstream evidence, but not enough for an engine candidate.
+- Stop condition: continue looping until one narrow candidate is accepted, the chosen evidence source is exhausted, or a true blocker requires Sir Slice.
+- Next targets: inspect unprocessed/current-baseline evidence candidates first; if none are clearly current and comparable, build a targeted SF19 diagnostic packet rather than reusing stale ShallowBlue/STS sources.
+
+## 2026-10-05 - Benchmark Corpus SF19 Diagnostic
+
+- Status: diagnostic
+- Commit: `2b70704`
+- Run: `analysis-runs\benchmark-corpus-sf19-diagnostic-20261005`
+- Motivation: use a materially different local evidence source after ShallowBlue sampled openings, SF19 anchor openings, and Lucas STS rows were exhausted under the confirmed-child gate.
+- Packet: 20 six-field FENs from `tests\data\search_benchmark_corpus.json`, excluding `startpos`.
+- SF19 comparison: `sf19-d8\20261004-203639` analyzed all 20 positions at fixed depth 8. High-diff different-move rows included `quiet-open`, `game4`, `in-check-tactical`, `swing-game95-kc3-after`, `swing-game36-rxh2-after`, and `swing-game92-qba1-after`; mate-class rows included `queen-rook-mate` and `promotion-race`.
+- Confirmed child-search: `reference-child-search-d8-confirm-d10` audited 8 high-diff rows and kept 0 candidates. Rejections were `gap<100=7`, `confirm-gap<100@d10=1`, and `mate-root-score=2`.
+- Root triage: `triage-d681012` classified 17/20 as `all-tied`, 2/20 as `mate-horizon-flip`, and 1/20 as `candidate-review` (`quiet-defense`, but Coach and SF19 agreed on the move and the row was mate-row contaminated).
+- Decision selector: `decision-candidates-confirmed` selected 0/20. Top non-mate different-move rows all failed the child/root gates: `quiet-open` child gap `-101cp`, `game4` gap `45cp`, `in-check-tactical` gap `-9cp`, `swing-game36-rxh2-after` gap `-19cp`, and `swing-game92-qba1-after` gap `0cp`.
+- Decision: no engine candidate from the benchmark corpus. This confirms the current pattern on a different source: SF19 root disagreements and eval-scale gaps exist, but Coach equal-depth child-search and root triage do not expose a narrow missing move.
+- Next targets: continue the active goal with a new evidence policy that can create non-tied before-move rows, not another static corpus sweep. Best next local process idea is to build a selector/generator that samples positions where Coach root band is already wide at shallow depth, then compares only those against SF19; otherwise ask Sir Slice for a fresh match from a different opening policy/opponent/time control.
+
+## 2026-10-05 - Exact Root-Tie Verification Candidate
+
+- Status: rejected
+- Commit: n/a
+- Tooling: `tools\select-root-spread-fens.mjs`
+- Run: `analysis-runs\root-spread-corpus-scan-20261005`
+- Motivation: after repeated broad-tie failures, add a root-spread selector that only emits triaged positions whose deepest Coach root table is `spread`, has at least 100cp band, at most 3 top ties, no mate rows, and is a before-move row.
+- Evidence packet: scanning the 20 most recent `fen-triage.json` artifacts found 5 unique before-move root-spread FENs. SF19 depth-10 comparison found two different-move rows: `game16-ply186-Kg8-before` and `game12-ply100-f4-before`.
+- Confirmed child-search: `reference-child-search-d10-confirm-d12` kept 1/2 rows. `game12-ply100-f4-before` (`8/8/1k1Bp3/1P2Pp1p/2K4P/8/5P2/8 b - - 2 50`) had Coach `b6b7`, SF19/reference `f5f4`, and confirmed child gap 433cp. `game16-ply186-Kg8-before` rejected with gap 0cp.
+- Root-bound diagnosis: `root-bound-pairs-d12` classified `game12-ply100-f4-before` as `bound-like-root-tie` and `coach-child-confirms-external`, with root gap 0cp, child gap 638cp, and external gap 433cp.
+- Code change: root tie verification now records verified scores for every tied root move, not only the selected move, and uses exact verified score ordering (`ROOT_TIE_VERIFY_SCORE_TOLERANCE = 0`) so an 8cp verified improvement is not overridden by the old king-move tie preference.
+- Sentinel: `tests\root_tie_verification.test.mjs` now asserts that the FEN above chooses `f5f4` at depth 10 and that the top root row agrees with the published best move.
+- Verification: focused tests passed (`tests\root_tie_verification.test.mjs`, `tests\select_root_spread_fens.test.mjs`, `tests\root_bound_pairs.test.mjs`, `tests\external_child_search_verifier.test.mjs`); `tests\engine_regressions.test.mjs` passed 64/64 with 67 skipped; `tests\uci.test.mjs` plus `tests\time_management_candidate.test.mjs` passed 60/60; `stability-short` exact identity passed on 4/4 primary positions with candidate 0.789% slower overall.
+- Candidate check: post-patch SF19 depth-10 rerun changed `game12-ply100-f4-before` from Coach `b6b7` to `f5f4`, matching SF19. The only remaining different-move row, `game16-ply186-Kg8-before`, still rejects with child gap 0cp.
+- Smoke: `analysis-runs\candidate-root-tie-exact-score-shallowblue1618-20g-5m0-20261005`, Coach vs ShallowBlue 1618 5+0, 20 games, 4 concurrent, seed `26092501`: `10 - 7 - 3 [0.575]`. Coach as White `2 - 6 - 2 [0.300]`; Coach as Black `8 - 1 - 1 [0.850]`.
+- Smoke mining: 20/20 games mined, 1822 Coach moves scored, 19 swings selected: 9 entered-losing-mate and 10 centipawn-drop records. Worst rows included `game3-ply179-Kf8`, `game3-ply177-Kg7`, `game16-ply196-Kc3`, `game1-ply135-Ke1`, and `game15-ply199-Kb2`.
+- Decision: rejected. The local sentinel and exact-identity stability-short were good, but the 20-game ShallowBlue smoke regressed below the accepted `12 - 7 - 1 [0.625]` baseline. The engine change was reverted; keep the root-spread selector tooling for future evidence generation.
+- Next targets: mine the rejected smoke only as evidence for future candidates. Do not reapply exact root-tie tolerance without a narrower trigger that avoids the White-side collapse seen in this smoke.
+
+## 2026-10-05 - Wide Root-Spread Corpus Scan
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\root-spread-corpus-scan-wide-20261005`
+- Motivation: after rejecting the exact root-tie verification candidate, broaden the new root-spread selector across all existing `fen-triage.json` artifacts rather than only the first recent slice.
+- Selection: strict root-spread gate (`candidate-review`, before-move only, band >=100cp, top ties <=3, mate rows 0) found 12 unique FENs after excluding the rejected `game12-ply100-f4-before` FEN.
+- SF19 comparison: `merged-root-spread\sf19-d10\20261004-225713` analyzed 12/12 at depth 10. Different-move rows were `game16-ply186-Kg8-before`, `game7-ply187-Ke1-before`, `game11-ply177-Kg8-before`, `game10-ply164-Kxh6-before`, and `game6-ply180-Kc6-before`.
+- Confirmed child-search: `reference-child-search-d10-confirm-d12` audited 5 rows and kept 0 candidates. Child gaps were `0cp`, `-2cp`, `-30cp`, `-151cp`, and `-605cp`.
+- Decision: no candidate from the wider existing root-spread corpus. The selector remains useful, but current local triage artifacts are exhausted under the confirmed child-search gate.
+- Next targets: require genuinely new evidence, preferably a different opening/opponent/time-control policy or a diagnostic that generates fresh non-flat before-move rows; do not repeat another scan of the same existing triage corpus.
+
+## 2026-10-05 - Rejected-Smoke Current-Engine Swing Review
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\candidate-root-tie-exact-score-shallowblue1618-20g-5m0-20261005\current-engine-before-only`
+- Motivation: use the rejected exact-root-tie smoke as new played evidence, but analyze the mined positions with the current reverted engine rather than the rejected candidate behavior.
+- Source: 18 before-move FENs from `swing-mining\coach-swing-targets.fens`, excluding the pathological/stalling `game19-ply155-Ke6-before`; after-position rows were excluded.
+- SF19 comparison: `sf19-d8\20261004-230717` analyzed 18/18. Most worst rows were mate-class same-move or already-lost king-move endgames. Different-move rows included `game19-ply149-Ke4-before`, `game16-ply188-d4-before`, and `game13-ply177-Kb6-before`.
+- Confirmed child-search: `reference-child-search-d8-confirm-d10` audited 5 high-diff different-move rows and kept 0 candidates. Non-mate child gaps were only 6cp, 15cp, and 10cp; mate-class rows had 0cp gap.
+- Decision selector: `decision-candidates-confirmed` selected 0/18.
+- Decision: no candidate from the failed-smoke swing evidence. The failed match is useful as rejection evidence for the exact-root-tie candidate, but its mined positions do not expose a new clean current-engine child-gap target.
+- Next targets: stop mining this failed smoke for candidates. Next progress requires a fresh evidence policy, not repeated analysis of this same failed-candidate match.
+
+## 2026-10-05 - Fresh SF19 2400 Fixed-1s Diagnostic Match
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\fresh-evidence-sf19-2400-20g-st1-20261005`
+- Setup: Coach vs Stockfish 19 limited to 2400 Elo, 20 games, fixed `st=1`, 4 concurrent, `-repeat`, seed `26092501`.
+- Result: Coach vs Stockfish 19 2400: `5 - 14 - 1 [0.275] 20`; Coach as White `2 - 7 - 1 [0.250]`, Coach as Black `3 - 7 - 0 [0.300]`.
+- Mining: 20/20 games mined, 1340 Coach moves scored, 39 swings. Selected 26 records / 52 FEN lines: 16 centipawn drops, 8 mate-score changes, and 2 entered-losing-mate rows.
+- Before-only SF19 pass: `before-only\sf19-d8\20261004-232121` analyzed 26 before-move FENs. A filtered non-mate, high-diff, different-move packet contained 16 rows.
+- Confirmed child-search: `before-only\reference-child-search-nonmate-d8-confirm-d10` audited 16 rows and kept 1 row: `game15-ply151-g8R-before` (`8/4N1P1/4KP1k/3R3P/2q5/8/8/8 w - - 17 76`), Coach `g7g8r`, SF19/reference `e6f7`, child gap 183cp. The other 15 rows rejected with `gap<100` or mate-root reasons.
+- Follow-up triage: `keeper-game15-g8R\triage-d681012` showed `game15-ply151-g8R-before` as `early-spread-then-tie`; at depth 12 Coach's root best was already `e6f7`, with a broad tied root table and depth 11 reached under the 30s cap.
+- Root-bound diagnostic: `keeper-game15-g8R\root-bound-pairs-d8` rejected the row as a patch target: root was already spread at depth 8, Coach child gap was `-60cp`, and classification was `coach-child-disagrees-with-external`, not `bound-like-root-tie`.
+- Decision selector: `keeper-game15-g8R\decision-candidates-confirmed` selected 0 candidates. The kept child-search row failed due `triageClass=early-spread-then-tie`, `deepest=broad-tie`, and `topTies>4`.
+- Time/depth: `time-depth\coach-time-depth-summary.md` confirms the fixed-1s match averaged depth 6.31 and ~0.86s per Coach move. The useful keeper appears to be a depth/time diagnostic rather than a narrow search/eval patch.
+- Decision: no engine candidate from this SF19 diagnostic match. The evidence is useful and different from the exhausted ShallowBlue/STS/static corpora, but it still does not satisfy the active gate for a clean current-engine patch.
+- Next targets: if pursuing this family, use it as time/depth targeting evidence only after collecting matching 5+0 or non-fixed-time examples. Do not patch from `game15-ply151-g8R-before` alone.
+
+## 2026-10-05 - Depth-Flip Evidence Policy
+
+- Status: diagnostic/tooling
+- Commit: n/a
+- Tooling: `tools\select-depth-flip-fens.mjs`
+- Motivation: pivot away from repeated sampled-opening ShallowBlue mining and look for positions where Coach's own deeper fixed-depth search disagrees with a shallower played match move by a real root-score gap. This directly tests the time/depth hypothesis before changing time management.
+- Tool behavior: consumes `coach-time-depth-summary.json`, filters low-depth played moves, orders lowest depth / latest move / lowest estimated clock first, probes the played depth and a target deeper depth with a per-search deadline, and emits JSON/Markdown/FEN artifacts for rows where the deeper Coach root move beats the played move by at least the configured gap.
+- Verification: `node --test tests\select_depth_flip_fens.test.mjs tests\select_root_spread_fens.test.mjs tests\select_decision_candidates.test.mjs` passed 4/4.
+- Accepted-baseline check: `analysis-runs\depth-flip-baseline-shallowblue1618-5m0-20261005-endgame-d9-wide` audited 80 late-game moves from the accepted `fresh-evidence-shallowblue1618-20g-5m0-20261004b` 5+0 baseline and found 0 depth-flip candidates. This argues against broad time-management changes from the current accepted baseline alone.
+- SF19 fixed-1s check: `analysis-runs\depth-flip-sf19-2400-st1-20261005-d9` audited 100 low-depth moves and found 3 depth-flip candidates. Root triage found `game4-ply68-b5` was mate-horizon contaminated, while `game7-ply77-Bxd4` and `game2-ply62-Rg6` were tied-table / depth-instability rows. SF19 depth-10 comparison and external child-search kept 0 candidates; `game7-ply77-Bxd4` collapsed to external child gap 3cp.
+- Non-fixed ShallowBlue checks: `analysis-runs\depth-flip-fresh-shallowblue-20261004a-20261005` found 2 late-endgame candidates, `analysis-runs\depth-flip-shallowblue-pgnsuite-20260928c-20261005` found 1, and `analysis-runs\depth-flip-rootplateau-baseline-pgnsuite-20261005` found 0. Merged packet: `analysis-runs\depth-flip-nonfixed-shallowblue-merged-20261005`.
+- Best non-fixed row: `game7-ply267-Kxf6` (`6r1/6K1/3kbp2/8/8/5p1p/5R2/8 w - - 46 134`) from 5+0 evidence flipped from played `g7f6` at depth 4 to `g7h7` by depth 7+. SF19 depth 10 also preferred `g7h7` over Coach `g7f6` with 590cp root eval difference, but external child-search rejected it with external child gap `-59cp`.
+- Decision: no engine candidate accepted from depth-flip evidence yet. The policy produced better evidence than another identical sampled-opening pass, but current survivors still fail the active child-search confirmation gate.
+- Next targets: keep `select-depth-flip-fens.mjs` as a reusable evidence selector. Further work should either generate more non-fixed 5+0 depth-flip evidence or calibrate why external root gaps are repeatedly collapsing at child-search before attempting a time-management patch.
+
+## 2026-10-05 - Child-Search Collapse Calibration
+
+- Status: diagnostic/tooling
+- Commit: n/a
+- Tooling: `tools\summarize-child-search-collapses.mjs`
+- Motivation: repeated candidate searches were producing large Coach/SF19 root eval gaps that collapsed under child-search. Add a durable calibration view before spending more cycles on the same failed evidence shape.
+- Summary run: `analysis-runs\child-search-collapse-summary-20261005` scanned 39 verifier artifacts and 533 rows from `analysis-runs`.
+- Results: 15 historical keepers, 15 near misses, and 5 active-gate-shaped Coach child-search keepers. Rejection counts were dominated by `gap<100=479`, `reference-not-in-top-12=75`, `mate-root-score=62`, and `external-gap<100=19`. Gap buckets were `<0=392`, `0-24=96`, `25-49=13`, `50-99=17`, and `>=100=15`.
+- Active-gate keeper audit: all 5 active-gate-shaped rows were already accounted for by prior work. `game15-ply151-g8R-before` is a fixed-time depth/time diagnostic, not a patch target; `game12-ply100-f4-before` is the exact root-tie candidate rejected by ShallowBlue smoke; `game18-ply148-Ke5-before` collapses below gate at deeper child depth; `game15-ply91-Kc1-before` collapses to 0cp at equal-depth confirmation; the duplicate `game12-ply100-f4-before` is the same rejected root-tie row.
+- Verification: `node --test tests\summarize_child_search_collapses.test.mjs tests\select_depth_flip_fens.test.mjs tests\select_root_spread_fens.test.mjs tests\select_decision_candidates.test.mjs` passed 5/5.
+- Decision: no hidden historical candidate remains in the verifier artifacts. This quantitatively confirms the active blocker is not lack of root-gap rows; it is that root/external gaps almost always fail Coach child-search or deeper confirmation.
+- Next targets: prioritize evidence that starts from Coach-confirmed child gaps or from a non-root-gap source. Do not run another broad SF-root disagreement pass unless it changes the upstream evidence policy.
+
+## 2026-10-05 - Direct Diagnostic Anchor SF19 Pass
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\diagnostic-anchors-sf19-direct-20261005`
+- Motivation: use the local diagnostic anchor suite directly as a different evidence source, rather than only via match seeds or the smaller benchmark corpus.
+- Packet: 55 six-field FENs from `tests\data\diagnostic_anchors.json`, excluding `control-startpos` because `coach-analysis-lab` FEN-file mode expects six-field FEN rows.
+- SF19 comparison: `sf19-d8\20261005-065303` analyzed 54/55 rows successfully at depth 8; one anchor (`arena-shallowblue-3sec-qxa6`) errored. High-diff rows included mate-heavy sentinels plus non-mate/control rows such as `arena-shallowblue-5min-g4`, `arena-shallowblue-3sec-kd7`, `control-castling-both`, `control-quiet-middlegame`, `control-open-file-pressure`, `control-pinned-piece`, and `arena-shallowblue-5min-ree1`.
+- Confirmed child-search: `sf19-d8\20261005-065303\reference-child-d8-confirm-d10` audited 11 high-diff rows and kept 0 candidates. Rejections included `arena-shallowblue-5min-g4` gap `-5cp`, `arena-shallowblue-3sec-kd7` gap `0cp`, `control-castling-both` gap `-2cp`, `control-open-file-pressure` gap `-24cp`, `control-quiet-middlegame` gap `-92cp`, `control-pinned-piece` gap `-9cp`, `arena-shallowblue-5min-ree1` gap `-430cp`, and mate sentinel collapses.
+- Decision: no engine candidate from direct diagnostic anchors. This source repeats the calibrated pattern: visible root/reference differences, but no Coach-confirmed child gap.
+- Next targets: avoid more static SF19 comparison sweeps unless paired with a pre-filter that predicts Coach child-search support. Better next evidence source is a deliberately generated Coach-confirmed child-gap packet or a fresh played match policy designed to create non-flat before-move decision rows.
+
+## 2026-10-05 - Coach Child-Gap-First Selector
+
+- Status: diagnostic/tooling
+- Commit: n/a
+- Tooling: `tools\select-coach-child-gap-fens.mjs`
+- Motivation: after calibration showed SF/root disagreement rows usually collapse under Coach child-search, invert the evidence order. Start from Coach's own root table, child-search the current root best and top alternatives, and only keep rows where a non-root-best move beats the root best by at least 100cp in Coach child-search.
+- Verification: `node --check tools\select-coach-child-gap-fens.mjs`; `node --test tests\select_coach_child_gap_fens.test.mjs` passed.
+- Accepted-baseline pass: `analysis-runs\coach-child-gap-baseline-shallowblue1618-20261005-small` audited 20 before-position swing rows from the accepted `fresh-evidence-shallowblue1618-20g-5m0-20261004b` 5+0 baseline, using root depth 8, child depth 8, top 5 root moves, and 1500ms per child. It found 5 Coach child-gap candidates.
+- Best rows from accepted baseline: `game15-ply155-Ka2-before` (`g2g4` root best vs `a3a2`, child gap 99048cp), `game20-ply106-Kc5-before` (`c6b6` vs `c6c5`, 98702cp), `game13-ply131-Kf3-before` (`f4g3` vs `f4f3`, 561cp), `game9-ply137-Kb5-before` (`c5c6` vs `c5d5`, 262cp), and `game12-ply90-Kc8-before` (`c7d8` vs `c3a2`, 241cp).
+- Follow-up triage: `triage-d6-12` classified the five rows as `early-spread-then-tie=2`, `mate-horizon-flip=2`, and `all-tied=1`. `game15-ply155-Ka2-before` and `game13-ply131-Kf3-before` were deeper-depth root fixes but tied/broad-tied by depth 12; `game20-ply106-Kc5-before` and `game9-ply137-Kb5-before` became mate-horizon rows; `game12-ply90-Kc8-before` was all-tied.
+- SF19 check: `sf19-d10\20261005-072041` completed 3/5 rows and SF19 agreed with Coach's deeper best on all completed rows: `game15-ply155-Ka2-before` -> `a3a2`, `game20-ply106-Kc5-before` -> `c6c5`, and `game13-ply131-Kf3-before` -> `f4f3`. The other two rows timed out/errored for Coach at depth 10.
+- SF19 fixed-1s pass: `analysis-runs\coach-child-gap-sf19-st1-before-20261005-top10` audited the top 10 before rows from the fresh SF19 2400 fixed-1s diagnostic and found 0 Coach child-gap candidates.
+- Decision: no engine candidate yet. The child-gap-first policy is a better upstream filter and did find real Coach-internal depth gaps, but the accepted-baseline survivors were depth/mate-horizon diagnostics or already corrected by deeper root search, not clean patch targets under the active gate.
+- Next targets: keep this selector, but use it on better ordered packets or add progress/output controls before broad runs. Candidate work should focus on rows where the child-gap-first selector finds a non-mate, non-tied candidate that remains a different move at deeper root depths and does not already agree with SF19 by depth 10.
+
+## 2026-10-05 - Stricter Goal Pivot: SF19/Diagnostic Evidence
+
+- Status: diagnostic/tooling
+- Commit: n/a
+- Tooling: `tools\select-coach-child-gap-fens.mjs`
+- Goal note: the active goal remains open because no accepted candidate has landed. The next loop is sharpened around a different evidence source: targeted SF19 diagnostics or a cleaner opening/evidence policy, not another identical sampled-opening ShallowBlue pass.
+- Tooling change: hardened `select-coach-child-gap-fens.mjs` with root and confirm-root search deadlines (`--max-ms-per-root`) plus confirm-root quality gates (`--min-confirm-root-band`, `--max-confirm-root-top-ties`). This prevents hard rows from stalling the loop and rejects broad/tied confirm roots explicitly.
+- Verification: `node --check tools\select-coach-child-gap-fens.mjs`; `node --test tests\select_coach_child_gap_fens.test.mjs tests\select_depth_flip_fens.test.mjs tests\summarize_child_search_collapses.test.mjs` passed 3/3.
+- Strict accepted-baseline rerun: `analysis-runs\coach-child-gap-baseline-shallowblue1618-20261005-filtered5` audited the five earlier child-gap-first rows with root depth 8, child depth 8, confirm-root depth 10, root/confirm band >=50cp, <=3 top ties, no mate rows, 1500ms child deadline, and 5000ms root deadline. It found 0 candidates.
+- Strict rejection reasons: `game15-ply155-Ka2-before` failed because confirm root did not prefer the alternative; `game20-ply106-Kc5-before` failed mate/flat confirm root gates; `game13-ply131-Kf3-before` failed confirm-root preference, band, and top-tie gates; `game9-ply137-Kb5-before` and `game12-ply90-Kc8-before` failed root/confirm plateau and timeout gates.
+- SF19 diagnostic selector rerun: `analysis-runs\diagnostic-anchors-sf19-direct-20261005\decision-candidates-filtered-20261005` applied the current decision-candidate gate to direct diagnostic-anchor SF19 results plus confirmed child-search. It selected 0 candidates from 55 positions.
+- Decision: no candidate from this stricter SF19/diagnostic pivot yet. This is still progress: the loop now rejects the tempting child-gap rows with durable reasons and confirms the direct SF19 anchor packet has no clean non-mate Coach-confirmed target.
+- Next loop target: generate or select positions that are likely to have Coach-confirmed child gaps before spending SF19/reference time. Avoid broad static SF19 sweeps unless they are pre-filtered by Coach root spread/child-gap evidence or come from a materially different played-opening policy.
+
+## 2026-10-05 - Coach Root Worklist Evidence Generator
+
+- Status: diagnostic/tooling
+- Commit: n/a
+- Tooling: `tools\build-coach-root-worklist.mjs`
+- Motivation: broad SF19/static sweeps keep collapsing under Coach child-search. Add a direct FEN-corpus scanner that starts from Coach root shape before expensive child-gap or SF19/reference passes: recursively scan `.fens` files, dedupe positions, exclude after-position labels, run bounded Coach root searches, and keep only non-mate rows with real root spread and limited top ties.
+- Tooling change: added `--exclude-file-regex` after an initial broad scan wasted its budget on old `candidate-regressions.fens` packets. This lets future runs skip noisy historical folders while scanning current evidence.
+- Verification: `node --check tools\build-coach-root-worklist.mjs`; `node --test tests\build_coach_root_worklist.test.mjs tests\select_coach_child_gap_fens.test.mjs` passed 3/3.
+- Initial broad scan: `analysis-runs\coach-root-worklist-corpus-20261005` audited 180 positions but wrote 0 worklist rows. Rejections were dominated by `band<80=178`, `topTies>3=155`, and `rootTimed=105`; the scan was polluted by old 202607 candidate-regression packets.
+- Recent SF19 fixed-1s scan: `analysis-runs\coach-root-worklist-sf19-st1-20261005` audited 26 positions from `fresh-evidence-sf19-2400-20g-st1-20261005` and wrote 5 worklist rows. Strict child-gap verification at root/child depth 7 with confirm-root depth 9 found 0 candidates; every row rejected with `gap<100` and/or confirm-root preference/band failure.
+- Clean corpus scan: `analysis-runs\coach-root-worklist-corpus-clean-20261005` skipped `candidate-regressions`, audited 160 current/historical swing and diagnostic FENs, and wrote 15 root-worklist rows. Strict child-gap verification found one survivor: `game17-ply137-Nf2-before` (`8/8/8/1p2k2p/1n4p1/1P2ppP1/8/4K2N w - - 1 69`), where depth-7 root preferred `e1f1` but child/confirm-root preferred `e1d1` with a huge apparent gap.
+- Depth probe: `probe-root-depths` on `game17-ply137-Nf2-before` showed this is not a clean non-mate candidate. Root best oscillated (`e1d1`, `e1f1`, `h1f2`) and by depth 10-12 all plausible moves collapsed into losing mate-class scores: depth 10 had `e1d1 -99988`; depth 11 had `e1d1 -99988`, `e1f1 -99990`; depth 12 had `h1f2 -99986`, `e1f1 -99986`, `e1d1 -99988`.
+- Decision: reject the survivor as a mate-horizon/endgame-loss artifact. Do not patch from it. The new worklist process is useful because it found and then safely killed a plausible row before engine-code changes, but this evidence path has not produced an acceptable candidate yet.
+- Next targets: use `build-coach-root-worklist.mjs` as an upstream queue builder for fresh evidence, preferably from a materially different played-opening policy or a targeted SF19 diagnostic set. For existing local corpora, require a survivor to remain non-mate through deeper root probes before entering SF19/reference or engine-candidate work.
+
+## 2026-10-05 - Automated Non-Mate Screen for Child-Gap Survivors
+
+- Status: diagnostic/tooling
+- Commit: n/a
+- Tooling: `tools\select-coach-child-gap-fens.mjs`
+- Motivation: the root-worklist loop found a plausible child-gap survivor, but manual depth probing showed it was mate-horizon contamination. Add the deeper non-mate screen directly to the selector so this class of false candidate is rejected before any engine patch work.
+- Change: added optional `--nonmate-check-depth <n>` to run a deeper root search only after a row has otherwise passed the child-gap and confirm-root gates. The row is rejected if the deeper search times out, exposes mate-class root rows, or no longer prefers the proposed alternative when `--require-confirm-root-different` is active.
+- Verification: `node --check tools\select-coach-child-gap-fens.mjs`; `node --test tests\select_coach_child_gap_fens.test.mjs tests\build_coach_root_worklist.test.mjs` passed 3/3.
+- Evidence rerun: `analysis-runs\coach-root-worklist-corpus-clean-20261005\child-gap-strict-d7d7-confirm9-nonmate12` reran the 15-row clean-corpus worklist with root/child depth 7, confirm-root depth 9, and non-mate check depth 12. It selected 0 candidates.
+- Key rejection: the previous survivor `game17-ply137-Nf2-before` now rejects automatically with `nonmateCheckMateRows` and `nonmateCheckDoesNotPreferAlternative`; its apparent child gap remained 98461cp, but the deeper root screen correctly classifies it as mate-horizon contamination.
+- Decision: keep the non-mate screen as a final candidate gate. It is too expensive for first-pass scans, but it prevents a known false-positive class from reaching engine-candidate work.
+- Next targets: apply `build-coach-root-worklist.mjs` plus `select-coach-child-gap-fens.mjs --nonmate-check-depth` to fresh evidence only. Existing local corpora now have no clean non-mate child-gap candidate under this stricter gate.
+
+## 2026-10-05 - Candidate Discovery Pipeline Wrapper
+
+- Status: diagnostic/tooling
+- Commit: n/a
+- Tooling: `tools\run-candidate-discovery-pipeline.mjs`
+- Motivation: the current best process is useful but had too much manual glue: build a Coach root-worklist, feed it to strict child-gap verification, then apply the deeper non-mate screen. Add a one-command wrapper so fresh evidence can be processed consistently without hand-copying commands.
+- Change: added a pipeline wrapper that runs `build-coach-root-worklist.mjs`, then runs `select-coach-child-gap-fens.mjs` on the resulting `coach-root-worklist.fens` with confirm-root and non-mate-depth gates, and writes combined JSON/Markdown summary artifacts.
+- Verification: `node --check tools\run-candidate-discovery-pipeline.mjs`; `node --test tests\run_candidate_discovery_pipeline.test.mjs tests\build_coach_root_worklist.test.mjs tests\select_coach_child_gap_fens.test.mjs` passed 4/4.
+- Smoke run: `analysis-runs\candidate-discovery-pipeline-sf19-st1-20261005` processed `analysis-runs\fresh-evidence-sf19-2400-20g-st1-20261005` with worklist depth 7, child depth 7, confirm depth 9, and non-mate depth 12. It produced 5 root-worklist rows and 0 strict child-gap candidates, matching the previous manual result.
+- Decision: keep the wrapper as the standard first command for new evidence folders. It does not find a candidate by itself, but it reduces repeated manual process and prevents known bad evidence shapes from reaching patch work.
+- Next targets: use this pipeline on the next fresh match/evidence policy. If it produces 0 candidates repeatedly across genuinely new evidence families, then the loop should pivot away from candidate fishing and toward a deeper eval/search-calibration investigation into why Coach child-search disagrees with SF19/reference on tactical branches.
+
+## 2026-10-05 - Diagnostic Anchor Pipeline Rerun
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\candidate-discovery-pipeline-diagnostic-anchors-20261005`
+- Source: `analysis-runs\diagnostic-anchors-sf19-direct-20261005`, the direct diagnostic-anchor packet of 55 curated FEN rows.
+- Pipeline: `tools\run-candidate-discovery-pipeline.mjs` with worklist depth 7, child depth 7, confirm-root depth 9, non-mate depth 12, min root band 50cp, max top ties 4, and min child gap 100cp.
+- Result: audited 55 positions, wrote 1 root-worklist row, and selected 0 strict child-gap candidates.
+- Sole worklist row: `arena-shallowblue-5min-g4` (`6k1/7p/4K3/6p1/5r2/8/8/8 b - - 1 72`) rejected with `gap<100`, `confirmRootDoesNotPreferAlternative`, and `confirmRootBand<50`; best alternative gap was 0cp.
+- Decision: no engine candidate from direct diagnostic anchors under the current stricter gate. This confirms the previous direct-anchor SF19 result with the newer automated pipeline: the family has at most one non-flat Coach-root row, and it fails Coach child/confirm support.
+- Next targets: do not keep reprocessing the static diagnostic-anchor packet. The next useful path is either fresh played evidence with a different opening policy or a calibration investigation into why SF19/root disagreements collapse under Coach child-search.
+
+## 2026-10-05 - External-vs-Coach Child Disagreement Calibration
+
+- Status: diagnostic/tooling
+- Commit: n/a
+- Tooling: `tools\summarize-external-child-disagreements.mjs`
+- Motivation: repeated evidence sources now show the same failure pattern: SF19/external child-search can prefer the reference branch by 100cp+, while Coach's equal-depth child-search either stays flat or prefers Coach's branch. Add a corpus-level view of that pattern so it can guide calibration work instead of being scattered across root-bound pair artifacts.
+- Verification: `node --check tools\summarize-external-child-disagreements.mjs`; `node --test tests\summarize_external_child_disagreements.test.mjs` passed 2/2.
+- Run: `analysis-runs\external-child-disagreement-summary-20261005`, scanning all existing `root-bound-pairs.json` artifacts under `analysis-runs`.
+- Result: audited 7 pair rows across 4 files and found 6 external-only disagreements. The largest rows were:
+  - `game3-before-8.Nxe5`: external gap 602cp, Coach child gap -76cp.
+  - `game12-ply100-f4-before`: external gap 433cp, Coach child gap 8cp. This is the exact root-tie candidate already rejected by ShallowBlue smoke (`10 - 7 - 3 [0.575]` versus accepted `12 - 7 - 1 [0.625]`), so do not recycle it directly.
+  - `game19-before-8.Re1`: external gap 350cp, Coach child gap -85cp.
+  - `game15-ply151-g8R-before`: external gap 183cp, Coach child gap -60cp; already classified as fixed-time depth/time diagnostic, not a patch target.
+  - `game20-before-9...Qe5`: external gap 110cp, Coach child gap -28cp.
+  - `game9-before-8.Bf8`: external gap 103cp, Coach child gap -59cp.
+- Decision: no engine candidate from these rows under the active gate because Coach child-search does not confirm them. However, this set is now the best calibration target for a separate investigation into why Coach undervalues SF19-backed tactical branches.
+- Next targets: if continuing without fresh played evidence, use this calibration set to compare static eval and child PV features after the Coach move vs SF19/reference move. Treat any resulting eval/search idea as exploratory and still require the full active candidate gates before patching.
+
+## 2026-10-05 - Static Eval Child Comparison
+
+- Status: diagnostic/tooling
+- Commit: n/a
+- Tooling: `tools\compare-static-eval-children.mjs`
+- Motivation: the external-vs-Coach child disagreement audit found rows where SF19 strongly prefers the reference branch but Coach child-search is flat or points the other way. Compare Coach's static evaluation immediately after each child move to determine whether the disagreement starts in static eval or emerges during search/PV.
+- Verification: `node --check tools\compare-static-eval-children.mjs`; `node --test tests\compare_static_eval_children.test.mjs tests\summarize_external_child_disagreements.test.mjs` passed 5/5.
+- Run: `analysis-runs\static-eval-child-comparison-20261005`, using `analysis-runs\external-child-disagreement-summary-20261005\external-child-disagreements.json`.
+- Result: analyzed 6 external-only disagreement rows.
+- Static eval findings:
+  - `game3-before-8.Nxe5`: external gap 602cp; Coach child gap -76cp; static gap 327cp. Static eval already sees a large part of SF19's preference for `d7e5`, mostly material (+300cp), but Coach child-search still reverses/loses it.
+  - `game12-ply100-f4-before`: external gap 433cp; static gap only 23cp. This is the already-rejected exact root-tie smoke candidate; do not recycle directly.
+  - `game19-before-8.Re1`: external gap 350cp; static gap -25cp.
+  - `game15-ply151-g8R-before`: external gap 183cp; static gap -68cp.
+  - `game20-before-9...Qe5`: external gap 110cp; static gap 0cp.
+  - `game9-before-8.Bf8`: external gap 103cp; static gap -15cp.
+- Decision: this is not a simple broad static-eval fix. Only `game3-before-8.Nxe5` has a strong static signal, while most residuals are large and point toward search/PV behavior or tactical horizon rather than static categories. No engine candidate yet.
+- Next targets: inspect `game3-before-8.Nxe5` as the best calibration row because static eval and SF19 agree directionally, but Coach child-search contradicts them. A narrow follow-up should compare Coach PV/root rows after `d7b6` vs `d7e5` across child depths before considering any patch.
+
+## 2026-10-05 - Child-Pair Depth Probe: game3-before-8.Nxe5
+
+- Status: diagnostic
+- Commit: n/a
+- Tooling: `tools\probe-child-pair-depths.mjs`
+- Run: `analysis-runs\child-pair-depths-game3-nxe5-20261005`
+- Target: `game3-before-8.Nxe5` (`r1b1k2r/3nqpbp/p2p2p1/1p1QN3/4PB2/1BP5/P4PPP/R3K2R b KQkq - 1 8`), comparing Coach `d7b6` against SF19/reference `d7e5`.
+- Motivation: this was the strongest calibration row: SF19 external child-search favored `d7e5` by 602cp, and Coach static eval also favored `d7e5` by 327cp, but Coach child-search at depth 7 favored/flattened toward `d7b6`.
+- Depth trajectory:
+  - Static eval: `d7e5` ahead by 327cp.
+  - Child depths 1-3: `d7e5` remains slightly ahead (`+8cp`, `+42cp`, `+38cp`).
+  - Child depth 4: Coach flips against `d7e5`; gap becomes `-123cp`.
+  - Child depths 5-10: Coach stays against `d7e5` by roughly `-130cp` to `-69cp`.
+- PV clue: after Coach's `d7b6`, depth 4+ chooses `d5c6` and line `d5c6 c8d7 e5d7 e7d7`, while after `d7e5`, Coach keeps `d5a8` lines. The disagreement therefore appears when Coach resolves the concrete `Qxc6`/recapture line, not at static eval or very shallow search.
+
+## 2026-10-05 - Game3 Nxe5 Depth-7 PV Static Replay
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\pv-static-replay-game3-nxe5-depth7-20261005`
+- Result: replayed the Coach child-search PVs from `game3-before-8.Nxe5` for Coach move `d7b6` and SF19/reference move `d7e5`.
+- Baseline: active published head `2b70704`; preserve ShallowBlue 1618 `5+0` baseline `12 - 7 - 1 [0.625]`.
+- Evidence: the `d7b6` PV ends at root-side static eval `-68` after `...Nd7-c5`; the `d7e5` reference PV ends at root-side static eval `-485` after `...d5 Bxe5`. Earlier static eval immediately after the child move favored `d7e5` by `+327cp`, but Coach child search flips against it from depth 4 onward.
+- Decision: no engine candidate. Treat this as a calibration target showing a deeper Coach PV disagreement with SF19, not as a clean static-eval miss or patchable candidate.
+- Next targets: pivot to a different evidence source or stricter SF19 diagnostic set. Only patch when a non-mate decision survives SF19/reference comparison, Coach root-depth probing, and equal-depth Coach child-search confirmation with a real gap.
+
+## 2026-10-05 - SF19 Midgame Material-Rich Diagnostic Pass
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\sf19-midgame-diagnostic-20261005\20261005-122035`; extraction `analysis-runs\first-disagreements-sf19-midgame-material-rich-20261005`; strict pipeline `analysis-runs\candidate-discovery-pipeline-sf19-midgame-material-rich-20261005`
+- Result: generated a fresh SF19 depth-8 analysis from `fresh-evidence-sf19-2400-20g-st1-20261005\match.pgn`, targeting Coach moves only, fullmoves 8-35, sampled/capped at 60 analyzed positions.
+- Evidence: material-rich first-disagreement extraction kept 13 true Coach/SF19 move disagreements with diff >=100cp, at least 16 pieces, and at least 2400cp non-pawn material. Examples included `game9-before-12.Bxe5`, `game4-before-14...Qg5`, `game14-before-10...Qxf6`, and `game15-before-8.O-O`.
+- Gate result: strict Coach root worklist rejected all 13 rows with `band<50` and `topTies>4`; every row had root band `0` and top ties `8` at depth 7. Direct probing of `game9-before-12.Bxe5` confirmed Coach assigns identical scores to the top 8 moves through depths 4-8.
+- Decision: no engine candidate. This is a cleaner negative result than the late-endgame SF19 pass: the blocker is Coach root plateau behavior on material-rich midgame disagreements, not lack of external disagreements.
+- Next targets: improve candidate discovery around plateau diagnosis rather than loosening gates. A future patch should not revive broad root-tie verification; it needs a narrow root-plateau cause or an evidence path that produces non-plateau Coach child gaps.
+
+## 2026-10-05 - SF19 Midgame Plateau Bypass and Reference Child Verification
+
+- Status: diagnostic
+- Commit: n/a
+- Run: plateau bypass `analysis-runs\child-gap-sf19-midgame-plateau-bypass-20261005`; explicit Coach-vs-reference child verifier `analysis-runs\reference-child-sf19-midgame-plateau-20261005`; focused depth probe `analysis-runs\child-pair-depths-game3-bb5-sf19-midgame-20261005`
+- Result: bypassed the root-worklist band/tie gate and ran full Coach child searches on the 13 SF19 material-rich midgame disagreements. Also ran explicit Coach move vs SF19 reference move child verification on 15 raw disagreements from the same analysis.
+- Evidence: root plateau rows were not hiding a qualifying Coach child-search gap. The plateau-bypass run found 0 candidates; every row failed `gap<100`. Explicit Coach-vs-reference verification also found 0 candidates; best positive row was `game3-before-10.Bb5` at +54cp for SF19's `f1b5` over Coach's `e5c4`.
+- Focused probe: `game3-before-10.Bb5` across child depths 1-10 showed static gap +46cp, peak search gap +54cp at depth 6, then +4cp at depth 7 and +18cp at depths 8-10 under the 12s per-search cap. It does not satisfy the active equal-depth >=100cp gate.
+- Tooling: `tools\verify-reference-child-search.mjs` now emits `gapClass` (`candidate`, `positive-subthreshold`, `flat`, `coach-favored`, `unknown`) so near misses are easier to separate from true candidates without changing candidate gates.
+- Tests: `node --test tests\reference_child_search_verifier.test.mjs tests\extract_first_disagreements.test.mjs tests\probe_child_pair_depths.test.mjs tests\run_candidate_discovery_pipeline.test.mjs tests\select_coach_child_gap_fens.test.mjs` passed 10/10.
+- Decision: no engine candidate. Do not patch from this SF19 midgame set; Coach's own equal-depth child search does not confirm SF19's preferred branches strongly enough.
+- Next targets: move to a different evidence policy that can produce Coach-confirmed child gaps, such as stronger external-pair generation with direct reference-child verification first, or mine losing transitions from a played match where Coach's own depth progression flips by >=100cp.
+- Decision: no engine candidate yet. This is a useful calibration row, but it does not satisfy the active candidate gate because Coach child-search still rejects the SF19 branch at practical depths. Do not patch from it directly.
+- Next targets: if continuing calibration, inspect the depth-4 transition and quiescence/material accounting around the `d7b6 d5c6 c8d7 e5d7 e7d7` line versus the `d7e5 d5a8` line. Any idea from this must be treated exploratory and retested through the full candidate gates.
+
+## 2026-10-05 - SF19 Low-Depth Flip Scan
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\depth-flip-sf19-midgame-lowdepth-20261005`
+- Source: `analysis-runs\fresh-evidence-sf19-2400-20g-st1-20261005\time-depth\coach-time-depth-summary.json`
+- Result: audited 30 Coach moves from the SF19 fixed-1s match where the played search depth was at most 7, requiring shallow agreement and a depth-9 alternative gap of at least 100cp. It selected 0 candidates.
+- Baseline: active published head `2b70704`; preserve ShallowBlue 1618 `5+0` baseline `12 - 7 - 1 [0.625]`.
+- Decision: no engine candidate. The existing SF19 fixed-1s time/depth evidence does not currently show a clean non-mate move where Coach's own deeper search flips by the required margin.
+- Next targets: pivot to a different evidence policy instead of repeating this scan: mine played-match losing transitions, first-divergence packets, or external-pair rows only when Coach equal-depth child-search can confirm a real non-mate gap.
+
+## 2026-10-05 - Confirmed Depth-Flip Gate
+
+- Status: diagnostic/tooling
+- Commit: n/a
+- Tooling: `tools\select-depth-flip-fens.mjs`
+- Change: added optional `--confirm-depth <n|off>` so a low-depth/deeper-flip row only survives if the deeper preferred move still beats the played move at a second confirmation depth by the same minimum gap.
+- Motivation: unconfirmed depth-flip scans produced tempting one-depth late-endgame rows that collapsed when probed deeper.
+- Evidence: `analysis-runs\depth-flip-fresh-shallowblue-20261004a-confirm12-20261005` audited 80 low-depth moves from `fresh-evidence-shallowblue1618-20g-5m0-20261004a` and selected 0 candidates. The two previous promotion rows both failed confirmation: `game19-ply205-Ka1` confirmed gap 0cp at depth 11, and `game19-ply217-Ka2` confirmed gap -145cp at depth 12.
+- PGN-suite check: the previous `fresh-evidence-shallowblue1618-20g-5m0-pgnsuite-20260928c` survivor `game7-ply267-Kxf6` (`6r1/6K1/3kbp2/8/8/5p1p/5R2/8 w - - 46 134`) was manually probed through depth 10. The depth-7 `g7h7` preference disappeared at depths 8-9 and reversed by depth 10, with `g7f6` better than `g7h7`; not a clean candidate.
+- Tests: `node --test tests\reference_child_search_verifier.test.mjs tests\extract_first_disagreements.test.mjs tests\probe_child_pair_depths.test.mjs tests\run_candidate_discovery_pipeline.test.mjs tests\select_coach_child_gap_fens.test.mjs tests\select_depth_flip_fens.test.mjs` passed 11/11.
+- Decision: no engine candidate from these depth-flip rows. Keep the confirmation gate as a required filter before treating low-depth played-match flips as candidates.
+- Next targets: pivot to a materially different source, such as Lucas STS misses or another curated tactical packet, then require SF19/reference comparison plus Coach equal-depth child confirmation before patching.
+
+## 2026-10-05 - Depth-Flip Reporting Refinement
+
+- Status: diagnostic/tooling
+- Commit: n/a
+- Tooling: `tools\select-depth-flip-fens.mjs`
+- Change: added rejection counts, preliminary-candidate counts, and optional `--progress` output to make long confirmed depth-flip scans auditable while they run.
+- Verification: focused diagnostic stack passed 11/11 after the change. Real-data smoke `analysis-runs\tool-smoke-depth-flip-progress-20261005` audited 5 low-depth ShallowBlue 5+0 moves with `--progress` and selected 0 candidates while printing per-row rejection reasons.
+- Decision: no engine candidate; this is process hardening so future depth/time evidence does not waste hours on silent one-depth artifacts.
+- Next targets: use the progress/reporting path only for genuinely new played evidence. Existing STS, benchmark corpus, diagnostic-anchor, SF19 midgame, and current ShallowBlue depth-flip artifacts are already exhausted under the active gates.
+
+## 2026-10-05 - PGN Root-First SF19 Anchor-Opening Scan
+
+- Status: diagnostic
+- Commit: n/a
+- Source: `analysis-runs\sf19-anchor-openings-sf19-2400-44g-st1-20261004\match.pgn`
+- Extraction: `analysis-runs\pgn-rootfirst-sf19-anchor-openings-20261005\20261005-200941`
+- Result: extracted 140 Coach-side before-move positions from the 44-game SF19 anchor-opening fixed-1s match using `coach-analysis-lab` in cheap Coach-only depth-1 mode, fullmoves 8-45, sample-every 3, max 4 per game.
+- Strict root-first pipeline: `analysis-runs\candidate-discovery-pipeline-pgn-rootfirst-sf19-anchor-openings-20261005` audited all 140 positions at Coach root depth 7 with band >=80cp, top ties <=3, mate rows 0, and found 0 root-worklist rows. Rejections were dominated by `band<80=136` and `topTies>3=126`.
+- Loose-band follow-up: `analysis-runs\candidate-discovery-pipeline-pgn-rootfirst-sf19-anchor-openings-looseband-20261005` lowered the root band to 20cp while keeping top ties <=4. It found 3 root-worklist rows (`game25-before-8.Kg1`, `game7-before-8.c6`, `game28-before-11...h5`) and 0 child-gap candidates.
+- Survivor rejections: all 3 failed `gap<100` and `confirmRootDoesNotPreferAlternative`; confirm-root also collapsed below the loose band and/or into too many top ties. Best alternative gaps were `-489cp`, `-29cp`, and `-11cp`.
+- Decision: no engine candidate. This different upstream policy confirmed the same pattern: even when PGN extraction starts from Coach root shape instead of SF19 disagreement, the anchor-opening packet is dominated by root plateaus and the few low-band rows do not survive child/confirm gates.
+- Next targets: do not repeat this anchor-opening PGN packet. Further progress likely requires either fresh played evidence from a materially different opening/opponent/time-control policy, or a deeper calibration/tooling pass focused on why Coach root search produces broad equal-score plateaus in so many non-mate middlegame positions.
+
+## 2026-10-05 - Root Plateau Child-Score Audit
+
+- Status: diagnostic/tooling
+- Commit: n/a
+- Tooling: `tools\audit-root-plateau-child-scores.mjs`
+- Motivation: recent SF19 and PGN-root-first passes repeatedly rejected positions because Coach root tables were all-tied or broad plateaus. Add a focused audit that takes the top root-table moves, searches each as a full-window child, and classifies whether the plateau is true-flat or hiding meaningful child-score spread.
+- Verification: `node --test tests\audit_root_plateau_child_scores.test.mjs tests\select_coach_child_gap_fens.test.mjs tests\run_candidate_discovery_pipeline.test.mjs tests\select_depth_flip_fens.test.mjs tests\reference_child_search_verifier.test.mjs` passed 7/7.
+- Run: `analysis-runs\root-plateau-child-audit-sf19-midgame-material-rich-20261005`, auditing the 13 material-rich SF19 midgame first-disagreement rows from `analysis-runs\first-disagreements-sf19-midgame-material-rich-20261005`.
+- Result: 13/13 rows classified as `hidden-child-spread`. The root table band was 0cp on every row, but full-window child scores showed 181cp to 1049cp spread.
+- Key interpretation: the plateau is not because Coach's full child searches truly see all top moves as equal. Root reporting/score storage is flattening these rows, but current root ordering still placed the full-window child-score best move first on all 13 audited positions. Examples: `game3-before-10.Bb5` root band 0cp, child scores `f1b5:161`, `e5c4:139`, `e5g4:136`; `game9-before-12.Bxe5` root band 0cp, child scores `f4e5:4`, `d4e5:-116`, `d2e4:-154`; `game14-before-10...Qxf6` root band 0cp, child scores `d8f6:-6`, `g7f6:-68`, `c6e5:-798`.
+- Decision: no engine candidate. This explains why the SF19 midgame rows failed the active gate despite root-table flatness: the full-window child signal exists, but it supports Coach's current root ordering rather than exposing a better move.
+- Next targets: use this auditor to separate diagnostic/root-reporting artifacts from true move-choice candidates. A future root-score patch would need evidence that corrected child scores change a real move choice and still passes ShallowBlue smoke; do not patch merely to make root tables prettier.
+
+## 2026-10-05 - Root Plateau Move-Choice Disagreement Scan
+
+- Status: diagnostic/tooling
+- Commit: n/a
+- Tooling: `tools\audit-root-plateau-child-scores.mjs`
+- Change: extended the plateau auditor to classify `root-child-disagreement` when full-window child scoring prefers a different root move than the root table's top move by at least the configured margin.
+- Verification: `node --test tests\audit_root_plateau_child_scores.test.mjs` passed.
+- Run: `analysis-runs\root-plateau-child-audit-pgn-anchor-openings-20261005`, auditing the first 60 PGN-derived SF19 anchor-opening positions from `analysis-runs\pgn-rootfirst-sf19-anchor-openings-20261005\20261005-200941\candidate-regressions.fens`.
+- Result: no `root-child-disagreement` rows at the 100cp threshold. Class counts were `hidden-child-spread=46`, `mate-child=9`, `child-spread=3`, and `true-flat=2`.
+- Near misses: a few rows had child-best moves different from the root-table top move, but the gap versus the root-table top move was tiny, e.g. `game3-before-14.Qf6` +10cp, `game4-before-11...e5` +1cp, `game7-before-14.Na4` +10cp, `game9-before-11.Rd8` +5cp, `game10-before-8...Nd1` +4cp, `game10-before-14...Qe1` +14cp, `game11-before-17.Qa4` +24cp, and `game13-before-14.g4` +14cp.
+- Decision: no engine candidate. Root-score flattening clearly makes diagnostics misleading, but current evidence still does not show a meaningful root move-choice error caused by that flattening.
+- Next targets: use the disagreement classifier as a cheap stop rule on future plateau packets. Only consider a root-score/search patch if it finds a non-mate row where full-window child scoring prefers a different move by >=100cp and that preference survives confirmation.
+
+## 2026-10-05 - Accepted-Baseline Plateau Disagreement Scan
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\root-plateau-child-audit-shallowblue-baseline-sf19-pipeline-20261005`
+- Source: `analysis-runs\fresh-evidence-shallowblue1618-20g-5m0-20261004b\sf19-pipeline-m16-90-d8\20261004-073654\candidate-regressions.fens`
+- Baseline: active published head `2b70704`; preserve ShallowBlue 1618 `5+0` baseline `12 - 7 - 1 [0.625]`.
+- Result: audited 60 accepted-baseline ShallowBlue/SF19-pipeline rows at root depth 7 and child depth 7. Class counts were `hidden-child-spread=55`, `child-spread=2`, and `mate-child=3`; `root-child-disagreements.fens` was empty.
+- Interpretation: the same root-table plateau pattern appears in accepted-baseline evidence, but full-window child scoring did not prefer a different move by the 100cp threshold. The largest repeated near-miss was `game5/7/9/11/15-before-24.Kg1`, where child scoring preferred `f2f4` over root-table `f1g1` by only 13cp.
+- Decision: no engine candidate. This closes the accepted-baseline plateau-disagreement path unless future evidence produces a real non-mate move-choice disagreement.
+- Next targets: pivot away from plateau-disagreement scans on existing ShallowBlue/SF19 packets. Better next loops are either fresh evidence with a different opening/time policy, or a targeted SF19 tactical diagnostic that starts from direct reference-child confirmation rather than root-table disagreement.
+
+## 2026-10-05 - Reference-Child-First Diagnostic Gate
+
+- Status: diagnostic/tooling
+- Commit: n/a
+- Tooling: `tools\verify-reference-child-search.mjs`
+- Motivation: pivot the loop away from repeated root-plateau fishing by starting from SF19/reference move pairs and requiring Coach's own equal-depth child search to confirm a real non-mate gap before a row can become an engine candidate.
+- Anchor diagnostic pass: `analysis-runs\reference-child-sf19-anchor-diagnostics-d10-confirm12-20261005` audited 7 rows from `analysis-runs\sf19-anchor-diagnostics-20261004\sf19-anchor-d10\20261004-094925\results.json` with child depth 10, confirm depth 12, min diff 50cp, min gap 100cp, and root limit 8. It found 0 candidates; all rows failed `gap<100`, and 5/7 also had the reference move outside the top 8 root rows.
+- Benchmark corpus pass: `analysis-runs\reference-child-benchmark-corpus-d8-confirm10-20261005` audited 8 rows from `analysis-runs\benchmark-corpus-sf19-diagnostic-20261005\sf19-d8\20261004-203639\results.json` with child depth 8, confirm depth 10, min diff 100cp, min gap 100cp, and root limit 8. It found 0 candidates.
+- Wide-root follow-up: `analysis-runs\reference-child-benchmark-corpus-d8-confirm10-root20-20261005` briefly exposed `swing-game95-kc3-after` (`1RQ5/8/8/8/7r/P1K5/1P6/1k6 b - - 2 55`) as a possible row when root limit was widened to 20: Coach `b1a1`, reference `h4h2`, child gap 98740cp. Root-depth probing rejected it as a clean candidate because the position transitions into mate-class root/child scores by depths 9-10.
+- Mate classification: Coach-only depth-10 run `analysis-runs\single-swing-game95-rootmate-depth10-20261005\20261005-213318` reported `b1a2` with mate -5 and PV `b1a2 c8e6 a2b1 e6e1 b1a2 e1h4 a2a1 c3b3 a1b1 h4h1`; PV replay `analysis-runs\pv-static-replay-swing-game95-rootmate-depth10-20261005` showed this is a mate-horizon/root-mate diagnostic, not a non-mate eval candidate.
+- Tool hardening: `verify-reference-child-search.mjs` now rejects `mate-child-score` and `confirm-mate-child-score@dN` rows so mate-class child arithmetic cannot pass the active non-mate candidate gate. Hardened rerun `analysis-runs\reference-child-benchmark-corpus-d8-confirm10-root20-20261005-hardened` found 0 candidates and correctly rejected `swing-game95-kc3-after` with `mate-child-score`.
+- Verification: `node --check tools\verify-reference-child-search.mjs`; `node --test tests\reference_child_search_verifier.test.mjs tests\summarize_child_search_collapses.test.mjs tests\run_candidate_discovery_pipeline.test.mjs` passed 7/7.
+- Decision: no engine candidate accepted. The reference-child-first gate is useful and stricter, and it prevented a tempting mate-class false lead from entering the patch queue.
+- Next targets: keep using the hardened gate for candidate intake. If continuing from this evidence family, either create a dedicated false-mate/PV-validity sentinel for mate-horizon rows or generate fresh non-mate paired positions where the reference move is in Coach's top root rows and both child searches stay below mate-class thresholds.
+
+## 2026-10-06 - Hardened STS Reference-Child Intake
+
+- Status: diagnostic/tooling
+- Commit: n/a
+- Run: `analysis-runs\reference-child-lucas-sts-d8-confirm10-root20-20261006-hardened`
+- Source: `analysis-runs\lucas-sts-miss-packet-20261005\sf19-d8\20261004-194607\results.json`
+- Baseline: active published head `2b70704`; preserve ShallowBlue 1618 `5+0` baseline `12 - 7 - 1 [0.625]`.
+- Result: audited 11 Lucas STS rows with child depth 8, confirm depth 10, min diff 100cp, min gap 100cp, root limit 20, and mate-child filtering. It found 0 candidates.
+- Rejections: every row failed `gap<100`; one row also had `reference-not-in-top-20`. Best positive subthreshold gaps were `lucas-g2-i69-Open-Files-and-Diagonals` at 33cp, `lucas-g8-i66-Advancement-of-f-g-h-Pawns` at 21cp, `lucas-g13-i93-Pawn-Play-in-the-Center` at 14cp, and `lucas-g2-i61-Open-Files-and-Diagonals` at 10cp.
+- Tooling change: `verify-reference-child-search.mjs` now writes `reference-child-candidates.fens` and `reference-child-positive-subthreshold.fens` beside the JSON/Markdown audit. This makes the candidate funnel chainable and separates true non-mate candidates from calibration-only near misses.
+- Verification: `node --test tests\reference_child_search_verifier.test.mjs tests\summarize_child_search_collapses.test.mjs tests\run_candidate_discovery_pipeline.test.mjs` passed 7/7.
+- Decision: no engine candidate from the hardened STS intake. The curated STS packet is exhausted under the active non-mate, Coach-confirmed child-search gate.
+- Next targets: use the near-miss FEN file only for calibration, not patching. Further candidate discovery should generate fresh non-mate paired positions or improve first-divergence extraction so the reference move starts inside Coach's root candidate set with a confirmed >=100cp child gap.
+
+## 2026-10-06 - Hardened SF19 Anchor First-Disagreement Intake
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\reference-child-sf19-anchor-first-disagreements-d10-confirm12-root20-20261006`
+- Source: `analysis-runs\sf19-anchor-openings-sf19-2400-44g-st1-20261004\first-disagreements-d10\20261004-184701\results.json`
+- Baseline: active published head `2b70704`; preserve ShallowBlue 1618 `5+0` baseline `12 - 7 - 1 [0.625]`.
+- Result: audited 13 SF19 anchor-opening first-disagreement rows with child depth 10, confirm depth 12, min diff 100cp, min gap 100cp, root limit 20, and 12s per child. It found 0 candidates.
+- Rejections: every row failed `gap<100`; three rows also had `reference-not-in-top-20`. The only positive subthreshold row was `game8-before-9...Ne4`, where Coach `a1a3` vs reference `d2e4` had only an 8cp Coach child-search gap. All other rows were flat or Coach-favored under Coach child search.
+- Global collapse summary: `analysis-runs\child-search-collapse-summary-after-hardened-intake-20261006` scanned 48 verifier artifacts / 619 rows and reported 16 historical keepers plus 16 near misses. The apparent active-gate keepers are already accounted for by earlier ledger entries: `game15-ply151-g8R-before` is fixed-time depth/time evidence, `game12-ply100-f4-before` is the rejected exact root-tie smoke candidate, `game18-ply148-Ke5-before` collapses at deeper follow-up, and `game15-ply91-Kc1-before` was already rejected by confirmation/deeper-root checks.
+- Verification: `node --test tests\summarize_child_search_collapses.test.mjs tests\reference_child_search_verifier.test.mjs` passed 6/6.
+- Decision: no new engine candidate. The SF19 anchor first-disagreement packet is exhausted under the hardened non-mate, Coach-confirmed child-search gate.
+- Next targets: stop reusing existing SF19-anchor disagreement artifacts for candidate fishing. The next productive process step is fresh paired-position generation that pre-filters for reference move inside Coach root candidates and excludes mate-class child/root scores before expensive confirmation.
+
+## 2026-10-06 - Reference-Child Intake Root Prefilter
+
+- Status: tooling
+- Commit: n/a
+- Tooling: `tools\verify-reference-child-search.mjs`
+- Motivation: the hardened verifier could still stall on expensive root searches before reaching the child-search gate. Add a bounded root-search path and optional root prefilter so fresh paired-position generation can reject rows where the reference move is outside Coach's root window or root scores are mate-class before spending child-search time.
+- Change: added `--max-ms-per-root <ms>` and `--prefilter-root`. Root searches now honor a deadline when supplied, root timeouts are recorded as `root-timed`, and prefiltered rows record `prefilter-reference-not-in-top-N` or `prefilter-mate-root-score` reasons.
+- Real-data smoke: `analysis-runs\reference-child-sf19-anchor-first-disagreements-prefilter-capped-d10-confirm12-root20-20261006` reran the SF19 anchor first-disagreement packet with 12s root and child caps. It completed with 0 candidates; the only positive subthreshold row remained `game8-before-9...Ne4` at 8cp. Three rows were skipped by `prefilter-reference-not-in-top-20`; 12 rows recorded `root-timed`, making the bounded nature of the audit explicit.
+- Verification: `node --check tools\verify-reference-child-search.mjs`; `node --test tests\reference_child_search_verifier.test.mjs tests\summarize_child_search_collapses.test.mjs` passed 7/7.
+- Decision: no engine candidate; this is intake hardening. Use the capped prefilter mode for new broad scans so they fail fast and produce machine-readable reasons instead of hanging.
+- Next targets: generate fresh non-mate paired positions with `--prefilter-root`, root/child caps, and the existing mate-child filter; only chase rows in `reference-child-candidates.fens`.
+
+## 2026-10-06 - Broad SF19 Anchor Paired-Position Intake
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\reference-child-sf19-anchor-wide-prefilter-capped-d8-confirm10-root20-20261006`
+- Source: `analysis-runs\sf19-anchor-openings-sf19-2400-44g-st1-20261004\sf19-pipeline-wide-m8-120-d8\20261004-132209\results.json`
+- Baseline: active published head `2b70704`; preserve ShallowBlue 1618 `5+0` baseline `12 - 7 - 1 [0.625]`.
+- Result: audited the top 40 highest-diff different-move rows from the 237-position / 44-game SF19 anchor-opening packet using child depth 8, confirm depth 10, min diff 300cp, min gap 100cp, root limit 20, 10s root cap, 10s child cap, and `--prefilter-root`. It found 0 candidates.
+- Rejections: every row failed `gap<100`; 14 rows were `prefilter-reference-not-in-top-20`, 3 rows were mate-root rows, and 1 row had a mate-child score. Root caps made the hard rows explicit with `root-timed=36`.
+- Near misses: `reference-child-positive-subthreshold.fens` contains five calibration-only rows: `game13-before-15.Re3` at 29cp, `game10-before-9...exd5` at 2cp, `game6-before-9...Qd1` at 15cp, `game1-before-13.Rfe8` at 4cp, and `game6-before-10...Bh3` at 14cp. No row is close to the 100cp gate.
+- Verification: `node --test tests\reference_child_search_verifier.test.mjs tests\summarize_child_search_collapses.test.mjs` passed 7/7.
+- Decision: no engine candidate. The broad SF19 anchor-opening match evidence is exhausted under the capped, root-prefiltered, non-mate Coach-confirmed candidate gate.
+- Next targets: do not run more passes over this same 44-game anchor match unless a new upstream selector is created. Next useful evidence should be genuinely fresh played data or a new paired-position generator that constructs non-mate decision points with the reference move already inside Coach's root candidate window.
+
+## 2026-10-06 - Fresh SF19 Fixed-1s Paired-Position Intake
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\reference-child-fresh-sf19-st1-prefilter-capped-d8-confirm10-root20-20261006`
+- Source: `analysis-runs\fresh-evidence-sf19-2400-20g-st1-20261005\before-only\sf19-d8\20261004-232121\results.json`
+- Baseline: active published head `2b70704`; preserve ShallowBlue 1618 `5+0` baseline `12 - 7 - 1 [0.625]`.
+- Result: audited 18 high-diff different-move rows from the fresh SF19 2400 fixed-1s match using child depth 8, confirm depth 10, min diff 150cp, min gap 100cp, root limit 20, 10s root cap, 10s child cap, and `--prefilter-root`. It found 0 candidates.
+- Rejections: 17/18 failed `gap<100`; 4 mate-root rows were prefiltered. The only row with an initial gap over 100cp was the already-known `game15-ply151-g8R-before` (`g7g8r` vs `e6f7`, gap 183cp), but it was rejected with `root-timed` and remains classified as fixed-time depth/time evidence rather than a stable non-mate patch candidate.
+- Near misses: `reference-child-positive-subthreshold.fens` contains only `game17-ply163-Kc5-before` at 19cp and `game17-ply143-Kf5-before` at 74cp; both are calibration-only and below the active gate.
+- Decision: no engine candidate. This played SF19 fixed-1s packet is also exhausted under the capped, root-prefiltered, non-mate Coach-confirmed gate.
+- Next targets: stop reusing existing SF19 fixed-1s evidence for patch candidates. Either collect genuinely fresh played evidence or build a generator that actively searches for non-mate rows whose root searches complete under cap, reference move is inside Coach's root window, and child gap remains >=100cp through confirmation.
+
+## 2026-10-06 - Consolidated Reference-Child Intake Tooling
+
+- Status: diagnostic/tooling
+- Commit: n/a
+- Tooling: `tools\build-reference-child-intake.mjs`
+- Motivation: existing hardened reference-child verification worked one `results.json` at a time, which made broad scans tedious and encouraged repeated fishing in already-exhausted packets. Add a consolidated intake that scans many analysis artifacts, applies a cheap Coach root gate first, keeps only rows where the reference move is inside Coach's root window, and writes a verifier-ready synthetic analysis packet.
+- Change: new intake writes `reference-child-intake.json`, `reference-child-intake.md`, `reference-child-intake.analysis.json`, and `reference-child-intake.fens`. It supports root caps, file/label filters, and `--exclude-mate-comparisons` so active-goal scans can avoid mate-disagreement rows before child-search verification.
+- Verification: `node --test tests\build_reference_child_intake.test.mjs tests\reference_child_search_verifier.test.mjs tests\run_candidate_discovery_pipeline.test.mjs` passed 8/8 after the initial tool add; `node --test tests\build_reference_child_intake.test.mjs tests\reference_child_search_verifier.test.mjs` passed 7/7 after the non-mate filter. Later, `--file-order name|mtime-desc|mtime-asc` was added so global scans can prefer newest artifacts instead of truncating in old 2026-07 folders; `node --test tests\build_reference_child_intake.test.mjs` passed 2/2.
+- Global smoke: `analysis-runs\reference-child-intake-global-smoke-20261006` scanned 142 result files, audited 60 rows, selected 20 intake rows, then verified 20 rows at child depth 8 / confirm 10. It found 0 candidates; all rows failed `gap<100`, showing the first broad pass was dominated by mate-scale historical rows whose Coach child searches were flat or Coach-favored.
+- Non-mate smoke: `analysis-runs\reference-child-intake-global-nonmate-smoke-20261006` scanned the same global root with `--exclude-mate-comparisons`, audited 80 rows, selected 20, and verified 20. It found 0 candidates; rejection counts were `gap<100=20`, with `root-timed=4` and `mate-child-score=1`. Best printed near rows remained below the gate, including `game2-before-35.Bf4` at 83cp and `game2-before-39.Kg3` at 66cp.
+- Newest-first smoke: `analysis-runs\reference-child-intake-newest-nonmate-smoke-20261006` used `--file-order mtime-desc` plus `--exclude-mate-comparisons`, audited 80 newer rows, selected 20, and verified 20. It found 0 candidates. One row, `game19-ply205-Ka1`, had an initial depth-8 child gap of 179cp, but the verifier rejected it because the gap collapsed below 100cp at confirm depth 10.
+- Decision: no engine candidate accepted. This is useful process progress: future broad evidence passes can now consolidate scattered analysis results into a single hardened verifier input without letting known mate-horizon rows consume the candidate queue.
+- Next targets: use this tool on genuinely fresh SF19/ShallowBlue evidence or a curated new opening/evidence policy. Do not treat historical 2026-07 rows or already-ledgered accepted-baseline king endings as patch candidates unless they survive the full non-mate child-gap gate and a fresh root-depth probe.
+
+## 2026-10-06 - game19-ply205-Ka1 Root-Child Disagreement Probe
+
+- Status: rejected-candidate / diagnostic
+- Commit: n/a
+- Target: `8/6P1/5n2/1k6/8/p7/8/1K6 w - - 8 103`
+- Evidence: `analysis-runs\reference-child-intake-newest-nonmate-smoke-20261006\verified-d8-confirm10` exposed `game19-ply205-Ka1` as a near-hit: Coach `b1a1`, reference `b1c2`, gap 179cp at child depth 8, rejected by `confirm-gap<100@d10`.
+- Probe: `analysis-runs\child-pair-depths-game19-ply205-ka1-20261006` showed unstable child gaps by depth: 92cp at d6, -12cp at d7, 179cp at d8, -19cp at d9/d10, and 262cp at d11/d12.
+- Plateau audit: `analysis-runs\root-plateau-child-audit-game19-ply205-ka1-d12-20261006` classified the FEN as `root-child-disagreement` at root depth 12 / child depth 12: root band 0cp, child band 412cp, root best `b1a1`, child best `b1c1`, gap vs root best 268cp.
+- Candidate attempt: raising `ROOT_TIE_VERIFY_MAX_MOVES` from 6 to 8 was not enough to change the real root result. Adding a fresh TT for root-tie verification changed behavior broadly and broke existing sentinels (`root tie verification covers queen-rich low-piece endings` and `advanced-pawn quiet queen check is searched before promotion`), so that approach was reverted.
+- Verification after revert: `node --test tests\engine_regressions.test.mjs tests\root_tie_verification.test.mjs tests\build_reference_child_intake.test.mjs tests\probe_child_pair_depths.test.mjs` passed 76, skipped 67, failed 0.
+- Decision: no accepted engine candidate. This is a valuable diagnostic target showing a real full-child/root-table disagreement, but the obvious root-tie verification levers are either insufficient or too broad.
+- Next targets: investigate why root-tie verification with the existing TT cannot reproduce the fresh per-child score spread, without clearing/replacing TT globally. Any future patch must preserve the two root-tie sentinels above and then pass the normal regression, stability, and ShallowBlue smoke gates.
+
+## 2026-10-06 - Sparse Knight-Pawn Root-Tie Per-Move TT Isolation
+
+- Status: accepted-narrow
+- Commit: n/a
+- Run: `analysis-runs\candidate-sparse-knightpawn-root-tie-shallowblue1618-20g-5m0-20261006`
+- Result: Coach vs ShallowBlue 1618 `5+0`: `15 - 1 - 4 [0.850] 20`; Coach as White `7 - 1 - 2 [0.800]`, Coach as Black `8 - 0 - 2 [0.900]`.
+- Target: `8/6P1/5n2/1k6/8/p7/8/1K6 w - - 8 103`
+- Baseline: active published head `2b70704`; preserve ShallowBlue 1618 `5+0` baseline `12 - 7 - 1 [0.625]`.
+- Change: in very sparse endings only (`nonPawnMaterial <= 1`), root-tie verification checks up to 8 tied moves and uses an isolated fresh TT per verified root move. This keeps the earlier broad fresh-TT idea out of queen-rich/advanced-pawn sentinels that it broke.
+- Local result: depth-12 root probe now chooses `b1c2` at `-309cp` instead of plateauing on `b1a1`; the candidate audit `analysis-runs\root-plateau-child-audit-game19-ply205-ka1-candidate-d12-20261006` reports `child-spread=1` and no root-child disagreement.
+- Tests: `node --test tests\root_tie_verification.test.mjs tests\engine_regressions.test.mjs` passed 72/72 with 67 skipped; `node --test tests\diagnose_root_tie_tt.test.mjs tests\build_reference_child_intake.test.mjs tests\probe_child_pair_depths.test.mjs tests\reference_child_search_verifier.test.mjs tests\summarize_child_search_collapses.test.mjs` passed 13/13.
+- Stability: `analysis-runs\candidate-sparse-knightpawn-root-tie-stability-short-20261006` passed stability-short versus temporary worktree `analysis-runs\bench-baseline-2b70704`; SearchStable OK, tree shape unchanged, PV changes 0, root-order changes 0, candidate timing 1.063% faster.
+- Mining: `swing-mining` found 13 swings over 1481 scored Coach moves: 1 entered-losing-mate, 2 centipawn drops, and 10 mate-score changes. The only loss was game 9 as White; repeated mate-score-change rows mostly came from won promotion races.
+- Decision: accepted-narrow because the exact sentinel is fixed, focused and regression tests pass, stability-short is SearchStable, and the 20-game ShallowBlue 1618 `5+0` smoke improves over the active `12 - 7 - 1 [0.625]` baseline without match-score regression.
+- Next targets: commit/push this candidate if Sir Slice wants to publish it; keep game9-ply139-Kg7 (`7R/2p2K2/8/p3r1k1/P7/5r2/1pp5/8 w - - 2 70`) as a future loss-mining target, not a blocker for this accepted candidate.

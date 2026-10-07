@@ -404,6 +404,8 @@ const ROOT_EXTENDED_ENDING_TIE_VERIFY_SCORE_FLOOR = 1000;
 
 const ROOT_TIE_VERIFY_MAX_MOVES = 6;
 
+const ROOT_TIE_VERIFY_LOW_NON_PAWN_MAX_MOVES = 8;
+
 const ROOT_TIE_VERIFY_SCORE_TOLERANCE = 10;
 
 const ROOT_TIE_VERIFY_MAX_NON_PAWN_MATERIAL = 4;
@@ -607,6 +609,8 @@ export default class Search {
 
         const scoreFloor =
             this.rootTieVerificationScoreFloor();
+        const nonPawnMaterial =
+            this.rootTieVerificationNonPawnMaterial();
 
         if (
             depth < ROOT_TIE_VERIFY_MIN_DEPTH ||
@@ -622,11 +626,15 @@ export default class Search {
 
         const topScore =
             result.rootMoves[0].score;
+        const verifyMaxMoves =
+            nonPawnMaterial <= 1
+                ? ROOT_TIE_VERIFY_LOW_NON_PAWN_MAX_MOVES
+                : ROOT_TIE_VERIFY_MAX_MOVES;
 
         const tiedMoves =
             result.rootMoves
                 .filter(rootMove => rootMove.score === topScore)
-                .slice(0, ROOT_TIE_VERIFY_MAX_MOVES);
+                .slice(0, verifyMaxMoves);
 
         if (tiedMoves.length < 2) {
             return result;
@@ -637,9 +645,24 @@ export default class Search {
             score: -SearchConstants.INFINITY
         };
 
+        const useIsolatedVerificationTable =
+            nonPawnMaterial <= 1;
+        const searchTable =
+            this.tt;
+
         try {
 
             for (const rootMove of tiedMoves) {
+
+                if (useIsolatedVerificationTable) {
+
+                    const verificationTable =
+                        new TranspositionTable(searchTable.sizeMB);
+
+                    verificationTable.age = searchTable.age;
+                    this.tt = verificationTable;
+
+                }
 
                 this.board.makeMove(rootMove.move);
 
@@ -661,6 +684,10 @@ export default class Search {
                 finally {
 
                     this.board.undoMove();
+
+                    if (useIsolatedVerificationTable) {
+                        this.tt = searchTable;
+                    }
 
                 }
 

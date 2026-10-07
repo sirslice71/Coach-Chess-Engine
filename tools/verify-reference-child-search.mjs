@@ -12,8 +12,9 @@ function usage() {
         "Usage: node tools/verify-reference-child-search.mjs " +
         "--analysis <coach-analysis-lab results.json> [--repo <Coach repo>] " +
         "[--child-depth 7] [--max-positions <n>] [--min-diff <cp>] " +
-        "[--min-gap <cp>] [--root-limit <n>] [--max-ms-per-child <ms>] " +
-        "[--confirm-child-depth <n|analysis|off>] [--out <dir>]"
+        "[--min-gap <cp>] [--root-limit <n>] [--max-ms-per-root <ms>] " +
+        "[--max-ms-per-child <ms>] " +
+        "[--confirm-child-depth <n|analysis|off>] [--prefilter-root] [--out <dir>]"
     );
 }
 
@@ -26,8 +27,10 @@ function parseArgs(argv) {
         minDiff: 150,
         minGap: 100,
         rootLimit: 16,
+        maxMsPerRoot: null,
         maxMsPerChild: null,
         confirmChildDepth: "analysis",
+        prefilterRoot: false,
         out: null
     };
 
@@ -55,6 +58,9 @@ function parseArgs(argv) {
         else if (token === "--root-limit") {
             args.rootLimit = Number.parseInt(argv[++index], 10);
         }
+        else if (token === "--max-ms-per-root") {
+            args.maxMsPerRoot = Number.parseInt(argv[++index], 10);
+        }
         else if (token === "--max-ms-per-child") {
             args.maxMsPerChild = Number.parseInt(argv[++index], 10);
         }
@@ -70,6 +76,9 @@ function parseArgs(argv) {
             else {
                 args.confirmChildDepth = Number.parseInt(value, 10);
             }
+        }
+        else if (token === "--prefilter-root") {
+            args.prefilterRoot = true;
         }
         else if (token === "--out") {
             args.out = argv[++index];
@@ -93,6 +102,16 @@ function parseArgs(argv) {
         if (!Number.isInteger(value) || value < 0) {
             throw new Error(`${name} must be a non-negative integer`);
         }
+    }
+
+    if (
+        args.maxMsPerRoot !== null &&
+        (
+            !Number.isInteger(args.maxMsPerRoot) ||
+            args.maxMsPerRoot <= 0
+        )
+    ) {
+        throw new Error("--max-ms-per-root must be a positive integer");
     }
 
     if (
@@ -144,6 +163,11 @@ function scoreText(score) {
 
 function isMateScore(score) {
     return Math.abs(score) >= MATE_THRESHOLD;
+}
+
+function hasMateChildScore(child) {
+    return Number.isFinite(child?.childRootSideScore) &&
+        isMateScore(child.childRootSideScore);
 }
 
 function whiteEvalToRootSideCp(whiteEvalText, rootSideToMove) {
@@ -293,6 +317,40 @@ function childSearchForMove({
     };
 }
 
+function rootSearch({
+    rootEngine,
+    rootDepth,
+    maxMsPerRoot,
+    uciModule
+}) {
+    const startMs =
+        performance.now();
+    const deadlineMs =
+        maxMsPerRoot === null
+            ? null
+            : startMs + maxMsPerRoot;
+    const search =
+        uciModule.withMutedConsole(
+            () => rootEngine.search.bestMove(
+                rootDepth,
+                {
+                    quiet: true,
+                    ...(deadlineMs === null ? {} : { deadlineMs })
+                }
+            )
+        );
+    const elapsedMs =
+        performance.now() - startMs;
+
+    return {
+        ...search,
+        elapsedMs,
+        timed:
+            maxMsPerRoot !== null &&
+            elapsedMs >= maxMsPerRoot
+    };
+}
+
 function inferConfirmChildDepth(args, position) {
     if (args.confirmChildDepth === null) {
         return null;
@@ -337,8 +395,23 @@ function classify(args, item) {
         reasons.push(`reference-not-in-top-${args.rootLimit}`);
     }
 
+    if (item.prefilterReason) {
+        reasons.push(item.prefilterReason);
+    }
+
+    if (item.rootTimed) {
+        reasons.push("root-timed");
+    }
+
     if (item.gapCp === null || item.gapCp < args.minGap) {
         reasons.push(`gap<${args.minGap}`);
+    }
+
+    if (
+        hasMateChildScore(item.coachChild) ||
+        hasMateChildScore(item.referenceChild)
+    ) {
+        reasons.push("mate-child-score");
     }
 
     if (item.confirmation) {
@@ -362,6 +435,13 @@ function classify(args, item) {
                 `confirm-gap<${args.minGap}@d${item.confirmation.childDepth}`
             );
         }
+
+        if (
+            hasMateChildScore(item.confirmation.coachChild) ||
+            hasMateChildScore(item.confirmation.referenceChild)
+        ) {
+            reasons.push(`confirm-mate-child-score@d${item.confirmation.childDepth}`);
+        }
     }
 
     if (
@@ -381,6 +461,26 @@ function classify(args, item) {
     };
 }
 
+function gapClass(args, gapCp) {
+    if (!Number.isFinite(gapCp)) {
+        return "unknown";
+    }
+
+    if (gapCp >= args.minGap) {
+        return "candidate";
+    }
+
+    if (gapCp > 0) {
+        return "positive-subthreshold";
+    }
+
+    if (gapCp === 0) {
+        return "flat";
+    }
+
+    return "coach-favored";
+}
+
 async function analyzePosition(row, args, uciModule) {
     const { position, diffCp } = row;
     const fen = position.fen;
@@ -392,12 +492,82 @@ async function analyzePosition(row, args, uciModule) {
         rootEngine.board.sideToMove;
 
     const root =
-        uciModule.withMutedConsole(
-            () => rootEngine.search.bestMove(
-                Math.max(1, args.childDepth + 1),
-                { quiet: true }
-            )
+        rootSearch({
+            rootEngine,
+            rootDepth: Math.max(1, args.childDepth + 1),
+            maxMsPerRoot: args.maxMsPerRoot,
+            uciModule
+        });
+
+    const coachRootScore =
+        rootScore(root, coachMove);
+    const referenceRootScore =
+        rootScore(root, referenceMove);
+    const referenceInRootLimit =
+        moveInRootRows(root, referenceMove, args.rootLimit);
+    const rootHasMateScore =
+        coachRootScore !== null &&
+        referenceRootScore !== null &&
+        (
+            isMateScore(coachRootScore) ||
+            isMateScore(referenceRootScore)
         );
+
+    if (
+        args.prefilterRoot &&
+        (
+            !referenceInRootLimit ||
+            rootHasMateScore
+        )
+    ) {
+        const item = {
+            label: position.label,
+            fen,
+            diffCp,
+            coachMove,
+            referenceMove,
+            coachScore: position.coach.score ?? null,
+            referenceScore: position.reference.score ?? null,
+            rootBest: root.uci,
+            rootTimed: root.timed === true,
+            coachRootRank: rootRank(root, coachMove),
+            referenceRootRank: rootRank(root, referenceMove),
+            coachRootScore,
+            referenceRootScore,
+            referenceInRootLimit,
+            rootTopTieCount:
+                (root.rootMoves || []).filter(rootMove =>
+                    rootMove.score === root.rootMoves?.[0]?.score
+                ).length,
+            coachChild: {
+                move: coachMove,
+                legal: true,
+                skipped: true
+            },
+            referenceChild: {
+                move: referenceMove,
+                legal: true,
+                skipped: true
+            },
+            gapCp: null,
+            gapClass: "unknown",
+            prefilterReason:
+                !referenceInRootLimit
+                    ? `prefilter-reference-not-in-top-${args.rootLimit}`
+                    : "prefilter-mate-root-score"
+        };
+        const classification =
+            classify(args, item);
+
+        return {
+            ...item,
+            keep: false,
+            reasons: classification.reasons,
+            score:
+                diffCp -
+                (item.referenceRootRank ?? 100) * 5
+        };
+    }
 
     const coachChild =
         childSearchForMove({
@@ -435,19 +605,20 @@ async function analyzePosition(row, args, uciModule) {
         coachScore: position.coach.score ?? null,
         referenceScore: position.reference.score ?? null,
         rootBest: root.uci,
+        rootTimed: root.timed === true,
         coachRootRank: rootRank(root, coachMove),
         referenceRootRank: rootRank(root, referenceMove),
-        coachRootScore: rootScore(root, coachMove),
-        referenceRootScore: rootScore(root, referenceMove),
-        referenceInRootLimit:
-            moveInRootRows(root, referenceMove, args.rootLimit),
+        coachRootScore,
+        referenceRootScore,
+        referenceInRootLimit,
         rootTopTieCount:
             (root.rootMoves || []).filter(rootMove =>
                 rootMove.score === root.rootMoves?.[0]?.score
             ).length,
         coachChild,
         referenceChild,
-        gapCp
+        gapCp,
+        gapClass: gapClass(args, gapCp)
     };
 
     let classification =
@@ -541,6 +712,9 @@ function buildMarkdown(args, payload) {
         `- Minimum eval diff: ${args.minDiff}cp`,
         `- Minimum child gap: ${args.minGap}cp`,
         `- Root limit: ${args.rootLimit}`,
+        args.maxMsPerRoot === null
+            ? "- Max ms per root: none"
+            : `- Max ms per root: ${args.maxMsPerRoot}`,
         args.maxMsPerChild === null
             ? "- Max ms per child: none"
             : `- Max ms per child: ${args.maxMsPerChild}`,
@@ -551,8 +725,8 @@ function buildMarkdown(args, payload) {
         `- Audited: ${payload.summary.audited}`,
         `- Rejection counts: ${formatCounts(payload.summary.rejectionCounts) || "none"}`,
         "",
-        "| Keep | Label | Diff | Coach | Coach child | Ref | Ref child | Gap | Ref rank | Root ties | Reasons | FEN |",
-        "| --- | --- | ---: | --- | ---: | --- | ---: | ---: | ---: | ---: | --- | --- |"
+        "| Keep | Label | Diff | Coach | Coach child | Ref | Ref child | Gap | Gap class | Ref rank | Root ties | Reasons | FEN |",
+        "| --- | --- | ---: | --- | ---: | --- | ---: | ---: | --- | ---: | ---: | --- | --- |"
     ];
 
     for (const item of payload.rows) {
@@ -565,6 +739,7 @@ function buildMarkdown(args, payload) {
             `${item.referenceMove} ${scoreText(item.referenceScore)}`,
             item.referenceChild.childRootSideScore ?? "",
             item.gapCp ?? "",
+            item.gapClass ?? "unknown",
             item.referenceRootRank ?? "",
             item.rootTopTieCount ?? "",
             escapeMarkdown(item.reasons.join(", ")),
@@ -573,6 +748,17 @@ function buildMarkdown(args, payload) {
     }
 
     return lines.join("\n") + "\n";
+}
+
+function fenLine(item) {
+    return `${item.label} | ${item.fen}`;
+}
+
+function writeFenList(outDir, fileName, rows) {
+    fs.writeFileSync(
+        path.join(outDir, fileName),
+        rows.map(fenLine).join("\n") + (rows.length > 0 ? "\n" : "")
+    );
 }
 
 async function main() {
@@ -631,6 +817,21 @@ async function main() {
             path.join(args.out, "reference-child-search.md"),
             buildMarkdown(args, payload)
         );
+
+        writeFenList(
+            args.out,
+            "reference-child-candidates.fens",
+            verified.filter(item => item.keep)
+        );
+
+        writeFenList(
+            args.out,
+            "reference-child-positive-subthreshold.fens",
+            verified.filter(item =>
+                !item.keep &&
+                item.gapClass === "positive-subthreshold"
+            )
+        );
     }
 
     console.log(
@@ -662,6 +863,7 @@ if (isMain) {
 
 export {
     classify,
+    gapClass,
     inferConfirmChildDepth,
     parseArgs
 };

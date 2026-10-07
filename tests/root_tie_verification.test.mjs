@@ -85,6 +85,34 @@ test("sparse rook-pawn root tie rollback preserves stable pawn push", () => {
 
 });
 
+test("sparse knight-pawn ending verifies each tied king move independently", () => {
+
+    const search =
+        createSearch(
+            "8/6P1/5n2/1k6/8/p7/8/1K6 w - - 8 103"
+        );
+
+    const result =
+        search.bestMove(12, { quiet: true });
+
+    assert.equal(
+        moveToUci(result.move),
+        "b1c2"
+    );
+
+    const rootScores =
+        new Map(
+            result.rootMoves.map(rootMove => [
+                rootMove.uci,
+                rootMove.score
+            ])
+        );
+
+    assert.equal(rootScores.get("b1c2"), -309);
+    assert.equal(rootScores.get("b1a1"), -577);
+
+});
+
 test("rollback removes sparse root-tie tolerance helper", () => {
 
     const search =
