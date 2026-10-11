@@ -3008,6 +3008,52 @@ test("quiescence move generation includes only capped quiet forcing moves", () =
 
 });
 
+test("quiescence limits quiet queen checks only in the sparse mixed-material window", () => {
+
+    const gatedMoves =
+        createEngine("4k3/8/8/8/8/8/P3Q3/RN2K3 w - - 0 1")
+            .search.generateQuiescenceMoves(0)
+            .map(moveToUci);
+    const ultraSparseMoves =
+        createEngine("4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1")
+            .search.generateQuiescenceMoves(0)
+            .map(moveToUci);
+    const richMoves =
+        createEngine("4k3/8/8/8/8/8/4Q3/RNB1KBNR w - - 0 1")
+            .search.generateQuiescenceMoves(0)
+            .map(moveToUci);
+
+    assert.equal(
+        gatedMoves.includes("e2e7"),
+        false,
+        "mixed-material sparse qsearch should not extend a quiet queen check"
+    );
+    assert.equal(
+        ultraSparseMoves.includes("e2e7"),
+        true,
+        "ultra-sparse queen conversion should retain quiet queen checks"
+    );
+    assert.equal(
+        richMoves.includes("e2e7"),
+        true,
+        "material-rich qsearch should retain quiet queen checks"
+    );
+
+});
+
+slowSearchTest("sparse queen-check qsearch does not report false mate", () => {
+
+    const fen =
+        "8/4NKP1/5P1k/3R3P/2q5/8/8/8 b - - 18 76";
+    const result =
+        searchBestMove(fen, 11);
+
+    assert.ok(
+        Math.abs(result.rootMoves[0].score) < SearchConstants.MATE_THRESHOLD,
+        `expected a centipawn score, got ${result.rootMoves[0].score}`
+    );
+});
+
 test("quiescence does not prune a winning capture when the only recapturer is absolutely pinned", () => {
 
     const {

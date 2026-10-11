@@ -174,6 +174,13 @@ const MAX_Q_CHECK_PLY = MAX_Q_PLY;
 
 const MAX_Q_QUIET_FORCING_PLY = 1;
 
+// Quiet queen checks in sparse mixed-material positions can
+// create a false mate horizon while ultra-sparse promotion
+// conversions rely on the same qsearch resource. Keep the gate
+// between those two observed classes.
+const QSEARCH_QUIET_QUEEN_MIN_NON_KING_PIECES = 4;
+const QSEARCH_QUIET_QUEEN_MAX_NON_KING_PIECES = 6;
+
 //----------------------------------
 // Principal Variation Search (PVS)
 //
@@ -583,6 +590,8 @@ export default class Search {
                 continue;
             }
 
+            const movingPiece =
+                Math.abs(this.board.pieceAt(move.fromSquare));
             this.board.makeMove(move);
 
             let givesCheck;
@@ -595,7 +604,16 @@ export default class Search {
                 this.board.undoMove();
             }
 
-            if (givesCheck) {
+            if (
+                givesCheck &&
+                !(
+                    movingPiece === Math.abs(Piece.WQ) &&
+                    this.board.pieceCount() >=
+                        QSEARCH_QUIET_QUEEN_MIN_NON_KING_PIECES &&
+                    this.board.pieceCount() <=
+                        QSEARCH_QUIET_QUEEN_MAX_NON_KING_PIECES
+                )
+            ) {
                 quietForcingMoves.push(move);
             }
 
