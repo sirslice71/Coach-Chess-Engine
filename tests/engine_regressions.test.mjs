@@ -3141,6 +3141,115 @@ test("lazy quiet generation falls back for sparse and promotion-ready positions"
 
 });
 
+test("qsearch TT reuses exact entries without leaking board state", () => {
+
+    const { board, search } =
+        createEngine(
+            "r3k2r/pp3ppp/8/8/8/8/PP3PPP/R3K2R w KQkq - 0 1"
+        );
+    const before = snapshotBoard(board);
+    const previous = Search.QSEARCH_TT;
+
+    try {
+        Search.QSEARCH_TT = true;
+
+        const first = search.quiescence(
+            -SearchConstants.INFINITY,
+            SearchConstants.INFINITY,
+            3,
+            0
+        );
+        const storesAfterFirst = search.qttStores;
+        const second = search.quiescence(
+            -SearchConstants.INFINITY,
+            SearchConstants.INFINITY,
+            5,
+            0
+        );
+
+        assert.equal(second, first);
+        assert.equal(storesAfterFirst, 1);
+        assert.equal(search.qttHits, 1);
+        assert.equal(search.qttCutoffs, 1);
+        assert.equal(search.qttStores, 1);
+        assert.notEqual(
+            search.qsearchTableKey(board.hashKey, 0),
+            search.qsearchTableKey(board.hashKey, 1)
+        );
+        assert.notEqual(
+            search.qsearchTableKey(board.hashKey, 0, 0),
+            search.qsearchTableKey(board.hashKey, 0, 1)
+        );
+        assertBoardSnapshot(board, before);
+    }
+    finally {
+        Search.QSEARCH_TT = previous;
+    }
+
+});
+
+test("qsearch TT stays disabled in sparse conversion positions", () => {
+
+    const { search } = createEngine(
+        "8/6P1/5n2/1k6/8/p7/8/1K6 w - - 8 103"
+    );
+    const previous = Search.QSEARCH_TT;
+
+    try {
+        Search.QSEARCH_TT = true;
+        search.quiescence(
+            -SearchConstants.INFINITY,
+            SearchConstants.INFINITY,
+            0,
+            0
+        );
+
+        assert.equal(search.qttProbes, 0);
+        assert.equal(search.qttStores, 0);
+    }
+    finally {
+        Search.QSEARCH_TT = previous;
+    }
+
+});
+
+test("qsearch TT preserves the exact fixed-depth root result", () => {
+
+    const fen =
+        "r2qk2r/ppp2ppp/2n1bn2/3pp3/3PP3/2N2N2/PPP2PPP/R1BQKB1R w KQkq - 0 1";
+    const previous = Search.QSEARCH_TT;
+    let baseline;
+    let candidate;
+    let candidateSearch;
+
+    try {
+        Search.QSEARCH_TT = false;
+        baseline = searchBestMove(fen, 4);
+
+        Search.QSEARCH_TT = true;
+
+        const engine = createEngine(fen);
+        candidateSearch = engine.search;
+        candidate = withMutedConsole(
+            () => candidateSearch.bestMove(4)
+        );
+    }
+    finally {
+        Search.QSEARCH_TT = previous;
+    }
+
+    assert.equal(candidate.uci, baseline.uci);
+    assert.equal(candidate.rootMoves[0].score, baseline.rootMoves[0].score);
+    assert.deepEqual(
+        candidate.rootMoves.map(row => [row.uci, row.score]),
+        baseline.rootMoves.map(row => [row.uci, row.score])
+    );
+    assert.equal(candidate.nodes, baseline.nodes);
+    assert.ok(candidate.leafNodes < baseline.leafNodes);
+    assert.ok(candidateSearch.qttCutoffs > 0);
+
+});
+
 test("LMR-active search leaves board, hash, material, and piece lists untouched", () => {
 
     const { board, search } =

@@ -1379,6 +1379,11 @@ test("setoption Hash updates internal TT size safely", () => {
         64
     );
 
+    assert.equal(
+        session.engine.search.qtt.sizeMB,
+        8
+    );
+
 });
 
 test("setoption Hash clamps low, high, and non-numeric values safely", () => {
@@ -1402,6 +1407,11 @@ test("setoption Hash clamps low, high, and non-numeric values safely", () => {
     assert.equal(
         session.hashSizeMB,
         512
+    );
+
+    assert.equal(
+        session.engine.search.qtt.sizeMB,
+        8
     );
 
     session.handleCommand(
@@ -1589,8 +1599,21 @@ test("setoption Clear Hash clears TT safely", () => {
         null
     );
 
+    session.engine.search.qtt.store(
+        2n,
+        0,
+        0,
+        0,
+        null
+    );
+
     assert.equal(
         session.engine.search.tt.stores,
+        1
+    );
+
+    assert.equal(
+        session.engine.search.qtt.stores,
         1
     );
 
@@ -1605,6 +1628,16 @@ test("setoption Clear Hash clears TT safely", () => {
 
     assert.equal(
         session.engine.search.tt.hits,
+        0
+    );
+
+    assert.equal(
+        session.engine.search.qtt.stores,
+        0
+    );
+
+    assert.equal(
+        session.engine.search.qtt.hits,
         0
     );
 

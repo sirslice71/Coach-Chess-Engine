@@ -297,6 +297,12 @@ const REVERSE_FUTILITY_DEPTH = 1;
 
 const REVERSE_FUTILITY_MARGIN = 300;
 
+const QSEARCH_TT_SIZE_DIVISOR = 4;
+const QSEARCH_TT_MAX_MB = 8;
+const QSEARCH_TT_MIN_NON_KING_PIECES = 10;
+const QSEARCH_TT_HASH_MIX = 0x9e3779b97f4a7c15n;
+const QSEARCH_TT_HASH_MASK = (1n << 64n) - 1n;
+
 //----------------------------------
 // Check Extension (near-horizon only, budget-capped v2)
 //
@@ -435,6 +441,22 @@ export default class Search {
         typeof process === "undefined" ||
         process.env?.COACH_LAZY_QUIET_MOVE_GENERATION !== "0";
 
+    static QSEARCH_TT =
+        typeof process === "undefined" ||
+        process.env?.COACH_QSEARCH_TT !== "0";
+
+    static qsearchTableSizeMB(hashSizeMB) {
+
+        return Math.min(
+            QSEARCH_TT_MAX_MB,
+            Math.max(
+                1,
+                Math.floor(hashSizeMB / QSEARCH_TT_SIZE_DIVISOR)
+            )
+        );
+
+    }
+
     constructor(board, legalMoveGenerator, evaluation) {
 
         this.board = board;
@@ -504,6 +526,9 @@ export default class Search {
         //----------------------------------
 
         this.tt = new TranspositionTable();
+        this.qtt = new TranspositionTable(
+            Search.qsearchTableSizeMB(this.tt.sizeMB)
+        );
         
         this.rootBestMove = null;
 
@@ -520,6 +545,10 @@ export default class Search {
         this.lazyMovePickerNodes = 0;
         this.lazyQuietGenerationCalls = 0;
         this.lazyQuietGenerationSkips = 0;
+        this.qttProbes = 0;
+        this.qttHits = 0;
+        this.qttCutoffs = 0;
+        this.qttStores = 0;
 
         //----------------------------------
         // History Heuristic
@@ -680,6 +709,8 @@ export default class Search {
             nonPawnMaterial <= 1;
         const searchTable =
             this.tt;
+        const qsearchTable =
+            this.qtt;
 
         try {
 
@@ -692,6 +723,12 @@ export default class Search {
 
                     verificationTable.age = searchTable.age;
                     this.tt = verificationTable;
+
+                    const qsearchVerificationTable =
+                        new TranspositionTable(qsearchTable.sizeMB);
+
+                    qsearchVerificationTable.age = qsearchTable.age;
+                    this.qtt = qsearchVerificationTable;
 
                 }
 
@@ -718,6 +755,7 @@ export default class Search {
 
                     if (useIsolatedVerificationTable) {
                         this.tt = searchTable;
+                        this.qtt = qsearchTable;
                     }
 
                 }
@@ -1066,6 +1104,7 @@ export default class Search {
             const startNodes = this.nodes;
 
             this.tt.nextAge();
+            this.qtt.nextAge();
 
             let alpha = -SearchConstants.INFINITY;
             let beta  =  SearchConstants.INFINITY;
@@ -2563,6 +2602,102 @@ export default class Search {
             return SearchConstants.DRAW;
         }
 
+        const alphaOriginal = alpha;
+        const repetitionHistory =
+            this.hasRepetitionHistory();
+        const qttEligible =
+            Search.QSEARCH_TT &&
+            !repetitionHistory &&
+            this.board.pieceCount() >=
+                QSEARCH_TT_MIN_NON_KING_PIECES;
+        const qttKey =
+            qttEligible
+                ? this.qsearchTableKey(
+                    this.board.hashKey,
+                    qPly,
+                    this.board.halfMoveClock
+                )
+                : null;
+
+        if (qttEligible) {
+
+            this.qttProbes++;
+
+            const qttEntry =
+                this.qtt.probe(qttKey);
+
+            if (qttEntry) {
+
+                this.qttHits++;
+
+                const qttScore =
+                    scoreFromTT(
+                        qttEntry.score,
+                        ply
+                    );
+
+                if (qttEntry.flag === TTFlag.EXACT) {
+                    this.qttCutoffs++;
+                    return qttScore;
+                }
+
+                if (
+                    qttEntry.flag === TTFlag.LOWER &&
+                    qttScore >= beta
+                ) {
+                    this.qttCutoffs++;
+                    return beta;
+                }
+
+                if (
+                    qttEntry.flag === TTFlag.UPPER &&
+                    qttScore <= alpha
+                ) {
+                    this.qttCutoffs++;
+                    return alpha;
+                }
+
+            }
+
+        }
+
+        const score =
+            this.searchQuiescenceNode(
+                alpha,
+                beta,
+                ply,
+                qPly
+            );
+
+        if (qttEligible) {
+
+            let flag = TTFlag.EXACT;
+
+            if (score <= alphaOriginal) {
+                flag = TTFlag.UPPER;
+            }
+            else if (score >= beta) {
+                flag = TTFlag.LOWER;
+            }
+
+            this.qtt.store(
+                qttKey,
+                0,
+                scoreToTT(score, ply),
+                flag,
+                null
+            );
+
+            this.qttStores++;
+
+        }
+
+        return score;
+
+    }
+
+    searchQuiescenceNode(alpha, beta, ply, qPly) {
+
         const inCheck = this.board.isInCheck();
 
         //----------------------------------
@@ -2727,6 +2862,25 @@ export default class Search {
             return alpha;
 
         }
+
+    }
+
+    qsearchTableKey(
+        hash,
+        qPly,
+        halfMoveClock = this.board.halfMoveClock
+    ) {
+
+        const context =
+            BigInt(qPly + 1) |
+            (BigInt(halfMoveClock + 1) << 8n);
+        const contextMix =
+            (
+                context *
+                QSEARCH_TT_HASH_MIX
+            ) & QSEARCH_TT_HASH_MASK;
+
+        return hash ^ contextMix;
 
     }
 
@@ -3018,6 +3172,7 @@ export default class Search {
     bench(depth = 5) {
 
         this.tt.clear();
+        this.qtt.clear();
 
         this.killers = [];
 
@@ -3188,6 +3343,10 @@ export default class Search {
         this.lazyMovePickerNodes = 0;
         this.lazyQuietGenerationCalls = 0;
         this.lazyQuietGenerationSkips = 0;
+        this.qttProbes = 0;
+        this.qttHits = 0;
+        this.qttCutoffs = 0;
+        this.qttStores = 0;
 
         this.board.profileMakeMove = 0;
         this.board.profileUndoMove = 0;

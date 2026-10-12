@@ -881,6 +881,10 @@ export class UciSession {
             new TranspositionTable(
                 this.hashSizeMB
             );
+        this.engine.search.qtt =
+            new TranspositionTable(
+                Search.qsearchTableSizeMB(this.hashSizeMB)
+            );
 
         this.currentFullMoveNumber =
             this.engine.board.fullMoveNumber;
@@ -1067,6 +1071,10 @@ export class UciSession {
 
             this.engine.search.tt =
                 new TranspositionTable(sizeMB);
+            this.engine.search.qtt =
+                new TranspositionTable(
+                    Search.qsearchTableSizeMB(sizeMB)
+                );
 
             return [];
 
@@ -1089,9 +1097,10 @@ export class UciSession {
 
         if (option.name === "Clear Hash") {
 
-            withMutedConsole(() =>
-                this.engine.search.tt.clear()
-            );
+            withMutedConsole(() => {
+                this.engine.search.tt.clear();
+                this.engine.search.qtt.clear();
+            });
 
             return [];
 
