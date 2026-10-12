@@ -285,6 +285,61 @@ function searchBestMove(fen, depth) {
 
 }
 
+test("static evaluation cache is exact, collision-safe, and can be disabled", () => {
+    const {
+        board,
+        search,
+        evaluation,
+        legalMoveGenerator
+    } = createEngine("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    const snapshot = snapshotBoard(board);
+    const originalEvaluate = evaluation.evaluate.bind(evaluation);
+    let evaluations = 0;
+
+    evaluation.evaluate = () => {
+        evaluations++;
+        return originalEvaluate();
+    };
+
+    const originalEnabled = Search.STATIC_EVAL_CACHE;
+
+    try {
+        Search.STATIC_EVAL_CACHE = true;
+
+        const initial = search.whiteRelativeEval();
+
+        assert.equal(search.whiteRelativeEval(), initial);
+        assert.equal(evaluations, 1);
+        assert.equal(search.staticEvalHits, 1);
+
+        const originalHash = board.hashKey;
+        board.hashKey += BigInt(search.staticEvalMask + 1);
+
+        assert.equal(search.whiteRelativeEval(), initial);
+        assert.equal(evaluations, 2, "different colliding key must not reuse score");
+
+        board.hashKey = originalHash;
+
+        const move = legalMoveGenerator.generateMoves()[0];
+        board.makeMove(move);
+        search.whiteRelativeEval();
+        board.undoMove();
+
+        assert.equal(search.whiteRelativeEval(), initial);
+        assert.equal(evaluations, 4);
+        assertBoardSnapshot(board, snapshot);
+
+        Search.STATIC_EVAL_CACHE = false;
+        search.clearStaticEvalCache();
+        search.whiteRelativeEval();
+        search.whiteRelativeEval();
+        assert.equal(evaluations, 6);
+    }
+    finally {
+        Search.STATIC_EVAL_CACHE = originalEnabled;
+    }
+});
+
 function searchBestMovesByDepth(fen, depths) {
 
     return depths.map(depth => {

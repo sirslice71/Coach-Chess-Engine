@@ -434,6 +434,11 @@ const ROOT_TIE_VERIFY_SCORE_TOLERANCE = 10;
 
 const ROOT_TIE_VERIFY_MAX_NON_PAWN_MATERIAL = 4;
 
+// Static evaluation is a pure function of the fully hashed board state.
+// A modest direct-mapped cache captures transpositions and repeated
+// iterative-deepening leaves without retaining positions between roots.
+const STATIC_EVAL_CACHE_ENTRIES = 1 << 16;
+
 export class SearchTimeout extends Error {}
 
 export default class Search {
@@ -453,6 +458,10 @@ export default class Search {
     static LATE_MOVE_PRUNING =
         typeof process === "undefined" ||
         process.env?.COACH_LATE_MOVE_PRUNING !== "0";
+
+    static STATIC_EVAL_CACHE =
+        typeof process === "undefined" ||
+        process.env?.COACH_STATIC_EVAL_CACHE !== "0";
 
     static qsearchTableSizeMB(hashSizeMB) {
 
@@ -538,6 +547,16 @@ export default class Search {
         this.qtt = new TranspositionTable(
             Search.qsearchTableSizeMB(this.tt.sizeMB)
         );
+
+        this.staticEvalTable =
+            new Array(STATIC_EVAL_CACHE_ENTRIES);
+
+        this.staticEvalMask =
+            STATIC_EVAL_CACHE_ENTRIES - 1;
+
+        this.staticEvalProbes = 0;
+        this.staticEvalHits = 0;
+        this.staticEvalStores = 0;
         
         this.rootBestMove = null;
 
@@ -580,7 +599,36 @@ export default class Search {
 
     whiteRelativeEval() {
 
-        return this.evaluation.evaluate().total;
+        if (!Search.STATIC_EVAL_CACHE) {
+            return this.evaluation.evaluate().total;
+        }
+
+        const hash = this.board.hashKey;
+        const index = Number(hash & BigInt(this.staticEvalMask));
+        const entry = this.staticEvalTable[index];
+
+        this.staticEvalProbes++;
+
+        if (entry && entry.hash === hash) {
+            this.staticEvalHits++;
+            return entry.score;
+        }
+
+        const score = this.evaluation.evaluate().total;
+
+        this.staticEvalTable[index] = { hash, score };
+        this.staticEvalStores++;
+
+        return score;
+
+    }
+
+    clearStaticEvalCache() {
+
+        this.staticEvalTable.fill(undefined);
+        this.staticEvalProbes = 0;
+        this.staticEvalHits = 0;
+        this.staticEvalStores = 0;
 
     }
 
@@ -1053,6 +1101,8 @@ export default class Search {
 
         this.profileEnabled =
             options.profile ?? false;
+
+        this.clearStaticEvalCache();
 
         this.board.profileEnabled =
             this.profileEnabled;

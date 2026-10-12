@@ -1473,3 +1473,818 @@
 - Mining: `swing-mining` found 13 swings over 1481 scored Coach moves: 1 entered-losing-mate, 2 centipawn drops, and 10 mate-score changes. The only loss was game 9 as White; repeated mate-score-change rows mostly came from won promotion races.
 - Decision: accepted-narrow because the exact sentinel is fixed, focused and regression tests pass, stability-short is SearchStable, and the 20-game ShallowBlue 1618 `5+0` smoke improves over the active `12 - 7 - 1 [0.625]` baseline without match-score regression.
 - Next targets: commit/push this candidate if Sir Slice wants to publish it; keep game9-ply139-Kg7 (`7R/2p2K2/8/p3r1k1/P7/5r2/1pp5/8 w - - 2 70`) as a future loss-mining target, not a blocker for this accepted candidate.
+
+## 2026-10-07 - Published Sparse Root-Tie Follow-Up Matches
+
+- Status: diagnostic / confidence check
+- Commit: `3afde24`
+- Gate run: `analysis-runs\coach-3afde24-shallowblue1618-20g-st3-gate-20261007`
+- Gate result: Coach vs ShallowBlue 1618 fixed `st=3`: `10 - 8 - 2 [0.550] 20`; Coach as White `7 - 1 - 2 [0.800]`, Coach as Black `3 - 7 - 0 [0.300]`.
+- Gate mining: 20 games mined, 1630 scored Coach moves, 19 swings: 5 entered-losing-mate, 10 centipawn drops, 2 mate-score changes. The gate passed Sir Slice's condition by a small margin, so the longer match was run.
+- Long run: `analysis-runs\coach-3afde24-shallowblue1618-50g-5m0-seed26100751-20261007`
+- Long result: Coach vs ShallowBlue 1618 `5+0`: `34 - 10 - 6 [0.740] 50`; Coach as White `14 - 8 - 3 [0.620]`, Coach as Black `20 - 2 - 3 [0.860]`.
+- Long mining: 50 games mined, 3556 scored Coach moves, 35 swings: 9 entered-losing-mate, 10 centipawn drops, 10 mate-score changes.
+- Decision: the original `15 - 1 - 4 [0.850]` smoke was not just a lone favorable datapoint; the independent 50-game `5+0` run with a different seed still stayed well above the active `12 - 7 - 1 [0.625]` baseline. The side split remains asymmetric: Coach is much stronger as Black than White in this sample.
+- Next targets: mine/probe the long-run loss rows if starting a new improvement goal, especially `game15-ply273-Kg3`, `game15-ply275-Kh4`, `game33-ply199-Kh6`, `game33-ply201-Kh7`, and `game45-ply137-h7`.
+
+## 2026-10-07 - ShallowBlue 50-Game Loss-Row First Pass
+
+- Status: diagnostic
+- Commit: `3afde24`
+- Source: `analysis-runs\coach-3afde24-shallowblue1618-50g-5m0-seed26100751-20261007\swing-mining`
+- Baseline: preserve `34 - 10 - 6 [0.740] 50` versus ShallowBlue 1618 `5+0`.
+- Named mate-entry probes: `game15-ply273-Kg3`, `game15-ply275-Kh4`, `game33-ply199-Kh6`, `game33-ply201-Kh7`, and `game45-ply137-h7` were all mate-class/all-lost by shallow or moderate Coach depth. None exposed a non-mate saving move.
+- Game33 precursor audit: `analysis-runs\game33-kingwalk-plateau-child-audit-20261007` audited four king-walk precursors at root/child depth 10. It found `child-spread=1`, `mate-child=2`, `true-flat=1`, and `disagreements=0`.
+- Before-target audit: `analysis-runs\shallowblue50-before-targets-plateau-child-audit-d8-20261007` audited 29 before-position swing targets at root/child depth 8. It found 3 root-child disagreements, but deeper root probes rejected them as clean candidates: `game21-ply103-Kf5` preferred the played move again by depths 9-12, `game20-ply118-Kc6` remained all-losing/unstable, and `game33-ply175-Ka2` flattened by depth 12.
+- Pipeline check: `analysis-runs\coach-3afde24-shallowblue50-before-only-candidate-pipeline-20261007` ran the strict before-only discovery pipeline over 23 unique before-position rows. It wrote 3 worklist rows and found 0 Coach child-gap candidates.
+- Decision: no engine candidate from this first loss-row pass. The current 50-game swing packet is useful as evidence of remaining endgame/mate-horizon weakness, but it does not yet provide a clean Coach before-move decision point that survives root-depth probing and focused confirmation.
+- Next targets: use a different selector or evidence source before patching, such as a Coach-as-White first-loss-transition extractor or an SF19/reference check on earlier game phases before these positions become all-lost.
+
+## 2026-10-07 - ShallowBlue 50-Game Loss-Transition / SF19 Pass
+
+- Status: diagnostic
+- Commit: `3afde24`
+- Source: `analysis-runs\coach-3afde24-shallowblue50-time-depth-20261007\coach-time-depth-summary.json`
+- New tooling: `tools\select-loss-transition-fens.mjs` extracts earlier Coach-as-White loss transitions from the time/depth summary; `tools\compare-coach-sf19-diagnostics.mjs` compares Coach root choices against verified SF19 at `<USERPROFILE>\Downloads\stockfish-windows-x86-64-universal.exe`.
+- Verification: `node --test tests\select_loss_transition_fens.test.mjs` passed 2/2 after fixing the selector CLI main guard to use `pathToFileURL`.
+- Strict transition pass: `analysis-runs\coach-3afde24-shallowblue50-loss-transitions-20261007` selected 14 Coach-as-White loss transitions with `min-drop=250` and `max-after-cp=-300`. The candidate pipeline over those rows wrote 0 worklist rows and found 0 child-gap candidates.
+- Loose transition pass: `analysis-runs\coach-3afde24-shallowblue50-loss-transitions-loose-20261007` selected 26 transitions with `min-drop=150` and `max-after-cp=0`. The pipeline wrote one worklist row, `game29-ply107-Kh7`, but the child-gap confirmer rejected it because deeper root search did not prefer the alternative. Direct depth 4-10 probing showed Coach and SF19 both settle on `g6h7`.
+- SF19 pass: `analysis-runs\coach-3afde24-shallowblue50-loss-transition-sf19-d10-20261007` compared 26 transition rows at Coach depth 8 / SF19 depth 10. It found one candidate-class disagreement, `game33-ply173-Kb3`, where Coach depth 8 preferred `c2b1` and SF19 preferred `c2b3`.
+- Follow-up probe: direct Coach depth 4-12 probing of `game33-ply173-Kb3` rejected the row as a shallow-only ghost. Coach chooses `c2b3` at depths 4, 5, 7, and 9-12; only depth 8 briefly prefers `c2b1`. The match move itself was `c2b3` at a deeper reported search depth, so this is not a patch target.
+- Extra probe: `game45-ply115-h5` was also checked through depths 8-12 after the SF19 table showed a shallow disagreement. The row is a broad tied losing-endgame table, not a clean Coach/SF miss; Coach returns to the played/SF move at depths 11-12.
+- Decision: no accepted engine candidate from the current ShallowBlue 50-game loss-transition evidence. The late mate-entry rows, before-target rows, transition rows, and SF19 reference check have all failed to isolate a stable non-mate decision point from this match.
+- Next targets: pivot to genuinely different evidence instead of another pass over the same ShallowBlue 50-game loss packet. Best next source is a targeted SF19 diagnostic set or fresh paired-position generation that prefilters for non-mate rows where the reference move is inside Coach's root window and the Coach child gap survives confirmation.
+
+## 2026-10-07 - Extended Root-Tie Verification Candidate From SF19 Non-Mate Intake
+
+- Status: rejected
+- Commit baseline: `3afde24`
+- Goal source: pivoted from exhausted ShallowBlue 50-game loss packet to a wider SF19/non-mate reference-child intake.
+- Intake: `analysis-runs\reference-child-intake-sf19-nonmate-wide-20261007` scanned 568 files, skipped 352 non-JSON artifacts, audited 401 SF19-derived non-mate rows, and selected 60 rows where the reference move was inside Coach's root window.
+- Verifier: `analysis-runs\reference-child-intake-sf19-nonmate-wide-verified-d8-confirm10-20261007` audited the top 40 rows at child depth 8 with confirm depth 10 and found one keeper: `game15-ply151-g8R-before` / `8/4N1P1/4KP1k/3R3P/2q5/8/8/8 w - - 17 76`. Coach/root move `g7g8r`; SF/reference move `e6f7`; confirmed child gap 183cp.
+- Root/child audit: `analysis-runs\root-plateau-child-audit-game15-ply151-g8r-d10-20261007` classified the target as `root-child-disagreement`: root band 0cp, child band 1743cp, root best `g7g8r`, child best `e6f7`, gap vs root best 211cp.
+- Direct probe: baseline depth 10 flattened the top root moves at 1869cp and chose `g7g8r`; depth 11 found `e6f7` mate-class. Child-pair probe `analysis-runs\child-pair-depths-game15-ply151-g8r-wide-sf19-20261007` showed the `e6f7` advantage appears at depths 8-10 and vanishes once both lines become mate-class at depths 11-12.
+- Change: increased root-tie verification coverage from 6 to 8 tied moves for material-eligible extended endings (`nonPawnMaterial <= ROOT_TIE_VERIFY_MAX_NON_PAWN_MATERIAL`). This lets the verifier reach the 7th tied move `e6f7` without changing the sparse-ending isolated-TT condition.
+- Sentinel: `tests\root_tie_verification.test.mjs` now checks that the target chooses `e6f7` at depth 10 and scores it above `g7g8r`.
+- Verification: `node --test tests\root_tie_verification.test.mjs` passed 9/9; `node --test tests\engine_regressions.test.mjs` passed 64, skipped 67, failed 0; tooling tests `build_reference_child_intake`, `probe_child_pair_depths`, and `select_loss_transition_fens` passed 7/7.
+- Stability: `analysis-runs\candidate-extended-root-tie-maxmoves-stability-short-20261007.json` vs baseline worktree `analysis-runs\bench-baseline-3afde24` was SearchStable OK with tree shape unchanged, PV changes 0, root-order changes 0, and candidate timing 0.720% slower.
+- Extra local gates: `node --test tests\uci.test.mjs` passed 45/45; `node --test tests\time_management_candidate.test.mjs` passed 15/15; rerun of `node --test tests\root_tie_verification.test.mjs` passed 9/9.
+- Smoke blocker: CuteChess exists at `<USERPROFILE>\AppData\Local\Programs\Cute Chess\cutechess-cli.exe`, but launching the 20-game smoke from Codex required elevated execution and was rejected by the app usage-limit gate. The run folder still has no `match.pgn` as of the local check.
+- Smoke: `analysis-runs\candidate-extended-root-tie-maxmoves-shallowblue1618-20g-5m0-20261007` scored `8 - 9 - 3 [0.475] 20`; Coach as White `2 - 7 - 1 [0.250]`, Coach as Black `6 - 2 - 2 [0.700]`.
+- Smoke mining: 20 games, 1212 scored Coach moves, 15 swings: 5 entered-losing-mate, 9 centipawn drops, 1 mate-score change. Worst rows included `game6-ply212-Kb8`, `game6-ply216-Kb6`, `game3-ply97-Rxg2`, `game5-ply139-Ka6`, and `game16-ply118-Rxa8`.
+- Decision: rejected. The local sentinel was real, but broadening extended-ending root-tie verification to 8 tied moves regressed practical ShallowBlue 1618 `5+0` strength badly versus the accepted `34 - 10 - 6 [0.740] 50` follow-up baseline and introduced a poor mate/swing profile. Candidate code and sentinel were reverted; `node --test tests\root_tie_verification.test.mjs` passed 8/8 after revert, and the target returned to the published depth-10 root plateau (`g7g8r`, all top moves 1869cp).
+- Known-bad idea: do not broadly increase extended-ending root-tie verification coverage from 6 to 8 tied moves, even when a single root/child disagreement is fixed. The root-verification family remains dangerous unless a much narrower trigger is found.
+- Next targets: continue the SF19 non-mate intake but avoid this broad max-move lever. If revisiting `game15-ply151-g8R-before`, isolate a more specific mechanism than tied-move count, or treat it as depth/time evidence rather than an engine patch candidate.
+
+## 2026-10-07 - SF19 Non-Mate Intake Max-60 Completion
+
+- Status: diagnostic
+- Commit baseline: `3afde24`
+- Source: `analysis-runs\reference-child-intake-sf19-nonmate-wide-20261007`
+- Run: `analysis-runs\reference-child-intake-sf19-nonmate-wide-verified-d8-confirm10-max60-postreject-20261007`
+- Result: audited all 60 selected SF19-derived non-mate rows with child depth 8, confirm depth 10, min gap 100cp, root limit 24, and root/child caps. It found 0 candidates.
+- Rejections: `gap<100=59`, `root-timed=28`, `mate-child-score=5`, `mate-root-score=3`, `prefilter-mate-root-score=3`, and `reference-not-in-top-24=2`.
+- Near hits: the only candidate-class gap was the already-rejected `game15-ply151-g8R-before` (`g7g8r` vs `e6f7`, 183cp gap, ref rank 7, 15 root ties), rejected here by `root-timed` and rejected in practice by the failed broad max-move smoke. Subthreshold positives included `game6-ply118-Kh8-before` at 73cp, `game7-ply187-Ke1-before` at 40cp, `game17-ply163-Kc5-before` at 19cp, `game16-ply188-d4-before` at 15cp, and several <=13cp midgame rows.
+- Verification: tooling tests `build_reference_child_intake`, `probe_child_pair_depths`, and `select_loss_transition_fens` passed 7/7 after this pass.
+- Decision: current wide SF19 non-mate intake is exhausted for patch candidates under the confirmed child-gap gate. Do not rerun the same 60-row packet unless the verifier criteria change materially.
+- Next targets: build a stricter fresh-position generator/source that excludes root-timed, low-material root-tie, mate-child, and gap-collapse families, preferably emphasizing middlegame/queen-rich rows where the reference move is already in Coach's root top 24 and both root and child searches complete under cap.
+
+## 2026-10-07 - Clean-Middlegame SF19 Intake Filter Pass
+
+- Status: diagnostic/tooling
+- Commit baseline: `3afde24`
+- Tooling: `tools\build-reference-child-intake.mjs` now supports `--min-total-pieces`, `--min-non-pawn-pieces`, and `--max-root-top-ties`; `tools\filter-reference-child-intake.mjs` can reuse a completed intake JSON to produce verifier-ready packets from otherwise-clean rows when only a cutoff changes.
+- Strict run: `analysis-runs\reference-child-intake-sf19-cleanmid-20261007` audited 401 SF19-derived non-mate rows with at least 12 pieces, at least 6 non-pawn pieces, and at most 8 tied top root moves. It selected 3 rows.
+- Strict verifier: `analysis-runs\reference-child-intake-sf19-cleanmid-verified-d8-confirm10-20261007` found 0 candidates. All 3 selected rows were Coach-favored in child search: gaps `-16cp`, `-73cp`, and `-79cp`.
+- Loosened tie packet: `analysis-runs\reference-child-intake-sf19-cleanmid-ties16-20261007` reused the strict intake JSON and selected 12 otherwise-clean rows with at most 16 tied top root moves.
+- Loosened verifier: `analysis-runs\reference-child-intake-sf19-cleanmid-ties16-verified-d8-confirm10-20261007` found 0 candidates. Best positive gap was only `13cp` on `game13-before-13.h5`; the rest were flat or Coach-favored.
+- Verification: `node --test tests\build_reference_child_intake.test.mjs tests\filter_reference_child_intake.test.mjs` passed 4/4.
+- Decision: the current historical SF19 non-mate intake family is exhausted under material-rich, bounded-tie, confirmed child-gap criteria. The stronger filters are useful process tooling, but they did not expose a patch candidate.
+- Next targets: generate genuinely fresh evidence instead of re-filtering the same historical rows. Prefer a fresh SF19 diagnostic/opening policy that samples earlier middlegame positions and prefilters for completed roots, material richness, reference move in Coach top 24, bounded root ties, and positive child gap before spending time on deeper confirmation.
+
+## 2026-10-07 - Fresh Diagnostic Anchor SF19 Pass
+
+- Status: diagnostic/tooling
+- Commit baseline: `3afde24`
+- Source tooling: `tools\export-diagnostic-anchor-fens.mjs` exports filtered FEN packets from `tests\data\diagnostic_anchors.json`.
+- Source: `analysis-runs\fresh-anchor-lucas-sf19-source-20261007\anchors.fens` exported 22 early-minor and Lucas regression anchors, excluding ShallowBlue endgames and control/sentinel rows.
+- Analysis: depth-10 SF19 analysis was stopped because it bogged down on the third anchor; depth-8 analysis completed at `analysis-runs\fresh-anchor-lucas-sf19-source-20261007\sf19-d8\20261007-090403`.
+- Strict intake: `analysis-runs\fresh-anchor-lucas-sf19-source-20261007\clean-intake-d8-20261007` used min diff 120cp, at least 12 pieces, at least 6 non-pawn pieces, and at most 16 tied top root moves. It selected 0 rows; the only audited row was rejected by `root-top-ties>16`.
+- Lower-threshold intake: `analysis-runs\fresh-anchor-lucas-sf19-source-20261007\clean-intake-d8-mindiff80-20261007` used min diff 80cp and selected 0 rows; both audited rows were rejected by `root-top-ties>16`, with one also `root-timed`.
+- Verification: `node --test tests\export_diagnostic_anchor_fens.test.mjs tests\filter_reference_child_intake.test.mjs tests\build_reference_child_intake.test.mjs` passed 5/5.
+- Decision: curated early-minor/Lucas anchors are useful regression coverage, but they did not expose a clean SF19/Coach child-gap candidate under the current non-mate gate.
+- Next targets: stop mining existing historical or curated packets for this goal. Generate genuinely fresh positions next: either a new SF19 match/diagnostic run through CuteChess, or a deterministic opening-continuation FEN generator that expands the curated opening suite into material-rich middlegames before running the same SF19 child-gap gate.
+
+## 2026-10-08 - Generated Opening Continuation SF19 Pass
+
+- Status: diagnostic/tooling
+- Commit baseline: `3afde24`
+- Source tooling: `tools\generate-opening-continuation-fens.mjs` creates deterministic legal continuations from 10 curated opening prefixes, branching early from Coach root choices and sampling material-rich middlegame positions.
+- Source: `analysis-runs\generated-opening-continuations-fresh-20261007\positions.fens` generated 120 opening/middlegame FENs with at least 12 pieces and 6 non-pawn pieces.
+- SF19 analysis: `analysis-runs\generated-opening-continuations-fresh-20261007\sf19-d8\20261007-091331` analyzed all 120 positions at depth 8 against verified SF19. It produced 29 non-mate best-move disagreements at or above 120cp.
+- Strict intake: `analysis-runs\generated-opening-continuations-fresh-20261007\clean-intake-d8-20261007` selected 0 rows at Coach root depth 8; rejections were dominated by `root-top-ties>16=28` and `root-timed=21`.
+- Cheaper-root intake: `analysis-runs\generated-opening-continuations-fresh-20261007\clean-intake-rootd6-20261007` selected 3 rows at Coach root depth 6: `ruy-lopez-line3-fm17-ply24`, `nimzo-indian-line4-fm23-ply36`, and `nimzo-indian-line2-fm19-ply28`.
+- Child verifier: `analysis-runs\generated-opening-continuations-fresh-20261007\clean-intake-rootd6-verified-d8-confirm10-20261008` found 0 candidates. Gaps were `1cp`, `-28cp`, and `-39cp`, so none showed a meaningful Coach child-search miss.
+- Verification: generator/tooling tests passed with `node --test tests\generate_opening_continuation_fens.test.mjs tests\export_diagnostic_anchor_fens.test.mjs tests\filter_reference_child_intake.test.mjs tests\build_reference_child_intake.test.mjs`.
+- Decision: the generated opening-continuation source produced fresh material-rich disagreements, but no child-gap candidate. The method is useful for producing cleaner evidence, yet Coach's own child searches did not confirm a patchable miss in this sample.
+- Next targets: change the fresh source policy rather than reusing this exact packet. Best next direction is to generate positions from SF19/reference-favored continuations or mixed Coach/SF branches, so the source is less dominated by Coach self-play plateaus before SF19 comparison.
+## 2026-10-08 - Model Escalation Operating Rule
+
+- Status: diagnostic
+- Commit: n/a
+- Run: n/a
+- Result: n/a
+- Baseline: accepted Coach baseline `3afde24`
+- Tests: n/a
+- Decision: Keep the current cost-efficient model for routine evidence generation, filtering, command building, ledger updates, and match mining. Escalate to a stronger model only when the work needs high-leverage reasoning: designing a narrow patch from ambiguous evidence, reviewing TT/root-tie/mate-score hypotheses, resolving competing candidate explanations, or making a final accept/reject call.
+- Next targets: continue the active SF19 diagnostic goal; include this rule in successor goals when a new goal is created.
+
+## 2026-10-08 - Generated Reference-Followup SF19 Pass
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\generated-reference-followups-fresh-20261008`
+- Result: `sf19-d8-limit56\20261008-124034` analyzed 56 generated reference-followup FENs at depth 8; strict depth-8 intake selected 0; root-depth-6 intake selected 0.
+- Baseline: accepted Coach baseline `3afde24`; ShallowBlue 1618 5+0 baseline `34 - 10 - 6 [0.740]`.
+- Tests: `node --test tests\generate_reference_followup_fens.test.mjs tests\generate_opening_continuation_fens.test.mjs tests\build_reference_child_intake.test.mjs tests\filter_reference_child_intake.test.mjs`
+- Decision: Exhaust this evidence source for candidate purposes. The intake audited 32 non-mate/material-rich rows, but every row failed the bounded-root-tie gate (`root-top-ties>16=32` at root depth 6; depth 8 also had 30 tie failures and 25 root timeouts), so it does not provide a clean Coach-child-search candidate.
+- Next targets: build a source that pre-filters for naturally separated Coach roots before SF19 comparison, instead of starting from SF19 disagreements and discovering Coach root tie pollution afterward.
+
+## 2026-10-08 - Coach-Root-Separated Opening Source
+
+- Status: rejected
+- Commit: n/a
+- Run: `analysis-runs\coach-root-separated-source-20261008`
+- Result: Coach-first root filter selected 7/120 generated opening-continuation FENs at root depth 6 with `root-top-ties<=16`; SF19 depth-8 comparison found 3 non-mate best-move disagreements over 120cp; intake selected 1 row.
+- Baseline: accepted Coach baseline `3afde24`; ShallowBlue 1618 5+0 baseline `34 - 10 - 6 [0.740]`.
+- Tests: `node --test tests\filter_coach_root_separated_fens.test.mjs tests\generate_reference_followup_fens.test.mjs tests\build_reference_child_intake.test.mjs`
+- Decision: Reject as a patch source. The single clean Ruy Lopez survivor (`r4rk1/2p2ppp/p1n4q/1pb1p3/4P3/1BB2N2/PP2QPPP/2KR3R w - - 1 17`) had SF19 `c1b1` vs Coach `e2d2`, but deeper Coach child verification produced `gap=-4cp`, so it is not a positive Coach-child-search miss.
+- Next targets: apply Coach-first root separation to the generated reference-followup pool, then run SF19 only on those clean roots.
+
+## 2026-10-08 - Coach-Root-Separated Reference-Followup Source
+
+- Status: rejected
+- Commit: n/a
+- Run: `analysis-runs\coach-root-separated-reference-followups-20261008`
+- Result: Coach-first root filter selected 12/116 generated reference-followup FENs at root depth 6 with `root-top-ties<=16`; SF19 depth-8 comparison produced 6 non-mate best-move disagreements over 120cp; depth-8 intake selected 0; root-depth-6 intake selected 3.
+- Baseline: accepted Coach baseline `3afde24`; ShallowBlue 1618 5+0 baseline `34 - 10 - 6 [0.740]`.
+- Tests: `node --test tests\filter_coach_root_separated_fens.test.mjs tests\generate_reference_followup_fens.test.mjs tests\build_reference_child_intake.test.mjs`
+- Decision: Reject as a patch source. The three shallow survivors failed deeper child verification: Queen's Gambit `c5b6` vs `b7b6` gap `-30cp`; Nimzo `d8c8` vs `c7c6` gap `-36cp`; Nimzo `d5f5` vs `g4f3` gap `-11cp`.
+- Next targets: switch to a Coach-depth-transition evidence source: find positions where Coach's own best move changes between shallow and deeper depths with bounded root ties, then use SF19 only to classify those transitions.
+
+## 2026-10-08 - Future Opening-Structure Investigation
+
+- Status: diagnostic
+- Commit: n/a
+- Run: n/a
+- Result: n/a
+- Baseline: accepted Coach baseline `3afde24`
+- Tests: n/a
+- Decision: Keep named-opening hardcoding out of Coach for now. Later, mine Coach match PGNs by color, opening family, and structural features, then consider evaluation/search improvements only if Coach shows a real strength pattern in structures such as open files, bishop pair, king safety, locked centers, IQP, or specific pawn skeletons.
+- Next targets: revisit after the current SF19 diagnostic candidate search, especially if match evidence suggests Coach repeatedly succeeds or fails in a particular structure rather than a single tactic.
+
+## 2026-10-08 - Coach Depth-Transition Generated Source
+
+- Status: rejected
+- Commit: n/a
+- Run: `analysis-runs\coach-depth-transitions-opening-20261008`, `analysis-runs\coach-depth-transitions-opening-swing20-20261008`, `analysis-runs\coach-depth-transitions-reference-followups-swing20-20261008`
+- Result: Opening-continuation pool selected 0/120 at depth 4->6 with 100cp swing; selected 0/120 with 20cp swing. Reference-followup pool selected 0/116 with 20cp swing.
+- Baseline: accepted Coach baseline `3afde24`
+- Tests: `node --test tests\find_coach_depth_transitions.test.mjs tests\filter_coach_root_separated_fens.test.mjs tests\generate_reference_followup_fens.test.mjs`
+- Decision: Reject generated depth-transition sampling as the next candidate source. Rejection counts are dominated by root ties (`low-root-top-ties>16` and `high-root-top-ties>16`) and small score swings, so generated openings are not producing clean depth-transition targets.
+- Next targets: mine existing real match PGNs for positions Coach actually reached, preferably losses or eval swings, then apply the same non-mate/material/root-tie gates before SF19 classification.
+
+## 2026-10-08 - Real-Match Midgame SF19 Small Pass
+
+- Status: rejected
+- Commit: n/a
+- Run: `analysis-runs\realmatch-midgame-sf19-small-20261008`
+- Result: Extracted 40 Coach positions from the accepted 50-game ShallowBlue 1618 5+0 match (`moves 10-35`, one sampled Coach move per game), SF19 depth 8. Only 2 unique non-mate/material-rich best-move disagreements exceeded 120cp.
+- Baseline: accepted Coach baseline `3afde24`; ShallowBlue 1618 5+0 baseline `34 - 10 - 6 [0.740]`.
+- Tests: n/a; diagnostic tool run completed and wrote `20261008-144109\results.json`.
+- Decision: Reject this small extraction as a candidate source. Both audited rows failed bounded-root-tie gates at root depth 8 and root depth 6; `game24-before-10...Bxf3` also had the SF19 move missing from Coach root top 24.
+- Next targets: widen real-match extraction beyond move-10 repeated openings, sampling later move windows or more positions per game while preserving material and non-mate gates.
+
+## 2026-10-08 - Real-Match Later-Midgame SF19 Pass
+
+- Status: rejected
+- Commit: n/a
+- Run: `analysis-runs\realmatch-midgame-later-sf19-20261008`
+- Result: Extracted 60 Coach positions from the accepted 50-game ShallowBlue 1618 5+0 match (`moves 16-35`, two sampled Coach moves per game), SF19 depth 8. Depth-8 intake selected 1 row; root-depth-6 intake selected 2 rows.
+- Baseline: accepted Coach baseline `3afde24`; ShallowBlue 1618 5+0 baseline `34 - 10 - 6 [0.740]`.
+- Tests: n/a; diagnostic tool run completed and wrote `20261008-144757\results.json`.
+- Decision: Reject as a patch source. The strict depth-8 survivor `game20-before-21...Rb8` failed child verification with `gap=-33cp`. Root-depth-6 survivors also failed: `game6-before-21...Rd8` had `gap=-19cp`; `game20-before-16...Bg4` had a weak positive child gap `+29cp` but verifier root prefilter remained timed even with a 30s root budget and root ties rose to 40, violating the completed/bounded-root requirement.
+- Next targets: try a later real-match window (`moves 24-45`) for more diverse, material-rich positions before abandoning real-match PGN sampling.
+
+## 2026-10-08 - Real-Match Late-Midgame SF19 Pass
+
+- Status: rejected
+- Commit: n/a
+- Run: `analysis-runs\realmatch-late-midgame-sf19-20261008`
+- Result: Extracted 60 Coach positions from the accepted 50-game ShallowBlue 1618 5+0 match (`moves 24-45`, two sampled Coach moves per game), SF19 depth 8. This produced the richest raw disagreement set so far, including `game9-before-24.Nc5` at 698cp, but strict gates selected only one row.
+- Baseline: accepted Coach baseline `3afde24`; ShallowBlue 1618 5+0 baseline `34 - 10 - 6 [0.740]`.
+- Tests: n/a; diagnostic tool run completed and wrote `20261008-150051\results.json`.
+- Decision: Reject as a patch source. The single survivor, `game17-before-28.Red1` (`r2r2k1/1b3p2/1p3pn1/5p1p/p1PB1P2/P3P3/1P4PP/R3R1K1 w - - 0 28`), was clean in intake (`22/7` pieces, root ties 2 at depth 8) but failed child verification with `gap=-11cp`. Root-depth-6 intake selected the same row only.
+- Next targets: stop chasing Coach-child-gap candidates from generated and real-match SF19 disagreement rows for this cycle; consider a different improvement source, likely direct root-tie diagnostic/tooling or a future structure/eval mining pass.
+
+## 2026-10-08 - Current Baseline Root-Bound Recheck
+
+- Status: diagnostic
+- Commit: accepted Coach baseline `3afde24`
+- Run: `analysis-runs\current-baseline-root-bound-game12-probe-20261008`
+- Result: Rechecked old `game12-ply100-f4-before` root-bound row (`8/8/1k1Bp3/1P2Pp1p/2K4P/8/5P2/8 b - - 2 50`, old Coach `b6b7`, reference `f5f4`). Child probe still shows a large old-child gap at deeper depths (`+433cp` at child depth 10, `+336cp` at depth 12), but current root search already chooses `f5f4` from depth 8 onward.
+- Baseline: accepted Coach baseline `3afde24`
+- Tests: diagnostic probe only.
+- Decision: Do not patch this old root-bound case. It is useful confirmation that the accepted low-material root-tie work fixes a real class, but it is not a live current-root failure.
+- Next targets: use root-bound/tie diagnostics only when the current root still selects the weaker move; otherwise prefer fresh evidence.
+
+## 2026-10-08 - Real-Match Root-Plateau Audit
+
+- Status: rejected
+- Commit: n/a
+- Run: `analysis-runs\realmatch-late-root-plateau-audit-dedup-d7-20261008`
+- Result: Audited the top 20 deduped late-midgame candidate FENs at root depth 8, child depth 7, root limit 8. Class counts: `hidden-child-spread=18`, `child-spread=2`, `root-child-disagreement=0`.
+- Baseline: accepted Coach baseline `3afde24`
+- Tests: `node tools\audit-root-plateau-child-scores.mjs --help`; added `--dedupe-fen` to avoid repeated match positions.
+- Decision: Reject root-child disagreement as a patch source for this packet. The root often presents broad same-score plateaus, but Coach's own child search usually keeps the current root best or differs by only a small gap (`<100cp`).
+- Next targets: pivot to structure/eval-source mining rather than broadening root-tie verification policy again.
+
+## 2026-10-08 - Real-Match Structure Summary
+
+- Status: diagnostic
+- Commit: n/a
+- Run: `analysis-runs\realmatch-structure-summary-20261008`, `analysis-runs\structure-passed-pawn-game9-nc5-childprobe-20261008`, `analysis-runs\realmatch-late-midgame-sf19-20261008\relaxed-tie-intake-d8-20261008`, `analysis-runs\realmatch-late-midgame-sf19-20261008\relaxed-tie-intake-d8-verified-child10-20261008`
+- Result: Summarized 51 high-diff (`>=150cp`) rows across the three fresh real-match SF19 passes. The strongest repeated bucket is passed-pawn tactical middlegames (`theme:passed pawn`, 12 rows, average abs diff 387cp, all Coach-optimistic). Top repeated row `game9/game29-before-24.Nc5` had SF19 `d7e5` vs Coach `d7c5`, but direct child probing rejected it: Coach child gap stayed negative (`-79cp` at depths 8-10) and root search remained a broad plateau. Relaxed root-tie intake (`max-root-top-ties=999`) selected 4 rows from the late pass; child verifier found 0 candidates (`game20...h6` only `+9cp`; others `-11`, `-79`, `-65`).
+- Baseline: accepted Coach baseline `3afde24`
+- Tests: `node --test tests\summarize_diagnostic_structures.test.mjs tests\find_coach_depth_transitions.test.mjs tests\filter_coach_root_separated_fens.test.mjs`
+- Decision: Treat passed-pawn tactical middlegames as a promising source theme, not as an accepted candidate. The first top row and all relaxed-tie late-pass survivors fail the required positive Coach child-search gap.
+- Next targets: generate/select new passed-pawn tactical middlegame FENs from real games or opening continuations, then require a positive Coach child gap and bounded current-root behavior before patching. Do not repeat blind SF19 disagreement scans without a structural filter.
+
+## 2026-10-09 - Structural Passed-Pawn Generated Sources
+
+- Status: rejected
+- Commit: n/a
+- Run: `analysis-runs\structural-passed-pawn-source-20261008`, `analysis-runs\expanded-opening-continuations-structural-20261009`, `analysis-runs\expanded-structural-passed-pawn-source-20261009`
+- Result: First structural selector kept 27/236 generated opening/reference-followup FENs with advanced passed pawns, >=12 pieces, >=6 non-pawn pieces, and >=2 heavy pieces. SF19 depth 8 produced many 200-500cp disagreements. Strict depth-8 intake selected one Ruy row (`ruy-lopez-line3-fm21-ply32-refline-ply6`) but child verification rejected it (`gap=-15cp`). Root-depth-6 intake selected one Nimzo row (`nimzo-indian-line4-fm23-ply36`) but child verification rejected it (`gap=-39cp`). Expanded generator produced 240 FENs; selector kept 20 Ruy Lopez passed-pawn rows. Strict/root-depth-6 intake selected the same clean row (`ruy-lopez-line4-fm25-ply40`, `2r2rk1/5ppp/pq6/1p2P3/1p1pB3/3Q4/P2R1PPP/2K4R w - - 2 25`, SF `c1b1` vs Coach `c1b2`, root ties 2 at depth 8 / 1 at depth 6), but child verification rejected it (`gap=-12cp`). Coach-only depth-transition scan on the expanded structural source selected 0/20 rows (`analysis-runs\expanded-structural-depth-transitions-20261009`).
+- Baseline: accepted Coach baseline `3afde24`; SF19 at `<USERPROFILE>\Downloads\stockfish-windows-x86-64-universal.exe`
+- Tests: `node --test tests\select_structural_fens.test.mjs tests\summarize_diagnostic_structures.test.mjs tests\find_coach_depth_transitions.test.mjs tests\filter_coach_root_separated_fens.test.mjs`
+- Decision: Reject structural passed-pawn generated sources as a patch source for this cycle. The structural filter improves disagreement density and root cleanliness versus blind scans, but all survivors fail the required positive Coach child-search gap.
+- Next targets: switch evidence policy from SF19 disagreement to Coach-only depth transitions/root behavior on the same structural source, or mine a different structure class instead of repeating passed-pawn Ruy/Nimzo rows.
+
+## 2026-10-09 - Real-Match Coach-Only Transition Source
+
+- Status: rejected
+- Commit: n/a
+- Run: `analysis-runs\realmatch-coachonly-fen-source-20261009`, `analysis-runs\realmatch-coachonly-later-fen-source-20261009`, `analysis-runs\realmatch-coachonly-later-depth-transitions-swing20-20261009`, `analysis-runs\realmatch-coachonly-later-root-plateau-audit-20261009`
+- Result: Built real-match Coach-only FEN sources from the accepted 50-game ShallowBlue 1618 5+0 match, avoiding SF-first filtering. Early window (`moves 12-16`) was too repetitive and was stopped. Later window (`moves 20-26`, 120 rows) produced no bounded Coach depth transitions even with `min-score-swing=20`; rejection counts were dominated by root plateaus (`low-root-top-ties>16=102`, `high-root-top-ties>16=99`). A deduped root-plateau child audit on 41 unique later positions found `hidden-child-spread=38`, `child-spread=2`, `true-flat=1`, but `root-child-disagreement=0`.
+- Baseline: accepted Coach baseline `3afde24`; ShallowBlue 1618 5+0 baseline `34 - 10 - 6 [0.740]`
+- Tests: diagnostic tools completed; no engine code changed.
+- Decision: Reject this real-match Coach-only source as a patch source. The positions are dominated by broad root plateaus, but Coach's child searches do not provide a clean alternative root move under the current disagreement threshold.
+- Next targets: mine a different structure class, specifically queen/rook tactical middlegames without advanced passed-pawn filtering, before returning to SF19 comparison.
+
+## 2026-10-09 - Queen/Rook Structural Source
+
+- Status: rejected
+- Commit: n/a
+- Run: `analysis-runs\queen-rook-structural-source-20261009`, `analysis-runs\queen-rook-depth-transitions-20261009`, `analysis-runs\queen-rook-root-plateau-audit-20261009`
+- Result: Added `queen-rook` mode to `tools\select-structural-fens.mjs` and selected 120/240 generated queen/rook middlegame FENs without advanced passed pawns. Coach-only depth-transition scan selected 0/120; rejection counts were dominated by root plateaus (`high-root-top-ties>16=112`, `low-root-top-ties>16=97`) and low score swing (`score-swing<50=107`). A 40-row root-plateau child audit found `hidden-child-spread=39`, `true-flat=1`, and `root-child-disagreement=0`.
+- Baseline: accepted Coach baseline `3afde24`
+- Tests: `node --test tests\select_structural_fens.test.mjs`
+- Decision: Reject this generated queen/rook structure source as a patch source. Like the passed-pawn source, it produces broad root plateaus but no clean Coach-child-supported alternate root move.
+- Next targets: use a source that ranks by actual match outcome deterioration or time/depth behavior before root plateau filtering, rather than more generated Ruy-heavy structural positions.
+
+## 2026-10-09 - Accepted-Match Time/Depth Remine
+
+- Status: diagnostic/rejected
+- Commit: n/a
+- Run: `analysis-runs\coach-3afde24-time-depth-remine-20261009`
+- Result: Re-summarized the accepted 50-game ShallowBlue 1618 5+0 match and added `tools\select-time-depth-candidate-fens.mjs` to extract time/depth pressure FENs. The material-rich low-clock/shallow slice selected 0 positions. The slow material-rich middlegame slice selected 35 positions from moves 12-35 where Coach spent 10-16s with at least 18 pieces and 8 non-pawn pieces.
+- Baseline: accepted Coach baseline `3afde24`; ShallowBlue 1618 5+0 baseline `34 - 10 - 6 [0.740]`
+- Tests: `node --test tests\select_time_depth_candidate_fens.test.mjs`; depth-transition probe on the 35 slow-rich FENs selected 0; root-plateau child audit found `hidden-child-spread=29`, `child-spread=2`, `true-flat=4`, and `root-child-disagreement=0`.
+- Decision: Reject slow-rich middlegame time/depth behavior as a patch source for this cycle. Coach often spends time in broad root plateaus, but child probes did not show a clean alternate move.
+- Next targets: if time management remains the focus, mine late low-clock/shallow endgame positions separately; otherwise use a new evidence policy rather than another generated structural/SF19 pass.
+
+## 2026-10-09 - Low-Clock Shallow Endgame Time/Depth Branch
+
+- Status: diagnostic/rejected
+- Commit: n/a
+- Run: `analysis-runs\coach-3afde24-time-depth-remine-20261009\low-clock-shallow-endgame`
+- Result: Relaxed low-clock/shallow selector kept 29 late-endgame FENs (`depth<=5`, estimated clock `<=30s`, moves 40-160, at least 4 pieces and 1 non-pawn). Coach depth-transition scan selected 2 connected queen/pawn-vs-rook FENs from game 2. SF19 comparison over the full 29-row slice at depth 14 found one apparent candidate (`game2-ply196-c3`, Coach `h7b1`, SF `h7e4`, Coach gap 257cp at Coach depth 8).
+- Baseline: accepted Coach baseline `3afde24`; ShallowBlue 1618 5+0 baseline `34 - 10 - 6 [0.740]`
+- Tests: `node --test tests\select_time_depth_candidate_fens.test.mjs tests\select_structural_fens.test.mjs tests\find_coach_depth_transitions.test.mjs`; child-pair probes rejected both candidate interpretations. `h7b1` vs `c4c3` ended with only `+4cp` for the reference move at child depth 12, and `h7b1` vs SF `h7e4` ended with only `+21cp` at child depth 12 after being worse at earlier depths.
+- Decision: Reject this branch as a patch source. It is useful evidence that low-clock depth-1/5 endgames exist, but the only surviving non-agreement case was a broad winning-conversion plateau rather than a stable move-quality miss.
+- Next targets: for a future time/endgame goal, collect more low-clock endgame examples before changing time management; for the current improvement loop, pivot again to a source with clearer child-search gaps.
+
+## 2026-10-09 - Coach Child-Gap-First Evidence Pass
+
+- Status: diagnostic/rejected
+- Commit: n/a
+- Run: `analysis-runs\child-gap-first-expanded-opening-fast-20261009`, `analysis-runs\child-gap-first-realmatch-later-fast-20261009`
+- Result: Inverted the evidence policy by probing Coach root alternatives first, before SF19. Expanded opening source audited 80 generated rows and selected 0 candidates; summary found 3 near misses. The only meaningful near miss (`ruy-lopez-line6-fm14-ply18`, root `a7c7`, alternative `f4e5`) kept a positive child-pair gap through depth 12, but current Coach root search already chooses/ties `f4e5` from depth 6 onward and SF19 depth 14 agrees with Coach depth 8 on `f4e5`. Accepted-match later source audited 80 real-match rows and selected 0 candidates with 0 near misses.
+- Baseline: accepted Coach baseline `3afde24`; SF19 at `<USERPROFILE>\Downloads\stockfish-windows-x86-64-universal.exe`
+- Tests: `node --test tests\summarize_coach_child_gap_run.test.mjs`; direct root probe and child-pair probe for `ruy-lopez-line6-fm14-ply18`; SF19 comparison `ruy-line6-sf19` found 0 candidates.
+- Decision: Reject these child-gap-first packets as patch sources. The method is useful and cheaper than SF-first scans, but the generated source is still dominated by flat Ruy plateaus and the real-match source has no positive child-gap signal.
+- Next targets: search existing verifier artifacts for any positive child-gap near misses not yet classified, then pivot to a source designed to contain naturally non-flat tactical roots rather than more broad opening plateaus.
+
+## 2026-10-09 - Global Root-Spread Worklist With Material Gate
+
+- Status: diagnostic/rejected
+- Commit: n/a
+- Run: `analysis-runs\child-search-collapse-global-20261009`, `analysis-runs\coach-root-spread-worklist-global-20261009`, `analysis-runs\coach-root-spread-worklist-material-global-20261009`
+- Result: Summarized 887 historical verifier rows from 70 artifacts and rechecked two opening keepers on current code. `game3-before-8.Nxe5` and `game19-before-8.Re1` both remain broad root plateaus, but their historical positive child gaps no longer survive current direct child-pair probing (`d7e5` was -59cp vs `d7b6`; `d1d2` was -79cp vs `c2e4`). A root-spread worklist over 300 global FENs found 3 naturally separated rows, but all were sparse pawn endgames. After adding material gates to `tools\build-coach-root-worklist.mjs`, the same 300-row scan with at least 12 pieces and 6 non-pawn pieces found 0 worklist rows.
+- Baseline: accepted Coach baseline `3afde24`
+- Tests: `node --test tests\summarize_coach_child_gap_run.test.mjs tests\select_time_depth_candidate_fens.test.mjs`; direct root and child-pair probes for `game3-before-8.Nxe5` and `game19-before-8.Re1`.
+- Decision: Reject global root-spread mining as a current patch source. Naturally separated roots in this pool are sparse-endgame only; material-rich positions remain dominated by flat root tables or timeouts.
+- Next targets: a better successor source should be generated for material-rich tactical positions with forced captures/checks or externally supplied tactical/STS positions, then filtered by material, non-mate scores, bounded roots, and positive current child gap.
+## 2026-10-09 - Lucas STS Material Root-Spread Recheck
+
+- Source: `analysis-runs\lucas-sts-miss-packet-20261005`.
+- Tool/run: `analysis-runs\lucas-sts-root-spread-material-20261009`.
+- Gate: Coach root depth 7, root limit 8, min band 80cp, max top ties 3, no mate-root rows, at least 12 total pieces and 6 non-pawn pieces.
+- Result: audited 48 STS miss positions, wrote 0 root-spread rows.
+- Rejection pattern: every audited position had `band<80`; every audited position also had `topTies>3`; 30 timed before the requested root depth; only 1 failed the material gate.
+- Decision: rejected as an improvement source. This confirms the Lucas STS miss packet is mostly a flat-root/tie surface for current Coach, matching the earlier STS-best child-search checks where depth-8 and depth-10 Coach child search did not produce a confirmed >=100cp gap.
+- Next policy: stop requiring root spread for this class of evidence; use a broader SF19 disagreement source with material/non-mate gates, then filter by reference move in Coach root and positive Coach child-search gap.
+
+## 2026-10-09 - Broad Opening SF19 Low-Gap Sample
+
+- Source: `analysis-runs\broad-opening-sf19-policy-20261009\positions.fens`.
+- Generator: curated opening continuations, Coach depth 3, fullmove 8-18 samples, at least 16 pieces and 8 non-pawn pieces.
+- First Ruy slice: `sf19-d10-lowgap-first40`; Coach depth 7 vs SF19 depth 10 MultiPV 6; found 0 candidates. Most disagreements had Coach gap 0cp, so no patch signal.
+- First non-Ruy/Sicilian slice: `sf19-d10-lowgap-nonruy60`; found 1 loose SF19 candidate, `sicilian-open-line8-fm13-ply16`, Coach `c4b5` vs SF19 `b1d2`.
+- Probe: `sicilian-line8-fm13-child-pair`, depths 4-12. Static eval favored SF by 80cp, but Coach child search rejected it from depth 6 onward and stabilized at about -35cp against the SF move.
+- Decision: rejected. Root/SF disagreement is not a Coach child-search-confirmed candidate.
+- Tooling added: `tools\sample-fen-lines.mjs` plus `tests\sample_fen_lines.test.mjs`, so future passes can quickly test different opening slices without fragile shell quoting.
+
+### Follow-up Slice
+
+- Source slice: `non-ruy-skip60-next60.fens`, containing later Sicilian rows plus early Nimzo rows.
+- SF pass: `sf19-d10-lowgap-nonruy-skip60`; Coach depth 7 vs SF19 depth 10 MultiPV 6; found 1 loose candidate, `sicilian-open-line7-fm15-ply20`, Coach `b1d2` vs SF19 `f2f4`.
+- Probe: `sicilian-line7-fm15-child-pair`, depths 4-12. Coach child search favored Coach's `b1d2` at every depth, stabilizing at -96cp against SF's move.
+- Decision: rejected. The broad source is currently over-weighted toward Ruy/Sicilian because the generator stops at the global limit; next pass should target or balance later opening families directly.
+
+### Targeted QGD Slice
+
+- Tooling change: `tools\generate-opening-continuation-fens.mjs` now accepts `--include-opening-regex` and `--exclude-opening-regex`, allowing direct generation from selected opening families.
+- Source: `analysis-runs\targeted-opening-families-sf19-20261009\qgd-english-first70.fens`; first 70 rows were QGD.
+- SF pass: `sf19-d10-lowgap-qgd-english70`; Coach depth 7 vs SF19 depth 10 MultiPV 6; found 2 loose QGD candidates:
+  - `queens-gambit-declined-line7-fm9-ply8`, Coach `g1f3` vs SF19 `f2f3`.
+  - `queens-gambit-declined-line7-fm10-ply10`, Coach `a2a3` vs SF19 `f3d2`.
+- Probes: `qgd-line7-fm9-child-pair` and `qgd-line7-fm10-child-pair`, depths 4-12. Coach child search favored Coach's move at every depth in both rows, stabilizing at -155cp and -34cp against the SF moves.
+- Decision: rejected. The QGD low-gap disagreements are not child-search-confirmed Coach candidates.
+
+### Targeted English Slice
+
+- Source: `analysis-runs\english-opening-sf19-policy-20261009\first50.fens`.
+- SF pass: `sf19-d10-lowgap-first50`; Coach depth 7 vs SF19 depth 10 MultiPV 6; found 1 loose candidate, `english-four-knights-line1-fm8-ply6`, Coach `f1g2` vs SF19 `b2b3`.
+- Probe: `english-line1-fm8-child-pair`, depths 4-12. Coach child search favored Coach's move at every depth, with the SF move worse by 91cp to 116cp at depths 9-12.
+- Decision: rejected. English low-gap disagreement is not a child-search-confirmed candidate.
+
+### Targeted French Slice
+
+- Source: `analysis-runs\french-caro-kings-sf19-policy-20261009\first60.fens`; first 60 rows were French Tarrasch.
+- SF pass: `sf19-d10-lowgap-first60`; Coach depth 7 vs SF19 depth 10 MultiPV 6; found 1 loose candidate, `french-tarrasch-line2-fm8-ply6`, Coach `e1f1` vs SF19 `g1f3`.
+- Probe: `french-line2-fm8-child-pair`, depths 4-12. Static eval favored SF by 137cp, but Coach child search favored Coach's move at every searched depth and stabilized at about -100cp against the SF move.
+- Decision: rejected. This reinforces that low-gap SF19 root disagreements are mostly false positives when checked through Coach child-search.
+- Next policy: pivot from SF root disagreement to Coach's own depth-transition/instability evidence, then use SF19 only as confirmation rather than the first filter.
+
+## 2026-10-09 - Targeted Opening Depth-Transition Scout
+
+- Source: `analysis-runs\targeted-opening-families-depth-transitions-20261009\scout80.fens`; first 80 rows from the targeted opening-family source, all Nimzo.
+- First attempted full pass: depth 5 -> 8 over 180 rows was stopped at row 34 because runtime was too high for a scout pass.
+- Cheaper scout: depth 4 -> 6, root limit 16, max top ties 8, min score swing 50cp, material gate 16/8.
+- Result: audited 80 Nimzo positions, selected 0 transitions.
+- QGD/English scout: `qgd-english-d4-d6.fens`, same gate; audited 70 QGD positions, selected 0 transitions.
+- Decision: generated opening-family positions are not producing clean Coach self-instability under this gate. Next source should use broader existing analysis artifacts or real-match evidence rather than more generated opening continuations.
+
+## 2026-10-09 - Broad Existing-Artifact Reference Intake
+
+- Source: all `analysis-runs` result artifacts, ordered by newest mtime.
+- Intake run: `analysis-runs\broad-existing-reference-intake-20261009`.
+- Gate: non-mate comparisons, min diff 80cp, Coach root depth 7, root limit 24, material at least 16 total pieces and 8 non-pawn pieces, max root top ties 12.
+- Result: scanned 155 files and 1088 raw positions; audited 180 high-diff rows; selected 3 intake rows.
+- Selected rows:
+  - `ruy-lopez-line3-fm17-ply24`, Coach `e2d2` vs reference `c1b1`, diff 358cp.
+  - `ruy-lopez-line3-fm17-ply24-refline-ply4`, Coach `h6f6` vs reference `c5d6`, diff 410cp.
+  - `queens-gambit-declined-line4-fm21-ply32-refline-ply2`, Coach `c5b6` vs reference `b7b6`, diff 291cp.
+- Coach child-search verification: `reference-child-search-d7-confirm9`, child depth 7 with confirmation at depth 9 and min gap 100cp.
+- Verification result: 0 candidates. Child gaps were negative for all three selected rows: -4cp, -22cp, and -30cp.
+- Decision: rejected. Even the best gated existing-artifact rows do not show Coach's own child search preferring the reference move.
+- Next policy: look for evidence where the candidate move is generated by Coach at a deeper root or by a real match depth/time miss, not merely by SF/reference disagreement.
+
+## 2026-10-09 - Real-Match Time/Depth Flip Scout
+
+- Source: `analysis-runs\coach-3afde24-shallowblue50-time-depth-20261007\coach-time-depth-summary.json`, the 50-game ShallowBlue 1618 5+0 accepted-baseline match.
+- Strict run: `analysis-runs\realmatch-time-depth-flips-20261009\shallowblue50-midgame-d9-confirm11`; middlegame moves 16-40, played depth <=7, target depth 9, confirmation depth 11, material gate 16 total / 8 non-pawn pieces, min deeper gap 80cp, requiring shallow search to agree with the played move.
+- Strict result: audited 80 moves and selected 0 candidates. Rejections were `deeper-agrees-with-played=74` and `gap<min=80`; prefilter rejections were mainly move-window/material/depth gates.
+- Loose run: `analysis-runs\realmatch-time-depth-flips-20261009\shallowblue50-midgame-d8-confirm10-loose`; middlegame moves 11-40, played depth <=6, target depth 8, confirmation depth 10, same material gate, min deeper gap 40cp, no shallow-agreement requirement.
+- Loose result: audited 25 moves and selected 0 candidates. Rejections were `deeper-agrees-with-played=23` and `gap<min=25`.
+- Decision: rejected as a patch source. The accepted 50-game ShallowBlue time/depth data does not currently expose a clean material-rich middlegame case where deeper Coach search prefers a different move.
+- Next policy: pivot to naturally forcing tactical sources such as checks/captures/threat positions, then keep the same gates: non-mate, material-rich, bounded root ties, positive Coach child-search gap, and SF19 only as confirmation.
+
+## 2026-10-09 - Forcing Tactical Existing-Artifact Scout
+
+- Tooling added: `tools\select-forcing-fens.mjs` plus `tests\select_forcing_fens.test.mjs`. The selector ranks existing FENs by legal captures and checking moves while keeping material gates.
+- Source run: `analysis-runs\forcing-tactical-source-20261009\forcing.fens`.
+- Source result: scanned 434 FEN files and 1,200 unique positions from `analysis-runs`; selected 83 material-rich forcing rows with at least 16 total pieces, 8 non-pawn pieces, 3 captures, 1 checking move, and 5 total forcing moves.
+- Root-spread run: `analysis-runs\forcing-tactical-source-20261009\root-worklist-d7`; Coach root depth 7, root limit 16, min band 60cp, max top ties 6.
+- Root-spread result: 0 worklist rows. Rejections were `band<60=83`, `topTies>6=82`, `rootTimed=51`, and `mateRootScore=1`, showing the forcing packet is still root-flat under Coach.
+- Fast child-gap scout: `analysis-runs\forcing-tactical-source-20261009\child-gap-d5-c7-fast20`; first 20 forcing rows, root depth 5, child depth 7, root limit 8, min gap 60cp, confirm root depth 8.
+- Fast child-gap result: 0 candidates. Best alternative gaps were mostly negative; only one row (`game2-before-20.exd5`) reached a positive but tiny `+24cp`, below threshold.
+- Remaining-row scout: `analysis-runs\forcing-tactical-source-20261009\child-gap-d5-c7-skip20-noconfirm`; scanned the remaining 63 rows at root depth 5 / child depth 7, root limit 8, min gap 40cp, no confirmation, and found 3 scout candidates.
+- Deeper confirmation: `analysis-runs\forcing-tactical-source-20261009\child-gap-d6-c9-confirm10-survivors`; rechecked the 3 scout candidates at root depth 6 / child depth 9, min gap 80cp, confirm root depth 10, and non-mate check depth 11. Result: 0 confirmed candidates. `game8-before-16...Nxd3` flipped to `-104cp`, `sicilian-open-line2-fm13-ply16` fell to `+27cp`, and `before-22...b6` flipped to `-16cp`.
+- SF19 comparison: `analysis-runs\forcing-tactical-source-20261009\sf19-d12-coachd7`; Coach depth 7, SF19 depth 12, MultiPV 6, min Coach gap 60cp, max absolute SF score 3000cp.
+- SF19 result: compared all 83 forcing rows and found 0 direct candidates. Most rows were `agree` or `small-coach-gap`; the SF19 move was usually in Coach's root list but carried a 0cp Coach gap because the root table was flat. One mate/extreme row was excluded.
+- Decision: rejected as a patch source. The forcing selector is useful durable tooling, but this existing-artifact tactical packet did not produce a stable positive Coach child-search gap or a bounded-root SF19 disagreement.
+- Next policy: before abandoning this packet entirely, run one cheap lower-depth root-separation scout. If that also finds no bounded-root rows, pivot away from historical artifacts toward a generated forcing source designed to reduce root plateaus.
+
+## 2026-10-09 - Generated Capped Forcing Source
+
+- Tooling change: `tools\select-forcing-fens.mjs` now supports `--max-legal-moves`, with coverage in `tests\select_forcing_fens.test.mjs`, so forcing packets can avoid very branchy positions.
+- Historical capped recheck: `analysis-runs\forcing-tactical-source-20261009\forcing-capped36.fens` selected 18/83 existing-artifact forcing rows with legal moves <=36. Root worklist `root-worklist-capped36-d6` still selected 0 rows.
+- Generated source: `analysis-runs\generated-capped-forcing-source-20261009\opening-continuations.fens`; generated 500 Coach opening-continuation FENs from curated openings with dense sampling from fullmoves 8-24.
+- Generated forcing filter: `analysis-runs\generated-capped-forcing-source-20261009\forcing-capped36.fens`; selected 15/500 rows with at least 16 total pieces, 8 non-pawn pieces, 3 captures, 1 checking move, 5 forcing moves, and legal moves <=36.
+- Root worklist: `analysis-runs\generated-capped-forcing-source-20261009\root-worklist-d6`; Coach root depth 6, root limit 12, min band 20cp, max top ties 8. Result: 0 worklist rows; every row had `band<20` and `topTies>8`.
+- SF19 comparison: `analysis-runs\generated-capped-forcing-source-20261009\sf19-d12-coachd7`; Coach depth 7, SF19 depth 12, MultiPV 6, min Coach gap 40cp. Result: 0 candidates; rows were `agree` or `small-coach-gap`, with Coach gap on SF move always 0cp.
+- Decision: rejected as a patch source. Even fresh generated forcing positions with lower legal-move counts still collapse into flat Coach root tables under the current evidence gates.
+- Next policy: stop sampling more opening/forcing FENs until the root-score collapse is diagnosed. Use these clean forcing rows to audit whether child searches show spread hidden by root reporting/order; only patch if the audit isolates a narrow root scoring, move-ordering, or search bookkeeping bug rather than a broad root-tie policy.
+
+## 2026-10-10 - Balanced Generated Opening Child-Gap Scout
+
+- Tooling change: `tools\sample-fen-lines.mjs` now supports `--every` and `--round-robin-opening`, with tests in `tests\sample_fen_lines.test.mjs`, so generated FEN sources can avoid opening-family clumps.
+- Plateau audit follow-up: `analysis-runs\generated-capped-forcing-source-20261009\plateau-child-audit-d6-c8`; audited the 15 capped generated forcing rows at root depth 6 / child depth 8. Result: `hidden-child-spread=14`, `mate-child=1`, `root-child-disagreements=0`. Child searches showed real spread, but the root-best move remained child-best in 14/15 rows; the only mismatch was `+6cp`.
+- Balanced source: `analysis-runs\generated-capped-forcing-source-20261009\opening-balanced80.fens`, generated with round-robin opening sampling from the 500-row opening-continuation source.
+- Scout: `analysis-runs\generated-capped-forcing-source-20261009\child-gap-balanced80-d5-c7`; first 40 balanced rows, root depth 5, child depth 7, root limit 8, min gap 60cp. Result: 1 scout candidate, `ruy-lopez-line5-fm8-ply6`, root `d1e2` vs child alternative `f3e5`, gap `+99cp`.
+- Deeper confirmation: `analysis-runs\generated-capped-forcing-source-20261009\child-gap-balanced-candidate-confirm`; root depth 6, child depth 9, min gap 80cp, confirm root depth 10, non-mate check depth 11. Result: 0 candidates; the scout row flipped to `-69cp` and confirm root timed.
+- Decision: rejected as a patch source. Balanced sampling improved source diversity and produced one scout signal, but it did not survive deeper Coach confirmation.
+- Next policy: move away from opening-continuation sources. The repeated pattern is that Coach child search usually validates the current root choice at deeper depths; the next source should be real-game outcome transitions or a curated external tactical suite, not more Coach-generated openings.
+
+## 2026-10-10 - Corrected Real-Game Loss Transition Refresh
+
+- Tooling fix: `tools\select-loss-transition-fens.mjs` now filters to Coach's actual move side using the FEN side-to-move, falling back to ply parity only when FEN side is missing. It also supports `--min-total-pieces` and `--min-non-pawn-pieces`. Tests updated in `tests\select_loss_transition_fens.test.mjs`.
+- Bug found: the earlier black-loss transition extraction used all moves in Coach-as-Black games, so rows like `game40-ply28-Rh1` were opponent moves. The apparent `game40` candidate was invalid as a Coach patch source even though its child-pair probe showed `g5g6` better than `f6f7`.
+- Accepted ShallowBlue 50-game refresh: `analysis-runs\realgame-loss-transition-refresh-20261010\white-losses-material-drop120`; with the 12/6 material gate selected 0 Coach-side transitions.
+- SF19 anchor refresh: `analysis-runs\realgame-loss-transition-refresh-20261010\sf19-anchor-coach-material-losses.fens`; after Coach-side and 12/6 material filtering, selected 6 valid Coach-move transitions from `analysis-runs\sf19-anchor-openings-sf19-2400-44g-st1-20261004\time-depth\coach-time-depth-summary.json`.
+- Child-gap scout: `analysis-runs\realgame-loss-transition-refresh-20261010\sf19-anchor-coach-material-childgap-d5-c7`; root depth 5, child depth 7, root limit 8, min gap 60cp. Result: 0 candidates; best gaps were all below threshold, with the closest only `+18cp`.
+- Decision: rejected as a patch source. The corrected material-rich real-game transition source did not produce a Coach child-search-supported candidate.
+- Next policy: continue only with Coach-side/material-gated transition packets; do not reuse pre-fix black-loss transition outputs. Try a different match summary or a curated external tactical suite if available.
+
+## 2026-10-10 - Corrected SF19 st1 Loss Transition Scout
+
+- Status: diagnostic/rejected
+- Commit: n/a
+- Run: `analysis-runs\realgame-loss-transition-refresh-20261010`
+- Source: `analysis-runs\fresh-evidence-sf19-2400-20g-st1-20261005\time-depth\coach-time-depth-summary.json`
+- Result: corrected Coach-side/material-gated extraction selected 8 positions: 5 Coach-as-White losses and 3 Coach-as-Black losses.
+- Child-gap scout: `sf19-st1-coach-material-childgap-d5-c7`; root depth 5, child depth 7, root limit 8, min gap 60cp. Found 1 scout row, `game13-ply81-Kc1`.
+- Confirmation: `sf19-st1-coach-material-childgap-d6-c9-confirm-long`; root depth 6, child depth 9, confirm root depth 10, non-mate check depth 11. The row survived with root `c2c1`, deeper/child alternative `c2d2`, and a +175cp child gap; no mate rows.
+- Probe: direct child pair `game13-ply81-child-pair-c2c1-c2d2` kept `c2d2` ahead from depths 7-11, settling at +63cp from depths 9-11.
+- SF19 check: `game13-ply81-sf19-compare-d14-coachd6` rejected it as a patch source. SF19 depth 14 also preferred `c2c1`, with `c2d2` only 12cp behind.
+- Decision: reject `game13-ply81-Kc1` as an improvement candidate. It is a real Coach internal depth/child-search disagreement, but the reference engine does not support changing toward `c2d2`.
+- Next policy: pivot from loss-transition child-gap-first mining to an SF19-first disagreement source over real match positions, then require Coach child-search confirmation before patching.
+
+## 2026-10-10 - SF19 st1 Real-Position Disagreement Child-Gap Scout
+
+- Status: diagnostic/rejected
+- Commit: n/a
+- Run: `analysis-runs\sf19-realposition-disagreement-20261010`
+- Source: 80 material-rich real-match positions selected from `analysis-runs\fresh-evidence-sf19-2400-20g-st1-20261005\time-depth\coach-time-depth-summary.json` using `tools\select-time-depth-candidate-fens.mjs` in `slow-rich` mode.
+- SF19 pass: `sf19-st1-slowrich80-sf19d12-coachd7`; Coach depth 7 vs SF19 depth 12, MultiPV 6, min Coach root gap 40cp. Result: 0 strict candidates. Most disagreements had Coach root gap 0cp because Coach root scores were flat.
+- Tooling added: `tools\select-reference-child-gap-from-compare.mjs`, which reads `coach-sf19-diagnostic.json`, filters root-visible SF19 disagreements, and child-probes Coach move vs SF19 move before emitting candidates.
+- Automated child-gap pass: `sf19-st1-slowrich80-reference-childgap-top12-d5d8`; audited the top 12 SF disagreements with child depths 5-8, min final gap 60cp, and selected 0.
+- Near miss: `game9-ply75-Rg3` (`3b1k2/p4q1r/1pQ1p2r/4Pb2/3P4/2N5/PPP3R1/5RK1 w - - 5 38`), Coach `g2g3` vs SF19 `f1f3`. Deeper child-pair probe `childpair-game9-ply75-g2g3-f1f3-deep` stabilized at +48cp for `f1f3` from depths 9-12, below the 60cp candidate gate.
+- Manual probes: `game9-ply61`, `game8-ply44`, `game13-ply43`, and `game18-ply28` all rejected the SF19 move under Coach child search, with negative deeper gaps.
+- Decision: reject this SF19-first real-position slice as a patch source. It produced one small reference-supported near miss but no strong child-confirmed candidate.
+- Next policy: use the new compare-child-gap tool on smaller, better-targeted slices only. Avoid broad 30+ row deep child passes unless the source has already shown multiple +40cp near misses.
+
+## 2026-10-10 - SF19 st1 Queen-Rook Real-Position Source
+
+- Status: diagnostic/rejected
+- Commit: n/a
+- Run: `analysis-runs\sf19-queenrook-target-20261010`
+- Source: 300 material-rich SF19 `st1` real-match positions from moves 8-30, filtered to 80 queen-rook middlegames with both queens, at least two rooks, at least 16 total pieces, at least 8 non-pawn pieces, and no advanced passed pawns.
+- SF19 pass: `queenrook80-sf19d12-coachd7`; Coach depth 7 vs SF19 depth 12, MultiPV 6, min Coach root gap 20cp. Result: 2 loose SF-root candidates: `game11-ply25-Nd6` and `game3-ply19-Bb5`.
+- Automated child-gap pass: `queenrook80-reference-childgap-top16-d5d8-gap40`; audited top 16 root-visible SF disagreements at child depths 5-8, min final gap 40cp. Result: 0 selected. Closest rows were `game4-ply32-Qc5` at +31cp and `game2-ply46-Nf6` at +26cp.
+- Direct probes for the 2 loose SF-root candidates:
+  - `childpair-game11-ply25-e1g1-d1d8`: SF move `Qxd8+` did not survive child search; gap settled at -18cp depths 10-11.
+  - `childpair-game3-ply19-f1b5-e5d3`: SF move `Nxd3` did not survive child search; gap settled at -7cp depths 9-11.
+- Tooling update: `tools\select-reference-child-gap-from-compare.mjs` now supports `--max-root-top-ties` so future compare-child scans can enforce the bounded-root gate directly.
+- Decision: rejected as a patch source. This was a cleaner structural source than broad real-position scans, but Coach child search still mostly validates Coach's move.
+- Next policy: pivot from same-position SF root disagreements to SF19 follow-up/child-position sources, where the SF move is applied first and Coach's evaluation of the resulting position can expose a more concrete eval/search defect.
+
+## 2026-10-10 - SF19 Queen-Rook Follow-Up Source
+
+- Status: diagnostic/rejected
+- Commit: n/a
+- Run: `analysis-runs\sf19-followup-source-20261010`
+- Tooling update: `tools\generate-reference-followup-fens.mjs` now accepts current `coach-sf19-diagnostic.json` files in addition to older `coach-analysis-lab` result files. Existing focused test `node --test tests\generate_reference_followup_fens.test.mjs` passed.
+- Source: `queenrook-sf19-followups.fens`; generated 80 positions by applying SF19's preferred move from the queen-rook comparison source, then following shallow Coach continuations for up to 4 plies with material gate 16/8.
+- SF19 pass: `queenrook-followups-sf19d12-coachd7`; Coach depth 7 vs SF19 depth 12, MultiPV 6, min Coach root gap 40cp. Result: 0 strict candidates.
+- Bounded-root child-gap pass: `queenrook-followups-reference-childgap-top12-d5d8-gap40`; after requiring material 16/8 and max root top ties 12, only 5 rows were audited. Result: 0 selected. Closest was `game9-ply37-Rae1-refline-ply2`, Coach `h6g6` vs SF19 `d8d5`, with deepest child gap +30cp.
+- Decision: rejected as a patch source. Applying SF19 moves first created a cleaner child-position source, but Coach's root and child search still did not expose a strong reference-supported miss.
+- Next policy: filter the SF19 follow-up positions for forcing structure (captures/checks, capped legal moves) before comparing again, so the next source is tactical rather than merely structural.
+
+## 2026-10-10 - SF19 Follow-Up Forcing Source
+
+- Status: diagnostic/rejected
+- Commit: n/a
+- Run: `analysis-runs\sf19-followup-forcing-20261010`
+- Source: `forcing-followups.fens`; filtered the SF19 queen-rook follow-up source for tactical rows with at least 16 total pieces, 8 non-pawn pieces, 2 captures, 1 checking move, 3 forcing moves, and no more than 40 legal moves. Result: selected 7/63 audited follow-up rows.
+- SF19 pass: `forcing-followups-sf19d14-coachd8`; Coach depth 8 vs SF19 depth 14, MultiPV 6, min Coach root gap 20cp. Result: 1 loose candidate, `game15-ply17-Re1-refline-ply1`, Coach `d1d3` vs SF19 `e4e5`, Coach root gap 20cp.
+- Direct child-pair probe: `childpair-game15-ply17-refline-ply1-d1d3-e4e5`, depths 5-12. The SF19 move did not survive: gaps were +1, +12, 0, 0, then -1cp from depths 9-12.
+- Decision: rejected as a patch source. This was the cleanest forcing follow-up signal so far, but Coach child search treats the two moves as essentially equal and slightly favors Coach's move at stable depths.
+- Next policy: avoid more broad queen-rook/follow-up variants for now. A better successor should target actual Coach self-instability/depth transitions inside forcing rows rather than SF19 best-move disagreement, because SF19 disagreement keeps collapsing under Coach child search.
+
+## 2026-10-10 - SF19 Follow-Up Depth-Transition Scout
+
+- Status: diagnostic/rejected
+- Commit: n/a
+- Run: `analysis-runs\sf19-followup-forcing-20261010\depth-transition-d5-d8` and `analysis-runs\sf19-followup-source-20261010\depth-transition-d5-d8`
+- Forcing scout: ran Coach depth transition finder on the 7 forcing follow-up rows from depth 5 to depth 8, root limit 12, max top ties 8, min score swing 20cp. Result: 0 selected. Rejections were dominated by `low-root-top-ties>8` and `high-root-top-ties>8`.
+- Only self-instability near miss: `game9-ply37-Rae1-refline-ply2` changed root best from `e7d6` at depth 5 to `d8d5` at depth 8, but both roots were broad plateaus. Direct child-pair `e7d6` vs `d8d5` favored `d8d5` by +93cp at depths 10-12, but the deeper root-floated move was `h6g6`; direct child-pair `h6g6` vs `d8d5` settled at only +5cp for `d8d5`.
+- Full follow-up scout: ran the same depth 5 to 8 scan over all 80 queen-rook follow-up rows, root limit 12, max top ties 8, min score swing 40cp. Result: 0 selected. Rejections: `low-root-top-ties>8=73`, `high-root-top-ties>8=78`, `same-best-move=53`, `score-swing<40=71`, `high-root-timed=16`.
+- Root scoring inspection: `js\engine\search.js` root loop records per-root move scores, but these sources are genuinely returning broad same-score plateaus. This is not yet evidence for a narrow root bookkeeping patch.
+- Decision: rejected as a patch source. Coach self-instability inside the SF19 follow-up packet did not produce a bounded-root, non-mate, material-rich candidate.
+- Next policy: stop mining this SF19 `st1` queen-rook/follow-up family. The recurring blocker is broad root ties; the next evidence source should be a different policy entirely, such as curated low-branch tactical suites or positions selected by naturally low legal move count plus non-flat root bands before any SF comparison.
+
+## 2026-10-10 - SF19 Low-Branch Real-Position Source
+
+- Status: diagnostic/rejected
+- Commit: n/a
+- Run: `analysis-runs\sf19-lowbranch-realpositions-20261010`
+- Tooling update: `tools\select-time-depth-candidate-fens.mjs` now supports `--max-legal-moves` and `--min-captures`, with coverage in `tests\select_time_depth_candidate_fens.test.mjs`, so real-position sources can target low/medium-branch tactical positions instead of only slow/high-mobility rows.
+- Strict source: `lowbranch-capture-rich.fens`; material-rich moves 8-40, legal moves <=24, captures >=2. Result: selected 7/1340 rows. Coach depth 7 vs SF19 depth 14, MultiPV 6, min Coach gap 40cp found 0 candidates.
+- Relaxed source: `lowbranch-capture-relaxed.fens`; material-rich moves 8-40, legal moves <=32, captures >=1. Result: selected 120/1340 rows. Coach depth 7 vs SF19 depth 14 found 0 strict candidates.
+- Child-gap salvage: `child-gap-relaxed`; audited 8 SF19-visible rows and selected 2 direct child-gap survivors: `game3-ply51-Nd7` (Coach `a1a2`, SF19 `e1d1`, stable child gap +59cp from depths 8-12) and `game12-ply20-Qxg7` (Coach `e8f8`, SF19 `e5g7`, stable child gap +46cp from depths 9-12).
+- Clock check: current Coach under normal 5+0 clock already solves both survivor FENs: `game3-ply51-Nd7` reaches depth 8 and plays `e1d1`; `game12-ply20-Qxg7` reaches depth 9 and plays `e5g7`.
+- Decision: reject as a code patch source. The positions reinforce that depth 8 matters, but they do not expose a current 5+0 time-management or search failure.
+- Next policy: stop treating sub-depth fixed-time SF19 `st1` misses as patch candidates unless the same FEN fails under clock-based 5+0. Pivot to evidence that tests current practical play directly, such as 5+0 loss positions where Coach had normal clock time but still chose a move that deeper Coach and SF19 both reject.
+
+## 2026-10-10 - ShallowBlue 50-Game Practical Rich Source
+
+- Status: diagnostic/rejected
+- Commit: n/a
+- Run: `analysis-runs\shallowblue50-practical-rich-20261010`
+- Source: accepted-baseline 50-game ShallowBlue 1618 5+0 time/depth summary, selecting material-rich moves 8-40 where Coach spent at least 5s, legal moves <=32, captures >=1, and material >=12/6.
+- Source result: `spent-rich-lowbranch.fens` selected 32/3556 Coach moves.
+- SF19 pass: `compare-d8-sf14`; Coach depth 8 vs SF19 depth 14, MultiPV 6, min Coach root gap 30cp. Result: 0 strict candidates. Most rows were `agree` or `small-coach-gap`, with SF19 moves carrying 0cp Coach root gap.
+- Child-gap salvage: `child-gap-d5d8`; only 2 SF19-visible rows qualified for audit (`game41-ply61-e6`, `game39-ply67-Rb1`), and selected 0 candidates.
+- Decision: rejected as a patch source. This current-practical-play source did not expose a position where Coach spent normal 5+0 time but missed a move that Coach child search and SF19 both support.
+- Next policy: stop broad SF19 comparison over match-derived real positions for now. Try a curated tactical/STS-style external suite or a deliberately narrow hand-built tactical packet where expected best moves are known, then require current Coach to fail under 5+0-like search before considering a patch.
+
+## 2026-10-10 - SF19-Guided Tactical Opening Source
+
+- Status: diagnostic/rejected
+- Commit: n/a
+- Run: `analysis-runs\sf19-guided-tactical-source-20261010`
+- Tooling added: `tools\generate-sf19-guided-tactical-fens.mjs` follows verified SF19 from curated openings, branches with MultiPV, and keeps material-rich positions where SF19's best move is a forcing move. This creates a fresh known-reference tactical source rather than another Coach-generated continuation packet.
+- Source result: `sf19-guided-tactical.fens` generated 80 positions from the Ruy Lopez and Sicilian prefixes at SF19 depth 8, requiring material >=12/6, at least one capture available, legal moves <=40, and a forcing SF19 best move. Rejections were mainly `sfBestNotForcing=192`, `legalMoves>40=71`, and `captures<1=14`.
+- SF19 pass: `compare-coachd8-sf14`; Coach depth 8 vs SF19 depth 14, MultiPV 6, min Coach root gap 30cp. Result: 0 strict candidates.
+- Strict child-gap pass: `child-gap-top24-d5d8`; bounded root ties <=12 selected 0 candidates. Only one row was audited under the strict gate and it failed.
+- Loose child-gap pass: `child-gap-loose-d5d8`; audited 24 SF-visible rows with max root ties 40 and min gap 20cp; selected 0. One row, `ruy-lopez-sfline8-fm9-ply9`, showed a large but unstable child gap and was promoted to direct probing.
+- Diagnostic survivor: `ruy-lopez-sfline8-fm9-ply9` / `r1b1kb1r/2ppqppp/p1n2n2/1p2P3/8/1Bp2N2/PPP2PPP/R1BQ1RK1 b kq - 3 9`. Direct child-pair `c6e5` vs `f6e4` favored `f6e4` by +193cp from depths 8-12, while root depth 8 and 10 returned broad same-score plateaus. Root-child audit confirmed a `root-child-disagreement`; a top-5 targeted audit found this as the only disagreement, with four other rows showing hidden child spread but root-best agreement.
+- Decision: reject as a patch source for now. The source is useful and produced one real high-material root/child contradiction, but it violates the bounded-root gate and does not yet justify a broad high-material root-tie verification policy, a family that has repeatedly hurt match strength.
+- Next policy: continue with a root-child-disagreement evidence source, not SF-best disagreement. Mine fresh tactical rows for repeated completed-root, high-material root-child disagreements; only patch if multiple rows isolate the same narrow root scoring/search bookkeeping mechanism without broad root-tie policy changes.
+## 2026-10-10 - SF19-Guided Tactical Diverse Plateau Audit
+
+- Status: diagnostic/rejected
+- Commit: n/a
+- Run: `analysis-runs\sf19-guided-tactical-diverse-20261010`
+- Tooling update: `tools\generate-sf19-guided-tactical-fens.mjs` now supports `--max-samples-per-opening`, and `tools\select-root-plateau-targets-from-compare.mjs` now supports `--classification-regex`, `--exclude-agree`, `--require-sf-in-root`, and `--max-sf-rank` so plateau audits can avoid already-agreeing rows.
+- Source result: generated 100 SF19-guided tactical rows across 10 curated openings, capped at 10 rows per opening. Coach depth 8 vs SF19 depth 14 produced 0 strict candidates.
+- Plateau audit: broad selector found 40/100 high-material root plateau rows; top-8 audit found `hidden-child-spread=8`, `disagreements=0`. Non-agree/SF-visible selector found 18/100 rows; top-8 audit found `hidden-child-spread=6`, `true-flat=2`, `disagreements=0`.
+- Tests: `node --check tools\select-root-plateau-targets-from-compare.mjs`; `node --check tools\generate-sf19-guided-tactical-fens.mjs`; `node --test tests\select_time_depth_candidate_fens.test.mjs tests\generate_reference_followup_fens.test.mjs tests\select_forcing_fens.test.mjs` all passed.
+- Decision: reject this diverse SF19-guided source as a patch source. High-material root plateaus are common, but the audited rows mostly agree with deeper Coach child search, so this does not justify widening high-material root-tie verification.
+- Next policy: pivot to a different evidence policy, preferably current-practical 5+0 positions where Coach spent real clock but failed to reach or hold a depth-8 resource, or a small curated tactical/known-answer suite; do not keep sampling equivalent SF19-guided opening plateau rows.
+
+## 2026-10-10 - Current Practical Slow-Shallow 5+0 Source
+
+- Status: diagnostic/rejected
+- Commit: n/a
+- Run: `analysis-runs\current-practical-slow-shallow-20261010`
+- Tooling update: `tools\select-time-depth-candidate-fens.mjs` now supports `--mode slow-shallow`, with a focused test in `tests\select_time_depth_candidate_fens.test.mjs`, so real 5+0 moves can be selected when Coach spent meaningful time but still reached only shallow depth.
+- Source result: from accepted-baseline ShallowBlue 1618 50-game 5+0 time-depth summary, selected 29/3556 rows with time >=6s, depth <=7, moves 8-40, material >=12/6, legal moves <=36, and at least one capture.
+- SF19 pass: Coach depth 8 vs SF19 depth 14 produced 1 strict row, `game35-ply63-Rf1` (`f2f6` vs SF19 `a1f1`, Coach root gap 38cp), but direct child-pair depths 5-12 rejected it; Coach's `f2f6` was ahead by 28-79cp at depths 10-12.
+- Coach self-depth pass: depth 5 -> depth 8 scan selected 3 rows. `game45-ply29-e4` and `game35-ply61-Qf2` were already the actual 5+0 match moves. `game22-ply60-c5` actual `c7c5` vs deeper-root `d8c8` was rejected by direct child-pair probe; actual `c7c5` was ahead by 5-11cp at depths 8-12.
+- Tests: `node --check tools\select-time-depth-candidate-fens.mjs`; `node --test tests\select_time_depth_candidate_fens.test.mjs` passed.
+- Decision: reject this current-practical slow-shallow packet as a patch source. It confirms depth-8/deeper moves matter, but the promising rows either were already played in the 5+0 game or failed deeper child-pair confirmation.
+- Next policy: move to a curated tactical/known-answer source rather than another sampled-opening or practical slow-shallow pass; require Coach to fail the known answer under current clock/search and then survive Coach child/deeper confirmation before patching.
+
+## 2026-10-10 - Game15 Ply151 Mate-Horizon Diagnostic Recheck
+
+- Status: diagnostic/future-target
+- Commit: n/a
+- Run: `analysis-runs\mate-horizon-game15-ply151-20261010`
+- Source: older verified non-mate-wide reference-child intake candidate `game15-ply151-g8R-before`, FEN `8/4N1P1/4KP1k/3R3P/2q5/8/8/8 w - - 17 76`.
+- Probe: current Coach root depths 4-12 showed `e6f7` appears at depth 7, `g7g8r` returns at depths 8-10, depth 11 reports `e6f7` as mate-class `999.87`, and depth 12 flattens all top moves to mate-class `999.87`.
+- PV replay: UCI depth 11 produced `e6f7 c4e4 g7g8r e4d5 e7d5 h6h5 f7e6 h5h4 f6f7 h4h3 f7f8q h3h4`; replay ended at `5QR1/8/4K3/3N4/7k/8/8/8 w - - 1 82`, which is not a terminal mate position.
+- Decision: do not patch under the active non-mate SF19 diagnostic goal. Preserve as a future false-mate / mate-PV sentinel target if the work pivots back to mate-score correctness.
+- Next policy: continue the active goal with non-mate, material-rich, bounded-root evidence. Avoid letting this mate-class endgame pull the current loop into broad root tie or broad mate-verification policy.
+
+## 2026-10-10 - Positive Subthreshold Reference-Child Aggregate
+
+- Status: diagnostic/rejected
+- Commit: n/a
+- Run: `analysis-runs\positive-subthreshold-aggregate-20261010`
+- Tooling added: `tools\summarize-positive-subthreshold-reference-child.mjs` aggregates prior `reference-child-search.json` rows, dedupes by FEN, and filters non-mate material-rich positive child gaps.
+- Strict aggregate: gap 35-99cp, material >=12/6, root ties <=24 selected 0/864 rows from 67 reference-child files.
+- Relaxed root-tie aggregate: root ties <=60 selected 4 rows. Direct child-pair depths 8-12 found two stable subthreshold rows: `lucas-g4-i73` held +79cp for STS `f1f5`, and `lucas-g10-i58` held +66cp for STS/SF19 `e3c5`; `game4` collapsed to +16-18cp and `lucas-g2-i69` reached only +62cp at depth 12.
+- SF19 check: Coach d8 vs SF19 d14 over the 4 relaxed rows found 0 strict candidates. SF19 aligned with `lucas-g10-i58` (`e3c5`) and `lucas-g2-i69` (`g8c8`), but Coach root gap was 0cp.
+- Root probes: `lucas-g10-i58` and `lucas-g2-i69` both kept broad same-score root plateaus through depth 12; the SF19/child-favored move floated to first, but remained tied with many alternatives.
+- Decision: reject as a patch source. These are useful diagnostics of high-tie root plateaus hiding small child-search differences, but they do not justify a broad root-tie policy change.
+- Next policy: target non-flat root-spread sources. The repeated blocker is flat Coach root tables; prioritize sources where Coach already shows a bounded root band before comparing SF19 or child gaps.
+
+## 2026-10-10 - Non-Flat Root-Spread / Mate-Horizon Pivot
+
+- Status: diagnostic/candidate-lead
+- Commit: n/a
+- Runs: `analysis-runs\current-practical-slow-shallow-20261010\root-worklist-d7-band20-ties8`; `analysis-runs\sf19-guided-tactical-diverse-20261010\root-worklist-d7-band20-ties8`; `analysis-runs\sf19-guided-tactical-source-20261010\plateau-audit-top12-equivalent-d8-c7`; `analysis-runs\sf19-guided-tactical-source-20261010\plateau-audit-top12-deep-d8-c10`; `analysis-runs\mate-horizon-game15-ply151-20261010\root-tt-diagnostic-d11-c10-entry`.
+- Non-flat source check: current-practical slow-shallow audited 29 rows and found 0 root worklist rows at depth 7 with band >=20cp and top ties <=8. SF19-guided diverse audited 100 rows and found 0 rows; rejections were `band<20=100`, `topTies>8=90`.
+- Root plateau exact-child check: top 12 SF19-guided tactical plateau rows all showed hidden child spread, but 0 root-child move disagreements at equivalent child depth 7 and 0 disagreements at deeper child depth 10. The root table flatness is mostly alpha-beta bound reporting, while the first root move still survives exact child rescoring in this packet.
+- Candidate lead: `game15-ply151-g8R-before` remains a real mate-horizon/TT target. UCI depth 11 still reports `e6f7` as mate-class with a PV that does not terminate in mate. SF19 depth 18 on the child position `8/4NKP1/5P1k/3R3P/2q5/8/8/8 b - - 18 76` reports centipawn-class advantage, not mate.
+- TT diagnostic: after root depth 11, the child entry after `e6f7` is TT `EXACT`, depth 11, stored score `-99988`, move `c4-e4`; searching the same child with the shared TT returns `99987` immediately, while isolated depth 10 and fresh depth 10 return `2075cp`. Fresh child depth 11 still reproduces a false mate-class result, so the issue is deeper than a stale non-exact root bound.
+- Negative patch probes: skipping non-exact mate TT bound cutoffs did not fix the child false mate. Fully disabling PVS or LMR for the depth-11 child was too slow for a practical quick candidate and was reverted.
+- Decision: the active non-mate SF19/STS/practical sources are dry. The best current improvement lead is now a narrow false-mate search diagnostic, likely in the PVS/LMR/TT interaction path, not another sampled-opening or ShallowBlue packet.
+- Next targets: add a focused sentinel that reproduces the child-position false mate, then isolate the smallest condition that prevents exact mate-class TT storage when the PV cannot be proven terminal. Avoid broad root-tie verification or global PVS/LMR disablement unless a much narrower trigger is found.
+
+## 2026-10-11 - Sparse Mixed-Material Quiet-Queen QSearch Candidate
+
+- Status: candidate / local gates passed / smoke pending
+- Commit baseline: `3afde24`
+- Target: child FEN `8/4NKP1/5P1k/3R3P/2q5/8/8/8 b - - 18 76`; baseline depth 11 reported false `mate -6`, while SF19 depth 18 remained centipawn-class.
+- Diagnosis: captures-only qsearch removed the false mate. Removing quiet promotions alone did not. Removing quiet queen checks changed the result to centipawn-class, isolating the active branch. An all-sparse (`<=6` non-king pieces) queen-check gate fixed the target but broke the accepted sparse knight-pawn root-tie sentinel after promotion.
+- Change: omit qsearch quiet queen checks only when 4-6 non-king pieces remain. Quiet checks from every other piece remain enabled, quiet promotions remain enabled, ultra-sparse 0-3-piece queen conversion remains unchanged, and positions with 7+ non-king pieces retain quiet queen checks.
+- Sentinel: opt-in depth-11 test `sparse queen-check qsearch does not report false mate` now requires a non-mate-class score on the exact child FEN. A fast move-generation test covers the 4-6 gate plus both neighboring material classes.
+- Tests: `node --test tests\engine_regressions.test.mjs` passed 65, skipped 68, failed 0; `node --test tests\root_tie_verification.test.mjs` passed 8/8; focused slow sentinel passed 1/1; `run-slow-tests.cmd /position rollback` passed 4/4, including all six rollback SF2400 positions.
+- Stability: `analysis-runs\candidate-sparse-mixed-qqueen-piececount-stability-short-20261011.json` vs `analysis-runs\bench-baseline-3afde24` was SearchStable OK, with unchanged tree shape, 0 PV changes, 0 root-order changes, and candidate timing 0.399% slower.
+- Decision: promote to a 20-game ShallowBlue 1618 `5+0` smoke. Do not accept unless it shows no practical regression against the published `3afde24` baseline (`34 - 10 - 6 [0.740] 50` nearest long-run evidence).
+- Next targets: run and mine the smoke; reject and revert candidate code if the practical score or mate/swing profile regresses.
+
+## 2026-10-11 - Strong-Engine Search-Feature Audit / Goal Expansion
+
+- Status: diagnostic / active-goal amendment
+- Baseline: `3afde24`; preserve the same sentinel, regression, stability-short, and ShallowBlue smoke acceptance gates.
+- Sources: current Stockfish search (`https://github.com/official-stockfish/Stockfish/blob/master/src/search.cpp`), Stockfish tested IIR change (`https://github.com/official-stockfish/Stockfish/commit/b1053e6`), Ethereal releases (`https://github.com/AndyGrant/Ethereal/releases`), and Berserk's documented search stack (`https://github.com/jhonnold/berserk`).
+- Gap audit: Coach already has iterative deepening, aspiration windows, PVS, conservative LMR, null move, reverse futility, check extensions, TT ordering, killers, basic from-to history, and qsearch SEE pruning. It does not currently have IIR, verified ProbCut, countermove/continuation/capture history, history-informed LMR/pruning, correction history, singular extensions, main-search SEE pruning, late-move pruning, or qsearch TT reuse.
+- Priority 1: add telemetry before another broad feature patch: TT-miss rate by node type/depth, first-move cutoff rate, mean cutoff move index, and quiet/capture cutoff split. Use it to decide whether move ordering or pruning is the actual depth bottleneck.
+- Priority 2: if deep PV/cut TT misses are frequent, test one conservative IIR candidate: reduce depth by one only at sufficient depth with no TT move. Require lower cutoff index or node count without sentinel loss before smoke.
+- Priority 3: if high-SEE captures frequently cause later cutoffs, test one verified ProbCut candidate: non-PV, non-mate window, sufficient depth, SEE-qualified captures, qsearch precheck, and reduced null-window verification. Reject on any mate/PV sentinel regression.
+- Priority 4: only with cutoff-order evidence, add one history layer at a time: capture history first or countermove/continuation history, then use it for ordering before considering history pruning or more aggressive LMR.
+- Deferred: correction history needs an eval-residual corpus; singular extensions and qsearch TT reuse are too entangled with current false-mate/root-tie behavior for the first experiment; NNUE, SMP, bitboard conversion, and tablebase integration are architecture projects rather than narrow candidates.
+- Decision: the active goal now includes this ranked successor lane. Finish the current sparse-qsearch smoke first; if it rejects, start telemetry rather than returning to another equivalent sampled-opening/SF19 intake pass.
+
+## 2026-10-11 - Paired Candidate-vs-Baseline Confirmation Gate
+
+- Status: process improvement / active-goal amendment
+- Motivation: separate candidate quality from opponent and opening noise. Stockfish's Fishtest tests a patched engine directly against its base, uses paired opening assignments, and accumulates W-L-D/pentanomial evidence until its statistical stopping rule is reached. Coach cannot reproduce that scale locally, but it can adopt the high-value experimental shape.
+- Available assets: executable baseline snapshot `analysis-runs\bench-baseline-3afde24\uci.js`; verified deterministic 10-opening suite `analysis-runs\fresh-evidence-shallowblue1618-20g-5m0-pgnsuite-20260928c\openings.pgn`; CuteChess `-repeat` color swapping was already smoke-tested with this suite. `<USERPROFILE>\Downloads\rodent.bin` remains available for later randomized-book confirmation, but the deterministic PGN suite is easier to reproduce and audit.
+- New gate: after a candidate passes its exact sentinel, focused regressions, rollback tests, and stability-short, run candidate directly against the accepted baseline with the same Hash/Move Overhead, paired openings, equal colors, and a fresh recorded seed. Use this as a sensitive candidate screen; retain ShallowBlue 1618 as the independent practical-collapse check.
+- Interpretation: a short A/B run can reject a clear loser but cannot prove a small Elo gain. Preserve pair-level outcomes and confidence bounds, and extend promising/ambiguous candidates rather than accepting from a lucky 20-game score. Do not call a local short run "SPRT" unless an actual sequential likelihood test and predeclared bounds are implemented.
+- Candidate-discovery order if the current smoke rejects: run the new cutoff/TT telemetry first; choose conservative IIR only when deep no-TT-move nodes are common, verified ProbCut only when qualifying captures support it, or one history layer only when late cutoff indices show ordering weakness. Then apply the paired A/B gate before another opponent smoke.
+- Decision: add paired candidate-vs-baseline testing to the active goal as a confirmation lane. It complements rather than replaces the existing ShallowBlue baseline and SF19 diagnostic evidence.
+
+## 2026-10-11 - Candidate Neighborhood Robustness Gate
+
+- Status: tooling / active-goal amendment
+- Motivation: narrow fixes derived from one FEN can overfit the exact position. Before accepting a correctness/search candidate, generate nearby legal positions and check whether baseline-vs-candidate behavior forms a coherent family under SF19 rather than a one-position coincidence.
+- Tooling: `tools\generate-fen-neighborhood.mjs` performs deterministic breadth-first legal move expansion with a ply and position cap, writing `.fens`, JSON, and Markdown evidence. `tests\generate_fen_neighborhood.test.mjs` covers determinism, bounds, legal child generation, and CLI validation (3/3 passed).
+- Current packet: `analysis-runs\candidate-sparse-mixed-qqueen-neighborhood-20261011` contains the false-mate seed plus 23 legal one-ply children. Keep the running 5+0 smoke uncontended; after it completes, probe this same packet at equal depths with baseline `3afde24`, the candidate, and SF19.
+- Gate: reject or narrow the patch if it creates new mate-class disagreement against SF19, breaks adjacent ultra-sparse conversion behavior, or only changes the exact seed without a defensible correctness explanation. A coherent reduction in false mate-class scores with no neighboring regression strengthens acceptance, but does not replace match testing.
+- Decision: add neighborhood robustness to candidate validation when a patch is triggered by one or very few exact positions. This is especially important for mate-score, TT, qsearch, and root-tie changes.
+
+## 2026-10-11 - Lazy Move-Generation Audit Lane
+
+- Status: diagnostic / active-goal amendment
+- Finding: Coach's `stagedPicker` delays scoring/sorting later buckets, but `negamax()` first calls `legalMoveGenerator.generateMoves()` and partitions the complete legal list. Thus a first-move beta cutoff still pays to generate and legality-check every quiet move. Current Stockfish separates pseudo-legal capture, quiet, and evasion generation and its MovePicker advances by stage, allowing later move classes to remain ungenerated after an early cutoff.
+- Tooling update: `tools\profile-search-cutoffs.mjs` now records total generated moves, searched moves, unused generated moves at beta cutoffs, aggregate generated-move use rate, and measured generation/order/make/undo phase time in addition to TT and cutoff-order metrics. Focused profiler plus neighborhood tests passed 5/5; the phase-timing extension kept its focused profiler tests at 2/2.
+- Decision rule: after the live match, run telemetry on the stable benchmark corpus. Consider a lazy capture/quiet legal-generation candidate only if a large share of generated moves is unused at cutoffs and search phase timing confirms move generation is material. This is potentially higher leverage than another pruning threshold, but it is a larger move-generator boundary change and therefore requires perft, legal-move, engine regression, search-equivalence, and match gates.
+- Priority: place this beside IIR, not ahead of evidence. If deep no-TT-move nodes dominate, try conservative IIR first; if unused generated moves and generation time dominate, prototype lazy staging; if late cutoff indices dominate, improve history ordering; if qualifying capture cutoffs dominate, consider verified ProbCut.
+
+## 2026-10-11 - Sparse Mixed-Material Quiet-Queen Candidate Final Validation
+
+- Status: accepted-narrow / committed as `423afb3`
+- Baseline: `3afde24`; candidate remains the 4-6 non-king-piece qsearch quiet-queen-check gate described above.
+- ShallowBlue smoke: `analysis-runs\candidate-sparse-mixed-qqueen-shallowblue1618-20g-5m0-20261011`; 20 games at `5+0`, concurrency 4, no opening book, seed `26092501`. Final Coach score `14 - 4 - 2 [0.750] 20`, matching the nearest accepted 50-game baseline `34 - 10 - 6 [0.740] 50` within smoke-level noise. Color split was White `5 - 4 - 1 [0.550]`, Black `9 - 0 - 1 [0.950]`, so this is non-regression evidence rather than a strength estimate.
+- Mining: 20/20 games replayed, 1,434 Coach-scored moves, 10 selected swings: 5 centipawn drops, 4 entered-losing-mate rows, and 1 mate-score change. No crash, replay error, or match warning was observed.
+- Neighborhood breadth: `analysis-runs\candidate-sparse-mixed-qqueen-neighborhood-20261011` contains the seed plus all 23 legal one-ply children. At Coach depth 8 / SF19 depth 12, candidate and baseline had identical best moves and scores on 23/24 rows; the remaining row kept the same Coach/SF19-agreed move and shifted by only 1cp.
+- Neighborhood depth: on a five-position forcing/representative sample at Coach depth 10 / SF19 depth 16, baseline reported the seed as false mate-class `-99988`, candidate reported normal `-2436cp`, and SF19 reported normal `-1440cp`. On the four neighboring positions with real mate-class outcomes, candidate and baseline retained identical moves/scores and SF19 independently remained mate-class.
+- Paired A/B interpretation: a general opening A/B is unlikely to distinguish this correctness patch because the exact seed and every sampled neighbor retained the same Coach move; the practical ShallowBlue smoke plus direct baseline/candidate/SF19 neighborhood comparison is more informative for this candidate. Retain paired A/B as the default gate for future candidates that change played moves or search efficiency.
+- Decision: accept narrowly. The candidate removes a reproducible fabricated mate score, preserves true neighboring mates, passes exact and adjacent sentinels, rollback/regression/root-tie tests, SearchStable stability, and a 75% ShallowBlue smoke. Prepare a scoped release without bundling unrelated worktree changes.
+
+## 2026-10-11 - Search Cutoff / Move-Generation Telemetry Result
+
+- Status: diagnostic / successor-goal evidence
+- Runs: `analysis-runs\search-cutoff-profile-primary-20261011.json` (10 primary benchmark positions at corpus depths) and `analysis-runs\search-cutoff-profile-primary-d8-one-20261011.json` (quiet-defense at depth 8).
+- Primary aggregate: 118,889 instrumented positive-depth nodes; TT hit rate 22.9%; 46,833 beta cutoffs; first-move cutoff rate 92.4%; mean cutoff index 1.16. Coach generated 1,662,104 legal moves but searched 413,960 (24.9% use), with 1,247,916 already-generated moves left unused at beta cutoffs. Move generation consumed 69.7% of tracked generate/order/make/undo time; ordering consumed 2.5%.
+- Depth-8 check: first-move cutoff rate 96.0%, mean cutoff index 1.09, generated-move use 29.8%, and move generation consumed 77.2% of tracked phase time. `deepNoTtMoveNodes=0`, so the proposed conservative IIR gate had no opportunities in this representative deeper run.
+- Capture signal: primary telemetry recorded 39,403 capture cutoffs versus 7,430 quiet cutoffs; 25,381 capture cutoffs had non-losing SEE. This leaves verified capture-only ProbCut as a secondary experiment, but only after the more direct generation bottleneck.
+- Decision: promote lazy capture/quiet legal-move staging to the next improvement goal. Coach's existing ordering is already effective once moves exist; the larger waste is eagerly generating and legality-checking move classes never reached after a cutoff. Deprioritize IIR and additional history for now. Any prototype must preserve exact move legality and ordering, then pass perft, legal-move tests, engine regressions, search equivalence/stability, neighborhood mate sentinels, paired candidate-vs-baseline testing if behavior changes, and ShallowBlue smoke.
+
+## 2026-10-11 - Material-Rich Lazy Quiet-Generation Candidate
+
+- Status: accepted-narrow / committed as `3ae1771`
+- Baseline: accepted qsearch correctness commit `423afb3`, preserved at `analysis-runs\bench-baseline-423afb3`.
+- Change: at non-check, material-rich nodes (at least 10 non-king pieces) using staged ordering, with no quiet TT move and no promotion-ready pawn, generate and search legal captures first. Generate the quiet stage only if capture search does not cut off. Roots, checks/evasions, quiet-TT nodes, promotions, and sparse endings retain the established full-generation path. `COACH_LAZY_QUIET_MOVE_GENERATION=0` provides direct rollback.
+- Motivation: baseline telemetry generated 1,662,104 legal moves but searched 413,960; move generation consumed 69.7% of tracked phase time, first-move cutoff rate was 92.4%, and mean cutoff index was 1.16. Extra move-history work was therefore lower leverage than avoiding unvisited quiet generation.
+- Correctness: `node --test tests\perft.test.mjs tests\root_tie_verification.test.mjs tests\engine_regressions.test.mjs` passed 107 with 68 skipped, including start-position perft depth 5, Kiwipete depth 4, promotions, en passant, LMR, root-tie, mate normalization, and qsearch sentinels. `run-slow-tests.cmd /position rollback` passed 4/4 and all six selected rollback positions. The exact sparse false-mate sentinel passed; apples-to-apples wall time was 105.1s candidate versus 106.4s baseline, confirming the material gate avoids the ungated sparse-endgame penalty.
+- Search equivalence: two fresh 16-group stability-short runs against `423afb3` retained Exact identity on all four primary positions. Seed `260101`: +2.565% raw; seed `260102`: +3.639% raw. Identical-build control was +0.069%. Multi-run summary: accepted, +3.033% mean control-adjusted gain, 2/2 positive runs, 4/4 positive positions in both gated runs, worst aggregated position +1.549%, no dominance failure.
+- Mechanism check: on the 10-position primary corpus, candidate searched the identical 413,960 moves while generated moves fell from 1,662,104 to 662,535 (-60.1%); measured generation time fell 39.8%, tracked generation/order/make/undo time fell 32.5%, and quiet generation was skipped at 31,049 / 45,393 eligible nodes (68.4%).
+- Paired A/B: `analysis-runs\candidate-lazy-quietgen-vs-423afb3-20g-st1-20261011`, 20 fixed-1s games, 10 deterministic openings, each color, concurrency 4. Candidate scored `10 - 8 - 2 [0.550]`; candidate White `8 - 1 - 1`, Black `2 - 7 - 1`, with overall White score 80%. Treat as non-regression/small positive smoke, not proof of Elo gain.
+- Final ShallowBlue gate: `analysis-runs\candidate-lazy-quietgen-shallowblue1618-20g-5m0-20261011`; 20 games, `5+0`, concurrency 4, seed `26092501`, no book. Coach scored `17 - 3 - 0 [0.850] 20`; White `7 - 3 - 0 [0.700]`, Black `10 - 0 - 0 [1.000]`. This exceeds the immediate `423afb3` qsearch smoke `14 - 4 - 2 [0.750] 20` and shows no regression versus published `3afde24` 50-game evidence `34 - 10 - 6 [0.740] 50`; still treat 20 games as smoke rather than proof of a 110-point Elo gain.
+- Smoke mining: all 20 games replayed with 0 errors; 1,520 Coach-scored moves and 10 selected swings: 3 centipawn drops, 2 entered-losing-mate rows, and 5 mate-score changes. No crash or match warning occurred.
+- Candidate guardrails: added direct tests proving feature-off/feature-on exact root move, score, node count, and root table equality in a material-rich position, plus sparse and promotion-ready fallback coverage. Final focused/default affected suite passed 109, skipped 68, failed 0.
+- Decision: accept narrowly. The candidate preserves exact fixed-depth search behavior, reduces eager move generation materially, clears perft/regression/root-tie/rollback/false-mate gates, passes two independent controlled speed runs, scores 55% in paired candidate-vs-baseline play, and scores 85% in the final ShallowBlue smoke.
+
+## 2026-10-11 - Native Quiet-Only Generation Follow-Up
+
+- Status: rejected / reverted
+- Baseline: accepted `3ae1771`, preserved at `analysis-runs\bench-baseline-3ae1771`.
+- Hypothesis: replace the deferred quiet stage's full legal generation plus capture filtering with native pseudo/legal quiet-only generation, preserving castling and quiet promotions while excluding captures, capture-promotions, and en passant.
+- Correctness probe: a six-position partition sentinel covered initial position, castling-rich Kiwipete, en passant, quiet/capture promotions, check evasion, and a pinned piece. Legal captures plus legal quiets exactly reconstructed the full legal move set with no duplicates.
+- Incremental benchmark: `analysis-runs\candidate-native-quietgen-ab4-20261011.json`, four-position stability-short against `3ae1771`, Exact identity. Result was 0.458% slower overall; quiet-open +0.005%, tactical-capture -0.522%, high-branching -2.314%, promotion-race +0.971%.
+- Decision: reject before broad slow gates or match testing because it missed the predeclared +1% incremental threshold and was directionally negative. Reverted only the native quiet-only generator/search/test changes; accepted `3ae1771` remains intact.
+- Next target: follow the goal fallback and test one conservative verified capture-only ProbCut candidate, using the existing capture-cutoff telemetry and strict PV/mate/SEE/depth gates.
+
+## 2026-10-11 - Verified Capture-Only ProbCut Follow-Up
+
+- Status: rejected / reverted
+- Baseline: accepted `3ae1771`, preserved at `analysis-runs\bench-baseline-3ae1771`.
+- Candidate: at non-root depth-6 scout nodes outside check, repetition, and mate-class windows, search only non-losing SEE captures. Require a qsearch fail-high at `beta + 200cp`, then repeat it in a reduced null-window search before returning fail-hard beta. Static evaluation had to be within 200cp of beta, and no speculative result was stored in the TT.
+- Guard probe: focused helper tests covered depth, PV, root, check, repetition, mate-bound, static-margin, feature-off, and lazy-static-evaluation gates. The feature path maintained make/undo symmetry.
+- Shallow benchmark: `analysis-runs\candidate-verified-probcut-ab4-20261011.json` retained SearchStable identity and identical tree shape on the four-position stability-short corpus, but was 0.536% slower. Telemetry confirmed zero ProbCut opportunities at these fixed depths, so the result measured guard overhead and timing noise rather than useful pruning.
+- Deep telemetry: depth 8 on `quiet-defense` produced 1 attempt, 1 verification, and 1 cutoff, reducing nodes from 112,360 to 112,047 (-0.28%). Across four depth-7 positions, lowering the minimum to depth 5 produced 20 capture attempts, 2 verifications, and 2 cutoffs, saving about 234 nodes out of roughly 609k (<0.04%). Lowering the margin from 200cp to 150cp added one verification but no cutoff and slightly increased nodes.
+- Decision: reject before slow sentinels or match testing. The strict verified form was too rare to create meaningful savings, while looser gates would exchange mate/PV safety for a threshold-tuning exercise unsupported by the measured tree. Reverted all ProbCut search and test changes; accepted `3ae1771` remains intact.
+- Next target: pivot away from speculative forward pruning. Audit a structurally different low-risk source from strong engines: transposition-table reuse inside qsearch or a narrowly measured main-search SEE/late-move pruning lane, but first instrument qsearch TT opportunity and main-search late-move cost so the next patch has a quantified trigger.
+
+## 2026-10-11 - Material-Rich Isolated QSearch TT Candidate
+
+- Status: accepted-narrow / ready to commit
+- Baseline: accepted `3ae1771`, preserved at `analysis-runs\bench-baseline-3ae1771`.
+- Telemetry: the extended cutoff profiler tracks completed qsearch bounds by position and q-ply, normalizes mate scores across root plies, bypasses repetition-sensitive entries, and counts only the first reusable node on an active path. Four primary positions showed 50,410 reusable entries out of 302,558 eligible and an estimated 17.3% qsearch-entry / 15.2% generated-move reduction. The sparse false-mate plus three match-derived tactical targets showed 175,654 reusable entries out of 1,048,061 eligible and an estimated 17.4% entry reduction.
+- Change: add a separate qsearch-only transposition table so qsearch entries cannot evict or masquerade as main-search entries. Keys include board hash, q-ply context, and halfmove clock; scores use existing mate-distance normalization; exact/lower/upper bounds use fail-hard returns; repetition-sensitive nodes bypass probe/store. The table is one quarter of configured main Hash up to an 8 MB cap, follows hash resize/clear and search age, and has `COACH_QSEARCH_TT=0` rollback.
+- Safety narrowing: the first broad prototype changed the accepted sparse knight-pawn root-tie result. Isolating root-tie verification tables was necessary but did not remove the change. Qsearch TT reuse is therefore limited to positions with at least 10 non-king pieces, where telemetry showed the speed opportunity; sparse conversions, promotion races, and the accepted false-mate family stay on the established path. The halfmove clock was also added to the key to prevent fifty-move-context reuse.
+- Tests: focused qsearch tests prove exact reuse across different root plies, q-ply and halfmove key separation, board-state preservation, sparse bypass, feature-off/feature-on exact fixed-depth root tables, lower leaf count, UCI resize cap, and dual-table clear. The full affected suite passed 161, skipped 68, failed 0, including perft, root-tie, engine, UCI, and profiler coverage. `run-slow-tests.cmd /position rollback` passed 4/4 with all six rollback SF2400 positions. The exact depth-11 sparse false-mate sentinel passed in 107.2s.
+- Stability: two 16-group SearchStable runs against `3ae1771` retained identical moves, scores, PVs, and root order. Seed `260402`: +3.924% raw; seed `260403`: +2.261% raw. Stable identical-build control seed `260405` was +0.424%. Multi-run verdict: accepted, +2.668% mean control-adjusted gain, 2/2 positive runs, all 4/4 positions positive in both, worst aggregate position +1.495%, no dominance failure. Candidate qsearch/leaf entries fell 6.72%.
+- Paired A/B: `analysis-runs\candidate-qsearch-tt-vs-3ae1771-20g-st1-20261011`, 20 fixed-1s games over 10 deterministic paired openings. Candidate scored `6 - 5 - 9 [0.525]`; White `3 - 4 - 3`, Black `3 - 1 - 6`. Treat as non-regression, not strength proof.
+- ShallowBlue smoke: `analysis-runs\candidate-qsearch-tt-shallowblue1618-20g-5m0-20261011`, 20 games at `5+0`, concurrency 4, seed `26092501`, no book. Coach scored `16 - 2 - 2 [0.850]`; White `6 - 2 - 2`, Black `10 - 0 - 0`, matching the accepted `3ae1771` smoke score rate (`17 - 3 - 0 [0.850]`).
+- Smoke mining: all 20 games replayed with 0 errors; 1,387 Coach-scored moves and 6 selected swings: 1 centipawn drop, 0 entered-losing-mate rows, and 5 mate-score changes. This is cleaner than the accepted baseline smoke's 10 selected swings, including 2 entered-losing-mate rows.
+- Decision: accept narrowly. The material-rich isolated qsearch table converts a measured transposition opportunity into a repeatable control-adjusted speed gain, preserves fixed-depth decisions and every correctness sentinel, scores 52.5% in paired baseline play, and matches the accepted baseline's 85% ShallowBlue smoke score.
+
+## 2026-10-12 - Depth-1 Late Quiet Move Pruning Candidate
+
+- Status: accepted-narrow / ready to commit
+- Baseline: accepted `8fbc85f`, preserved at `analysis-runs\bench-baseline-8fbc85f`.
+- Telemetry trigger: the 10-position primary corpus recorded 316,943 late moves (move 4 or later) consuming 752,156 nodes; 99.733% failed low. At depth 1, move 8 or later, non-check, static evaluation at least 200cp below alpha, 136,586 branches recorded zero alpha raises or cutoffs. A separate target packet containing the sparse false-mate sentinel plus three SF19/ShallowBlue-derived tactical positions recorded 150,632 coarse-lane branches with only 7 alpha raises before the candidate's additional safety exclusions.
+- Change: `COACH_LATE_MOVE_PRUNING=0` rolls back a depth-1-only late quiet pruning rule. It operates only at non-root scout nodes, from the eighth move onward, outside check/repetition/mate-class bounds, with at least 10 non-king pieces, no promotion-ready pawn, no promotion/capture/killer move, and a cached static evaluation at least 200cp below alpha. The move is made first and retained whenever it gives check, so checks and check extensions remain on the existing path.
+- Correctness: direct helper sentinels cover every gate and rollback. Fixed-depth root equivalence retains the exact move, score, and complete root table while pruning nodes. Full affected regression coverage passed 164, skipped 68, failed 0; the exact sparse false-mate depth-11 sentinel passed in 107.1s; `run-slow-tests.cmd /position rollback` passed 4/4 over all six selected positions. On the four external tactical targets, all best moves and scores remained identical; the queen-rook target saved 66,732 nodes.
+- Stability: two stable seeds against `8fbc85f` retained exact fixed-depth identity. Seeds `260503` and `260504` gained +5.510% and +6.629%; a stable control seed was -0.139%. The control-adjusted mean was +6.209%, both runs were positive, the worst aggregate position was +0.021%, and the candidate was not dominated. Nodes fell 16.52% and qsearch/leaf work fell 8.14%.
+- Paired A/B: `analysis-runs\candidate-lmp-vs-8fbc85f-20g-st1-20261011`, 20 fixed-1s games, scored `11 - 6 - 3 [0.625]`. Candidate White was `9 - 1 - 0`; Black was `2 - 5 - 3`. This is a positive non-regression smoke, not an Elo estimate.
+- ShallowBlue smoke: `analysis-runs\candidate-lmp-shallowblue1618-20g-5m0-20261011`, 20 games at `5+0`, concurrency 4, no opening book, seed `26092501`, scored `16 - 1 - 3 [0.875]`; White `6 - 1 - 3`, Black `10 - 0 - 0`. It narrowly exceeds the immediate `8fbc85f` smoke `16 - 2 - 2 [0.850]`, so treat it as non-regression support rather than proof of a rating jump.
+- Mining and loss audit: all 20 games replayed with 0 errors; 1,470 Coach-scored moves yielded two selected swings, both in the sole loss. The loss's `Nxd2` entered a losing mate, but direct candidate-vs-rollback probes at depths 4-8 produced identical best moves, scores, and root rows at every depth. Both versions first see the forced mate at depth 8, so it is an existing horizon/root-choice issue rather than caused by this candidate.
+- Decision: accept narrowly. This is a measured, heavily fenced instance of a standard strong-engine late-move-pruning idea: it clears all correctness gates, has a repeatable +6.209% control-adjusted speed gain, retains tactical-target scores, wins its paired smoke, and improves the immediate ShallowBlue smoke without a mate/replay warning.
+
+## 2026-10-12 - Root-Depth / Time-Management Evidence Pass
+
+- Status: diagnostic rejected / no patch
+- Target packet: `analysis-runs\root-depth-transition-diagnostics-20261012\targets.json` contains the sole loss from the accepted late-move-pruning smoke plus three independent SF19 mismatches from the prior long-game diagnostic: sparse losing-mate transition, passed-pawn tactic, rook-choice tactic, and passed-pawn defense.
+- Coach depth sweep: current `6d9396e` was probed at depths 4-10. The new smoke loss (`Nxd2`) looks like a real horizon event at depth 4-7, but by depth 8 the played move is mate-class and by depth 9 every plausible root alternative is mate-class. The actual 5+0 move was searched to depth 9 in 0.92s, so allocation of more time/depth would not have rescued it; the earlier `hxg4` error is a separate game-level target.
+- Independent checks: the passed-pawn tactical case stays on Coach `d7c5` through depth 10 while SF19 prefers `d7e5` by roughly 700cp; the rook-choice case keeps Coach `e1d1` through depth 10 while SF19 prefers `a1d1`; the defensive case shifts among tied Coach moves (`h7h6`, `f7f6`, `g7g6`) but still remains far from SF19's negative assessment. These are persistent evaluation/child-search disagreements or broad root plateaus, not shallow tied moves becoming cleanly separated at deeper depth.
+- Known-bad confirmation: earlier broad root-tie verification and broad time-management candidates already regressed in 5+0 smoke tests. This new packet gives no recurring, bounded-root mechanism that would justify reopening either family.
+- Decision: reject root verification and time-management as the next patch source. Do not use the new loss to add an emergency depth rule. Pivot to a different evidence source: curated forcing tactical positions with naturally bounded legal/root bands, then measure move-ordering/child-search signal before considering capture-history or main-search SEE work.
+
+## 2026-10-12 - Tactical Move-Ordering Evidence Pass
+
+- Status: diagnostic rejected / no patch
+- Corpus: `analysis-runs\tactical-ordering-diagnostics-20261012\corpus.json` used three independent Lucas/SF19 child-gap confirmations: `lucas-g4-i73`, `lucas-g10-i58`, and `lucas-g2-i69`. The packet is deliberately marked provisional because all three parent positions retain broad tied root tables; it was suitable for ordering-cost attribution, not for claiming a new best-move correction.
+- Tooling: `tools\profile-search-cutoffs.mjs` now attributes every searched main-search move to hash, killer, promotion, capture by SEE class, or quiet with positive/nonpositive basic history, alongside subtree nodes, qsearch entries, alpha raises, and beta cutoffs. Focused profiler coverage passed 5/5.
+- Aggregate ordering evidence at depth 8: hash moves cut off 73.7% of the time; non-losing SEE captures 64.9%; killers 23.8%; losing SEE captures 6.0%; positive-history quiets 1.0%; and nonpositive-history quiets 0.13%. This says existing TT/capture/SEE ordering is already doing most of the tactical work. Positive quiet history distinguishes a slightly better quiet class but remains far too weak for an ordering-only tactical explanation.
+- Classification: the three independent reference alternatives are mixed (one quiet queen move, one capture, one quiet rook move), while Coach's root rows remain broad/flat. No move class is consistently late-and-decisive, so adding capture history, countermove history, continuation history, or a new SEE forward prune would be a threshold-driven experiment rather than a response to recurring evidence.
+- Decision: reject a history-layer patch. Keep the new profiler attribution for future diagnostics. Pivot to a distinct source: evaluation residuals on stable, non-mate child-search disagreements, where Coach and SF19 agree on a bounded root/child line but materially disagree on the resulting position score.
+
+## 2026-10-12 - Evaluation Residual Evidence Pass
+
+- Status: diagnostic rejected / no patch
+- Source: `analysis-runs\reference-child-lucas-sts-d8-confirm10-root20-20261006-hardened\reference-child-search.json`, analyzed with `tools\compare-static-eval-children.mjs` into `analysis-runs\evaluation-residual-diagnostics-20261012\lucas-hardened`.
+- Eligibility result: all 11 historical Lucas rows remain non-keepers under the existing confirmed child-gap process. They are useful for static-component comparison but do not meet the required bounded-root, stable positive-child-gap gate for an evaluation change.
+- Component result: the largest static child differences are heterogeneous: pawn structure (-59cp) in `lucas-g2-i69`, material (-100cp) from a material-changing comparison in `lucas-g6-i15`, and general position (-35cp) in `lucas-g4-i75`. Other rows scatter among opening, position, king, and pawn terms at small magnitudes. No concrete feature recurs independently strongly enough to tune.
+- Decision: reject an evaluation correction. Do not adjust passed-pawn, king-safety, or generic positional constants from this packet; that would fit unrelated move-pair outcomes, not a verified evaluation residual. Pivot to a search-microarchitecture source: profile main TT collision/replacement quality and only consider a clustered/depth-preferred replacement policy if measured avoidable collision churn is material.
+
+## 2026-10-12 - Main TT Replacement Evidence Pass
+
+- Status: diagnostic rejected / no replacement-policy patch
+- Tooling: `TranspositionTable.stats()` now records same-key refreshes, foreign-key collisions, foreign replacements, protected foreign stores, depth-versus-stale replacement reason, and replaced-entry depth/age summaries. `tools\profile-search-cutoffs.mjs` records both main and qsearch TT statistics per position. The direct collision sentinel passed, along with focused profiler tests.
+- Main TT evidence at normal 32 MB (`1,048,576` entries): `analysis-runs\main-tt-profile-primary-20261012.json` recorded 188 foreign collisions in 62,528 stores (0.30%) over the 10-position primary corpus; `analysis-runs\main-tt-profile-targets-20261012.json` recorded 3,534 in 174,748 (2.02%) over the sparse false-mate and three tactical targets. Replaced entries averaged only about depth 1.1-1.3, and most foreign stores were correctly rejected to preserve a deeper current entry.
+- Comparison: the separate capped qsearch TT has materially higher collision pressure on the same runs (7.4% primary, 11.7% tactical), consistent with its deliberately much smaller allocation and the already accepted isolated qsearch-TT optimization. This pass did not change qsearch allocation or threshold behavior.
+- Decision: reject clustered/main-TT replacement work at Coach's actual Hash setting. The main table is sparse (under 1% fill on the primary corpus) and its collision rate is far too low for an extra bucket probe or more complex replacement logic to plausibly clear the predeclared +1% speed gate. Preserve the telemetry and pivot to a different measured source.
+
+## 2026-10-12 - Exact Static-Evaluation Cache Candidate
+
+- Status: accepted-narrow / local commit pending
+- Baseline: accepted `6d9396e` (depth-1 late quiet move pruning), preserved at `analysis-runs\bench-baseline-6d9396e`.
+- Evidence trigger: evaluation profiling on the primary corpus, tactical packet, and qsearch/target packet found 401,404 / 1,503,723 / 873,378 calls respectively. Pawn-structure work consumed 34.4% / 41.8% / 45.2% of total evaluation time, but a pawn-only key would be incorrect because passed-pawn scoring reads attacks, blockers, kings, material phase, and stopper pieces. Full board hashes repeated on 27.6-39.1% of calls, so an exact full static-evaluation cache was the safe boundary.
+- Change: `Search.whiteRelativeEval()` uses a bounded 65,536-entry direct-mapped cache keyed by the full Zobrist position key. Every entry retains the full key and score, so index collisions are misses rather than aliases. The cache clears at the start of each root search, cannot grow across a game, and `COACH_STATIC_EVAL_CACHE=0` restores the old direct evaluation path.
+- Correctness: direct sentinels cover same-key reuse, collision rejection, make/undo board integrity, and feature-off evaluation. `node --test tests\engine_regressions.test.mjs tests\profile_search_cutoffs.test.mjs` passed 80 with 68 skipped; `node --test tests\perft.test.mjs` passed 34/34; the sparse false-mate depth-11 sentinel passed 4/4 in 58.9s. Both controlled benchmark runs retained Exact move, score, node, leaf, PV, and root-table identity on every sampled position.
+- Stability: `analysis-runs\evaluation-cache-candidate-20261012\benchmark-summary.txt` reports two stable same-session controls and two positive candidate runs. Raw speed gains were +6.104% and +5.407%; control-adjusted mean gain was +5.902%, with all 4/4 sampled positions positive in both runs and no dominance failure.
+- Paired A/B: `analysis-runs\evaluation-cache-vs-6d9396e-20g-st1-20261012` scored `15 - 4 - 1 [0.775]`; candidate White `6 - 3 - 1`, Black `9 - 1 - 0`. Treat as a positive non-regression smoke, not an Elo estimate.
+- ShallowBlue smoke: `analysis-runs\evaluation-cache-shallowblue1618-20g-st3-20261012` scored `10 - 10 - 0 [0.500]` at fixed 3 seconds per move. Every game was won by White (Coach White `10 - 0 - 0`, Coach Black `0 - 10 - 0`), so this is a strongly color-biased opening-policy sample rather than evidence that an exact cache changes Black play. All 20 games replayed cleanly; 1,515 Coach moves yielded 18 selected swings, chiefly existing long endgame conversion/mate entries on the Black side.
+- Decision: accept narrowly. This is a measured, bounded, collision-safe pure static-evaluation cache rather than an incremental-evaluation rewrite. It provides repeatable +5.9% control-adjusted speed while preserving fixed-depth decisions and all correctness sentinels. The color-biased 3-second smoke is non-regression support only; future candidate matches should use varied paired openings before treating that opponent result as a strength estimate.
