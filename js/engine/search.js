@@ -181,6 +181,12 @@ const MAX_Q_QUIET_FORCING_PLY = 1;
 const QSEARCH_QUIET_QUEEN_MIN_NON_KING_PIECES = 4;
 const QSEARCH_QUIET_QUEEN_MAX_NON_KING_PIECES = 6;
 
+// Capture-first lazy generation pays an extra capture pass when a
+// node reaches its quiet stage. Restrict it to material-rich
+// positions where broad branching makes skipped quiet generation
+// worthwhile; sparse endings retain the single-pass baseline.
+const LAZY_QUIET_MIN_NON_KING_PIECES = 10;
+
 //----------------------------------
 // Principal Variation Search (PVS)
 //
@@ -425,6 +431,10 @@ export default class Search {
         typeof process === "undefined" ||
         process.env?.COACH_STAGED_MOVE_ORDERING !== "0";
 
+    static LAZY_QUIET_MOVE_GENERATION =
+        typeof process === "undefined" ||
+        process.env?.COACH_LAZY_QUIET_MOVE_GENERATION !== "0";
+
     constructor(board, legalMoveGenerator, evaluation) {
 
         this.board = board;
@@ -507,6 +517,9 @@ export default class Search {
         this.nullAttempts = 0;
         this.nullCutoffs = 0;
         this.reverseFutilityCutoffs = 0;
+        this.lazyMovePickerNodes = 0;
+        this.lazyQuietGenerationCalls = 0;
+        this.lazyQuietGenerationSkips = 0;
 
         //----------------------------------
         // History Heuristic
@@ -2045,8 +2058,19 @@ export default class Search {
                 ? performance.now()
                 : 0;
 
+        const useLazyQuietGeneration =
+            Search.LAZY_QUIET_MOVE_GENERATION &&
+            Search.STAGED_MOVE_ORDERING &&
+            !inCheck &&
+            this.board.pieceCount() >=
+                LAZY_QUIET_MIN_NON_KING_PIECES &&
+            (!ttMove || ttMove.isCapture()) &&
+            !this.hasPromotionReadyPawn();
+
         const moves =
-            this.legalMoveGenerator.generateMoves();
+            useLazyQuietGeneration
+                ? this.legalMoveGenerator.generateCaptures()
+                : this.legalMoveGenerator.generateMoves();
 
         if (this.profileEnabled) {
 
@@ -2063,12 +2087,23 @@ export default class Search {
         const killers = this.getKillers(ply);
 
         const movePicker =
-            this.createMovePicker(
-            moves,
-            killers,
-            ttMove,
-            this.history
-        );
+            useLazyQuietGeneration
+                ? this.createLazyQuietMovePicker(
+                    moves,
+                    killers,
+                    ttMove,
+                    this.history
+                )
+                : this.createMovePicker(
+                    moves,
+                    killers,
+                    ttMove,
+                    this.history
+                );
+
+        if (useLazyQuietGeneration) {
+            this.lazyMovePickerNodes++;
+        }
 
         if (this.profileEnabled) {
 
@@ -2081,7 +2116,7 @@ export default class Search {
         // Mate / Stalemate
         //----------------------------------
 
-        if (moves.length === 0) {
+        if (!useLazyQuietGeneration && moves.length === 0) {
 
             if (inCheck) {
 
@@ -2452,6 +2487,19 @@ export default class Search {
 
         }
 
+        if (
+            useLazyQuietGeneration &&
+            !movePicker.quietGenerated
+        ) {
+            this.lazyQuietGenerationSkips++;
+        }
+
+        if (moveIndex === 0) {
+            return inCheck
+                ? -SearchConstants.MATE + ply
+                : SearchConstants.DRAW;
+        }
+
         let flag;
 
         if (bestScore <= alphaOriginal) {
@@ -2797,6 +2845,91 @@ export default class Search {
 
     }
 
+    hasPromotionReadyPawn() {
+
+        const pawns =
+            this.board.sideToMove > 0
+                ? this.board.whitePieces.pawns
+                : this.board.blackPieces.pawns;
+        const promotionReadyRank =
+            this.board.sideToMove > 0 ? 1 : 6;
+
+        return pawns.some(
+            square => (square >> 3) === promotionReadyRank
+        );
+
+    }
+
+    createLazyQuietMovePicker(
+        captures,
+        killers,
+        ttMove,
+        history
+    ) {
+
+        const capturePicker =
+            this.createMovePicker(
+                captures,
+                killers,
+                ttMove,
+                history
+            );
+        let quietPicker = null;
+        const picker = {
+            quietGenerated: false,
+            next: () => {
+
+                const capture = capturePicker.next();
+
+                if (capture !== null) {
+                    return capture;
+                }
+
+                if (quietPicker === null) {
+
+                    let t =
+                        this.profileEnabled
+                            ? performance.now()
+                            : 0;
+                    const quiets =
+                        this.legalMoveGenerator
+                            .generateMoves()
+                            .filter(move => !move.isCapture());
+
+                    if (this.profileEnabled) {
+                        this.generateTime += performance.now() - t;
+                    }
+
+                    t =
+                        this.profileEnabled
+                            ? performance.now()
+                            : 0;
+                    quietPicker =
+                        this.createMovePicker(
+                            quiets,
+                            killers,
+                            null,
+                            history
+                        );
+
+                    if (this.profileEnabled) {
+                        this.orderTime += performance.now() - t;
+                    }
+
+                    picker.quietGenerated = true;
+                    this.lazyQuietGenerationCalls++;
+
+                }
+
+                return quietPicker.next();
+
+            }
+        };
+
+        return picker;
+
+    }
+
     //----------------------------------
     // Best Move
     //----------------------------------
@@ -3052,6 +3185,9 @@ export default class Search {
         this.lmrReductions = 0;
         this.lmrResearches = 0;
         this.reverseFutilityCutoffs = 0;
+        this.lazyMovePickerNodes = 0;
+        this.lazyQuietGenerationCalls = 0;
+        this.lazyQuietGenerationSkips = 0;
 
         this.board.profileMakeMove = 0;
         this.board.profileUndoMove = 0;

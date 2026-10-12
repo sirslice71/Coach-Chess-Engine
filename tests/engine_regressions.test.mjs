@@ -3099,6 +3099,48 @@ test("quiescence does not prune a winning capture when the only recapturer is ab
 // and no board-state leakage from the extra search calls.
 //----------------------------------
 
+test("lazy quiet generation preserves the exact material-rich search result", () => {
+
+    const fen =
+        "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 2";
+    const previous = Search.LAZY_QUIET_MOVE_GENERATION;
+    let baseline;
+    let candidate;
+
+    try {
+        Search.LAZY_QUIET_MOVE_GENERATION = false;
+        baseline = searchBestMove(fen, 4);
+        Search.LAZY_QUIET_MOVE_GENERATION = true;
+        candidate = searchBestMove(fen, 4);
+    }
+    finally {
+        Search.LAZY_QUIET_MOVE_GENERATION = previous;
+    }
+
+    assert.equal(candidate.uci, baseline.uci);
+    assert.equal(candidate.rootMoves[0].score, baseline.rootMoves[0].score);
+    assert.equal(candidate.nodes, baseline.nodes);
+    assert.deepEqual(
+        candidate.rootMoves.map(row => [row.uci, row.score]),
+        baseline.rootMoves.map(row => [row.uci, row.score])
+    );
+
+});
+
+test("lazy quiet generation falls back for sparse and promotion-ready positions", () => {
+
+    const sparse =
+        createEngine("8/4NKP1/5P1k/3R3P/2q5/8/8/8 b - - 18 76");
+    const promotionReady =
+        createEngine("4k3/P7/8/8/8/8/8/4K3 w - - 0 1");
+
+    sparse.search.bestMove(3, { quiet: true });
+
+    assert.equal(sparse.search.lazyMovePickerNodes, 0);
+    assert.equal(promotionReady.search.hasPromotionReadyPawn(), true);
+
+});
+
 test("LMR-active search leaves board, hash, material, and piece lists untouched", () => {
 
     const { board, search } =
