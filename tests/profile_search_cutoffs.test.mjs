@@ -152,3 +152,60 @@ test("search cutoff profiler bypasses repetition-sensitive qsearch entries", () 
     assert.equal(qsearch.repeatedEntries, 0);
     assert.equal(qsearch.reusableEntries, 0);
 });
+
+test("search cutoff profiler attributes late fail-low subtree cost", () => {
+    const moves = Array.from({ length: 5 }, (_, index) => ({
+        key: index,
+        isCapture: () => false,
+        isPromotion: () => false
+    }));
+    const search = {
+        nodes: 0,
+        leafNodes: 0,
+        board: {
+            isInCheck: () => false
+        },
+        tt: {
+            probe: () => null
+        },
+        createMovePicker(list) {
+            let index = 0;
+            return { next: () => list[index++] ?? null };
+        },
+        negamax(depth, alpha, beta) {
+            this.nodes++;
+
+            if (depth === 0) {
+                this.leafNodes++;
+                return 0;
+            }
+
+            const picker = this.createMovePicker(moves);
+            let best = -Infinity;
+
+            for (
+                let move = picker.next();
+                move !== null;
+                move = picker.next()
+            ) {
+                const score = -this.negamax(0, -beta, -alpha);
+                best = Math.max(best, score);
+                alpha = Math.max(alpha, score);
+            }
+
+            return best;
+        }
+    };
+    const telemetry = instrumentSearch(search);
+
+    assert.equal(Math.abs(search.negamax(1, -1, 1)), 0);
+
+    const outcomes = telemetry.snapshot().moveOutcomes.totals;
+    assert.equal(outcomes.moves, 5);
+    assert.equal(outcomes.alphaRaises, 1);
+    assert.equal(outcomes.failLows, 4);
+    assert.equal(outcomes.lateMoves, 2);
+    assert.equal(outcomes.lateFailLows, 2);
+    assert.equal(outcomes.lateNodes, 2);
+    assert.equal(outcomes.lateQsearchEntries, 2);
+});

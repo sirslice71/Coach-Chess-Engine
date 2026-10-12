@@ -297,6 +297,11 @@ const REVERSE_FUTILITY_DEPTH = 1;
 
 const REVERSE_FUTILITY_MARGIN = 300;
 
+const LATE_MOVE_PRUNING_DEPTH = 1;
+const LATE_MOVE_PRUNING_MIN_INDEX = 7;
+const LATE_MOVE_PRUNING_STATIC_MARGIN = 200;
+const LATE_MOVE_PRUNING_MIN_NON_KING_PIECES = 10;
+
 const QSEARCH_TT_SIZE_DIVISOR = 4;
 const QSEARCH_TT_MAX_MB = 8;
 const QSEARCH_TT_MIN_NON_KING_PIECES = 10;
@@ -445,6 +450,10 @@ export default class Search {
         typeof process === "undefined" ||
         process.env?.COACH_QSEARCH_TT !== "0";
 
+    static LATE_MOVE_PRUNING =
+        typeof process === "undefined" ||
+        process.env?.COACH_LATE_MOVE_PRUNING !== "0";
+
     static qsearchTableSizeMB(hashSizeMB) {
 
         return Math.min(
@@ -549,6 +558,7 @@ export default class Search {
         this.qttHits = 0;
         this.qttCutoffs = 0;
         this.qttStores = 0;
+        this.lateMovePrunes = 0;
 
         //----------------------------------
         // History Heuristic
@@ -2181,6 +2191,20 @@ export default class Search {
 
             while ((move = movePicker.next()) !== null) {
 
+                const pruneLateMoveCandidate =
+                    this.canLateMovePrune(
+                        depth,
+                        alpha,
+                        beta,
+                        isRoot,
+                        inCheck,
+                        repetitionHistory,
+                        moveIndex,
+                        move,
+                        killers,
+                        getStaticEval
+                    );
+
                 //----------------------------------
                 // Make Move
                 //----------------------------------
@@ -2235,6 +2259,30 @@ export default class Search {
                 const childDepth = depth - 1 + extend;
 
                 const childExtensions = extensionsLeft - extend;
+
+                if (
+                    pruneLateMoveCandidate &&
+                    !givesCheck
+                ) {
+
+                    this.lateMovePrunes++;
+
+                    t =
+                        this.profileEnabled
+                            ? performance.now()
+                            : 0;
+
+                    this.board.undoMove();
+
+                    if (this.profileEnabled) {
+                        this.undoMoveTime +=
+                            performance.now() - t;
+                    }
+
+                    moveIndex++;
+                    continue;
+
+                }
 
                 const usePvsScout =
 
@@ -2884,6 +2932,40 @@ export default class Search {
 
     }
 
+    canLateMovePrune(
+        depth,
+        alpha,
+        beta,
+        isRoot,
+        inCheck,
+        repetitionHistory,
+        moveIndex,
+        move,
+        killers,
+        getStaticEval
+    ) {
+
+        return (
+            Search.LATE_MOVE_PRUNING &&
+            depth === LATE_MOVE_PRUNING_DEPTH &&
+            beta === alpha + 1 &&
+            !isRoot &&
+            !inCheck &&
+            !repetitionHistory &&
+            Math.abs(beta) < SearchConstants.MATE_THRESHOLD &&
+            moveIndex >= LATE_MOVE_PRUNING_MIN_INDEX &&
+            !move.isCapture() &&
+            !move.isPromotion() &&
+            move.key !== killers[0] &&
+            move.key !== killers[1] &&
+            this.board.pieceCount() >=
+                LATE_MOVE_PRUNING_MIN_NON_KING_PIECES &&
+            !this.hasPromotionReadyPawn() &&
+            getStaticEval() + LATE_MOVE_PRUNING_STATIC_MARGIN <= alpha
+        );
+
+    }
+
     searchQuiescenceMove(
         move,
         alpha,
@@ -3347,6 +3429,7 @@ export default class Search {
         this.qttHits = 0;
         this.qttCutoffs = 0;
         this.qttStores = 0;
+        this.lateMovePrunes = 0;
 
         this.board.profileMakeMove = 0;
         this.board.profileUndoMove = 0;

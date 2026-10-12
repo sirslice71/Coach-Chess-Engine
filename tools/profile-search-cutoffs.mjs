@@ -113,6 +113,93 @@ function classifyWindow(alpha, beta) {
     return beta === alpha + 1 ? "scout" : "pv";
 }
 
+const LATE_MOVE_NUMBER = 4;
+
+function blankMoveOutcomeStats() {
+    return {
+        moves: 0,
+        nodes: 0,
+        qsearchEntries: 0,
+        alphaRaises: 0,
+        betaCutoffs: 0,
+        failLows: 0,
+        quiets: 0,
+        captures: 0,
+        promotions: 0,
+        checks: 0,
+        nonLosingCaptures: 0,
+        losingCaptures: 0,
+        staticEvalKnown: 0,
+        staticBelowAlpha: 0,
+        staticBelowAlphaNodes: 0,
+        staticBelowAlphaRaises: 0,
+        staticBelowAlphaCutoffs: 0,
+        staticBelowAlphaChecks: 0,
+        staticBelowAlphaNonCheckMoves: 0,
+        staticBelowAlphaNonCheckNodes: 0,
+        staticBelowAlphaNonCheckRaises: 0,
+        staticBelowAlphaNonCheckCutoffs: 0,
+        staticBelow50NonCheckMoves: 0,
+        staticBelow50NonCheckNodes: 0,
+        staticBelow50NonCheckRaises: 0,
+        staticBelow50NonCheckCutoffs: 0,
+        staticBelow100NonCheckMoves: 0,
+        staticBelow100NonCheckNodes: 0,
+        staticBelow100NonCheckRaises: 0,
+        staticBelow100NonCheckCutoffs: 0,
+        staticBelow200NonCheckMoves: 0,
+        staticBelow200NonCheckNodes: 0,
+        staticBelow200NonCheckRaises: 0,
+        staticBelow200NonCheckCutoffs: 0,
+        lateMoves: 0,
+        lateNodes: 0,
+        lateQsearchEntries: 0,
+        lateAlphaRaises: 0,
+        lateBetaCutoffs: 0,
+        lateFailLows: 0
+    };
+}
+
+function addMoveOutcomeStats(target, source) {
+    for (const key of Object.keys(target)) {
+        target[key] += source[key] ?? 0;
+    }
+}
+
+function finalizeMoveOutcomeStats(stats) {
+    return {
+        ...stats,
+        alphaRaiseRate:
+            stats.moves > 0 ? stats.alphaRaises / stats.moves : null,
+        failLowRate:
+            stats.moves > 0 ? stats.failLows / stats.moves : null,
+        lateAlphaRaiseRate:
+            stats.lateMoves > 0
+                ? stats.lateAlphaRaises / stats.lateMoves
+                : null,
+        lateFailLowRate:
+            stats.lateMoves > 0
+                ? stats.lateFailLows / stats.lateMoves
+                : null,
+        lateNodeShare:
+            stats.nodes > 0 ? stats.lateNodes / stats.nodes : null
+    };
+}
+
+function moveIndexBucket(moveNumber) {
+    if (moveNumber === 1) return "1";
+    if (moveNumber <= 3) return "2-3";
+    if (moveNumber <= 7) return "4-7";
+    return "8+";
+}
+
+function moveClass(move) {
+    if (move.isPromotion()) return "promotion";
+    if (!move.isCapture()) return "quiet";
+    if ((move.seeScore ?? -Infinity) >= 0) return "capture-see-nonlosing";
+    return "capture-see-losing";
+}
+
 function blankQsearchStats() {
     return {
         entries: 0,
@@ -206,6 +293,11 @@ export function instrumentSearch(search) {
     const qsearchRecords = new Map();
     const qsearchTotals = blankQsearchStats();
     const qsearchByPly = new Map();
+    const moveOutcomeTotals = blankMoveOutcomeStats();
+    const moveOutcomesByDepth = new Map();
+    const moveOutcomesByBucket = new Map();
+    const moveOutcomesByNumber = new Map();
+    const moveOutcomeMatrix = new Map();
     const totals = blankStats();
     const byDepth = new Map();
     const byWindow = new Map([
@@ -216,6 +308,129 @@ export function instrumentSearch(search) {
     const originalNegamax = search.negamax.bind(search);
     const originalCreateMovePicker = search.createMovePicker.bind(search);
     const originalProbe = search.tt.probe.bind(search.tt);
+    const originalWhiteRelativeEval = search.whiteRelativeEval?.bind(search);
+
+    const recordMoveOutcome = context => {
+        const pending = context.pendingMove;
+
+        if (!pending || pending.childScores.length === 0) {
+            context.pendingMove = null;
+            return;
+        }
+
+        const score = pending.childScores.at(-1);
+        const raisedAlpha = score > context.runningAlpha;
+        const betaCutoff = score >= context.beta;
+        const late = pending.moveNumber >= LATE_MOVE_NUMBER;
+        const row = blankMoveOutcomeStats();
+        const nodes = search.nodes - pending.startNodes;
+        const qsearchEntries = search.leafNodes - pending.startLeafNodes;
+
+        row.moves = 1;
+        row.nodes = nodes;
+        row.qsearchEntries = qsearchEntries;
+        row.alphaRaises = raisedAlpha ? 1 : 0;
+        row.betaCutoffs = betaCutoff ? 1 : 0;
+        row.failLows = raisedAlpha ? 0 : 1;
+        row.quiets = pending.move.isCapture() ? 0 : 1;
+        row.captures = pending.move.isCapture() ? 1 : 0;
+        row.promotions = pending.move.isPromotion() ? 1 : 0;
+        row.checks = pending.givesCheck ? 1 : 0;
+
+        if (pending.move.isCapture()) {
+            if ((pending.move.seeScore ?? -Infinity) >= 0) {
+                row.nonLosingCaptures = 1;
+            }
+            else {
+                row.losingCaptures = 1;
+            }
+        }
+
+        if (context.staticEval !== null) {
+            row.staticEvalKnown = 1;
+
+            if (context.staticEval <= pending.alphaBefore) {
+                row.staticBelowAlpha = 1;
+                row.staticBelowAlphaNodes = nodes;
+                row.staticBelowAlphaRaises = raisedAlpha ? 1 : 0;
+                row.staticBelowAlphaCutoffs = betaCutoff ? 1 : 0;
+                row.staticBelowAlphaChecks = pending.givesCheck ? 1 : 0;
+
+                if (!pending.givesCheck) {
+                    row.staticBelowAlphaNonCheckMoves = 1;
+                    row.staticBelowAlphaNonCheckNodes = nodes;
+                    row.staticBelowAlphaNonCheckRaises = raisedAlpha ? 1 : 0;
+                    row.staticBelowAlphaNonCheckCutoffs = betaCutoff ? 1 : 0;
+
+                    const staticMargin =
+                        pending.alphaBefore - context.staticEval;
+
+                    for (const margin of [50, 100, 200]) {
+                        if (staticMargin < margin) continue;
+
+                        row[`staticBelow${margin}NonCheckMoves`] = 1;
+                        row[`staticBelow${margin}NonCheckNodes`] = nodes;
+                        row[`staticBelow${margin}NonCheckRaises`] =
+                            raisedAlpha ? 1 : 0;
+                        row[`staticBelow${margin}NonCheckCutoffs`] =
+                            betaCutoff ? 1 : 0;
+                    }
+                }
+            }
+        }
+
+        if (late) {
+            row.lateMoves = 1;
+            row.lateNodes = nodes;
+            row.lateQsearchEntries = qsearchEntries;
+            row.lateAlphaRaises = raisedAlpha ? 1 : 0;
+            row.lateBetaCutoffs = betaCutoff ? 1 : 0;
+            row.lateFailLows = raisedAlpha ? 0 : 1;
+        }
+
+        addMoveOutcomeStats(moveOutcomeTotals, row);
+
+        if (!moveOutcomesByDepth.has(context.depth)) {
+            moveOutcomesByDepth.set(context.depth, blankMoveOutcomeStats());
+        }
+
+        addMoveOutcomeStats(moveOutcomesByDepth.get(context.depth), row);
+
+        const indexBucket = moveIndexBucket(pending.moveNumber);
+
+        if (!moveOutcomesByBucket.has(indexBucket)) {
+            moveOutcomesByBucket.set(indexBucket, blankMoveOutcomeStats());
+        }
+
+        addMoveOutcomeStats(moveOutcomesByBucket.get(indexBucket), row);
+
+        if (!moveOutcomesByNumber.has(pending.moveNumber)) {
+            moveOutcomesByNumber.set(
+                pending.moveNumber,
+                blankMoveOutcomeStats()
+            );
+        }
+
+        addMoveOutcomeStats(
+            moveOutcomesByNumber.get(pending.moveNumber),
+            row
+        );
+
+        const matrixKey =
+            `${context.depth}:${pending.moveNumber}:${moveClass(pending.move)}`;
+
+        if (!moveOutcomeMatrix.has(matrixKey)) {
+            moveOutcomeMatrix.set(matrixKey, blankMoveOutcomeStats());
+        }
+
+        addMoveOutcomeStats(moveOutcomeMatrix.get(matrixKey), row);
+
+        if (raisedAlpha) {
+            context.runningAlpha = score;
+        }
+
+        context.pendingMove = null;
+    };
 
     search.tt.probe = (...args) => {
         const entry = originalProbe(...args);
@@ -229,6 +444,25 @@ export function instrumentSearch(search) {
 
         return entry;
     };
+
+    if (originalWhiteRelativeEval) {
+        search.whiteRelativeEval = (...args) => {
+            const value = originalWhiteRelativeEval(...args);
+            const context = contexts.at(-1);
+
+            if (
+                context &&
+                context.depth > 0 &&
+                !context.pickerAttached &&
+                context.staticEval === null
+            ) {
+                context.staticEval =
+                    search.toSideToMoveScore(value);
+            }
+
+            return value;
+        };
+    }
 
     search.createMovePicker = (...args) => {
         const picker = originalCreateMovePicker(...args);
@@ -253,18 +487,30 @@ export function instrumentSearch(search) {
         context.generatedMoves += Array.isArray(args[0]) ? args[0].length : 0;
         const originalNext = picker.next.bind(picker);
 
-        return {
-            next() {
-                const move = originalNext();
+        const wrappedPicker = Object.create(picker);
 
-                if (move) {
-                    context.movesSeen++;
-                    context.lastMove = move;
-                }
+        wrappedPicker.next = () => {
+            recordMoveOutcome(context);
+            const move = originalNext();
 
-                return move;
+            if (move) {
+                context.movesSeen++;
+                context.lastMove = move;
+                context.pendingMove = {
+                    move,
+                    moveNumber: context.movesSeen,
+                    alphaBefore: context.runningAlpha,
+                    startNodes: search.nodes,
+                    startLeafNodes: search.leafNodes,
+                    givesCheck: false,
+                    childScores: []
+                };
             }
+
+            return move;
         };
+
+        return wrappedPicker;
     };
 
     search.negamax = function instrumentedNegamax(
@@ -273,6 +519,7 @@ export function instrumentSearch(search) {
         beta,
         ...rest
     ) {
+        const parentContext = contexts.at(-1);
         const context = {
             depth,
             alpha,
@@ -285,7 +532,10 @@ export function instrumentSearch(search) {
             pickerAttached: false,
             generatedMoves: 0,
             movesSeen: 0,
-            lastMove: null
+            lastMove: null,
+            pendingMove: null,
+            runningAlpha: alpha,
+            staticEval: null
         };
         let score;
 
@@ -297,6 +547,16 @@ export function instrumentSearch(search) {
         }
         finally {
             contexts.pop();
+
+            if (
+                parentContext?.pendingMove &&
+                score !== undefined
+            ) {
+                parentContext.pendingMove.childScores.push(-score);
+                parentContext.pendingMove.givesCheck ||= context.inCheck;
+            }
+
+            recordMoveOutcome(context);
 
             if (depth > 0 && score !== undefined) {
                 const row = blankStats();
@@ -502,6 +762,46 @@ export function instrumentSearch(search) {
                                 finalizeQsearchStats(stats)
                             ])
                     )
+                },
+                moveOutcomes: {
+                    totals: finalizeMoveOutcomeStats(moveOutcomeTotals),
+                    byDepth: Object.fromEntries(
+                        [...moveOutcomesByDepth.entries()]
+                            .sort(([left], [right]) => left - right)
+                            .map(([depth, stats]) => [
+                                depth,
+                                finalizeMoveOutcomeStats(stats)
+                            ])
+                    ),
+                    byIndexBucket: Object.fromEntries(
+                        [...moveOutcomesByBucket.entries()]
+                            .map(([bucket, stats]) => [
+                                bucket,
+                                finalizeMoveOutcomeStats(stats)
+                            ])
+                    ),
+                    byMoveNumber: Object.fromEntries(
+                        [...moveOutcomesByNumber.entries()]
+                            .sort(([left], [right]) => left - right)
+                            .map(([moveNumber, stats]) => [
+                                moveNumber,
+                                finalizeMoveOutcomeStats(stats)
+                            ])
+                    ),
+                    matrix: [...moveOutcomeMatrix.entries()]
+                        .map(([key, stats]) => {
+                            const [depth, moveNumber, classification] =
+                                key.split(":");
+
+                            return {
+                                depth: Number(depth),
+                                moveNumber: Number(moveNumber),
+                                indexBucket:
+                                    moveIndexBucket(Number(moveNumber)),
+                                classification,
+                                ...finalizeMoveOutcomeStats(stats)
+                            };
+                        })
                 }
             };
         }
@@ -631,6 +931,19 @@ function aggregateQsearch(rows) {
     return finalizeQsearchStats(totals);
 }
 
+function aggregateMoveOutcomes(rows) {
+    const totals = blankMoveOutcomeStats();
+
+    for (const row of rows) {
+        addMoveOutcomeStats(
+            totals,
+            row.telemetry.moveOutcomes.totals
+        );
+    }
+
+    return finalizeMoveOutcomeStats(totals);
+}
+
 function main() {
     const args = parseArgs(process.argv.slice(2));
 
@@ -660,6 +973,7 @@ function main() {
         phaseTimes: aggregatePhaseTimes(rows),
         lazyGeneration: aggregateLazyGeneration(rows),
         qsearch: aggregateQsearch(rows),
+        moveOutcomes: aggregateMoveOutcomes(rows),
         positions: rows
     };
 

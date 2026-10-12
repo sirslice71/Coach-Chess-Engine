@@ -3250,6 +3250,108 @@ test("qsearch TT preserves the exact fixed-depth root result", () => {
 
 });
 
+test("late-move pruning helper accepts only the measured shallow scout lane", () => {
+
+    const { search, legalMoveGenerator } = createEngine(
+        "r2qk2r/ppp2ppp/2n1bn2/3pp3/3PP3/2N2N2/PPP2PPP/R1BQKB1R w KQkq - 0 1"
+    );
+    const quietMove = legalMoveGenerator
+        .generateMoves()
+        .find(move => !move.isCapture() && !move.isPromotion());
+    const previous = Search.LATE_MOVE_PRUNING;
+    const eligible = overrides => search.canLateMovePrune(
+        overrides.depth ?? 1,
+        overrides.alpha ?? 100,
+        overrides.beta ?? 101,
+        overrides.isRoot ?? false,
+        overrides.inCheck ?? false,
+        overrides.repetitionHistory ?? false,
+        overrides.moveIndex ?? 7,
+        overrides.move ?? quietMove,
+        overrides.killers ?? [-1, -1],
+        overrides.getStaticEval ?? (() => -100)
+    );
+
+    try {
+        Search.LATE_MOVE_PRUNING = true;
+        assert.equal(eligible({}), true);
+
+        for (const overrides of [
+            { depth: 2 },
+            { alpha: 99, beta: 101 },
+            { isRoot: true },
+            { inCheck: true },
+            { repetitionHistory: true },
+            { moveIndex: 6 },
+            {
+                move: {
+                    key: 123,
+                    isCapture: () => true,
+                    isPromotion: () => false
+                }
+            },
+            {
+                move: {
+                    key: 124,
+                    isCapture: () => false,
+                    isPromotion: () => true
+                }
+            },
+            { killers: [quietMove.key, -1] },
+            { getStaticEval: () => -99 },
+            {
+                alpha: SearchConstants.MATE_THRESHOLD,
+                beta: SearchConstants.MATE_THRESHOLD + 1
+            }
+        ]) {
+            assert.equal(eligible(overrides), false);
+        }
+
+        Search.LATE_MOVE_PRUNING = false;
+        assert.equal(eligible({}), false);
+    }
+    finally {
+        Search.LATE_MOVE_PRUNING = previous;
+    }
+
+});
+
+test("late-move pruning preserves the measured fixed-depth root result", () => {
+
+    const fen =
+        "r2qk2r/ppp2ppp/2n1bn2/3pp3/3PP3/2N2N2/PPP2PPP/R1BQKB1R w KQkq - 0 1";
+    const previous = Search.LATE_MOVE_PRUNING;
+    let baseline;
+    let candidate;
+    let candidateSearch;
+
+    try {
+        Search.LATE_MOVE_PRUNING = false;
+        baseline = searchBestMove(fen, 4);
+
+        Search.LATE_MOVE_PRUNING = true;
+
+        const engine = createEngine(fen);
+        candidateSearch = engine.search;
+        candidate = withMutedConsole(
+            () => candidateSearch.bestMove(4)
+        );
+    }
+    finally {
+        Search.LATE_MOVE_PRUNING = previous;
+    }
+
+    assert.equal(candidate.uci, baseline.uci);
+    assert.equal(candidate.rootMoves[0].score, baseline.rootMoves[0].score);
+    assert.deepEqual(
+        candidate.rootMoves.map(row => [row.uci, row.score]),
+        baseline.rootMoves.map(row => [row.uci, row.score])
+    );
+    assert.ok(candidate.nodes < baseline.nodes);
+    assert.ok(candidateSearch.lateMovePrunes > 0);
+
+});
+
 test("LMR-active search leaves board, hash, material, and piece lists untouched", () => {
 
     const { board, search } =
