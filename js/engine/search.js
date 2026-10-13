@@ -437,7 +437,11 @@ const ROOT_TIE_VERIFY_MAX_NON_PAWN_MATERIAL = 4;
 // Static evaluation is a pure function of the fully hashed board state.
 // A modest direct-mapped cache captures transpositions and repeated
 // iterative-deepening leaves without retaining positions between roots.
-const STATIC_EVAL_CACHE_ENTRIES = 1 << 16;
+const STATIC_EVAL_CACHE_ENTRIES =
+    typeof process !== "undefined" &&
+    process.env?.COACH_STATIC_EVAL_CACHE_ENTRIES === "65536"
+        ? 1 << 16
+        : 1 << 17;
 
 export class SearchTimeout extends Error {}
 
@@ -557,6 +561,7 @@ export default class Search {
         this.staticEvalProbes = 0;
         this.staticEvalHits = 0;
         this.staticEvalStores = 0;
+        this.staticEvalCollisions = 0;
         
         this.rootBestMove = null;
 
@@ -573,6 +578,7 @@ export default class Search {
         this.lazyMovePickerNodes = 0;
         this.lazyQuietGenerationCalls = 0;
         this.lazyQuietGenerationSkips = 0;
+        this.lazyQuietTtMoveSuppressedNodes = 0;
         this.qttProbes = 0;
         this.qttHits = 0;
         this.qttCutoffs = 0;
@@ -614,6 +620,10 @@ export default class Search {
             return entry.score;
         }
 
+        if (entry) {
+            this.staticEvalCollisions++;
+        }
+
         const score = this.evaluation.evaluate().total;
 
         this.staticEvalTable[index] = { hash, score };
@@ -629,6 +639,7 @@ export default class Search {
         this.staticEvalProbes = 0;
         this.staticEvalHits = 0;
         this.staticEvalStores = 0;
+        this.staticEvalCollisions = 0;
 
     }
 
@@ -2166,6 +2177,20 @@ export default class Search {
             (!ttMove || ttMove.isCapture()) &&
             !this.hasPromotionReadyPawn();
 
+        const lazyQuietGenerationSuppressedByTtMove =
+            Search.LAZY_QUIET_MOVE_GENERATION &&
+            Search.STAGED_MOVE_ORDERING &&
+            !inCheck &&
+            this.board.pieceCount() >=
+                LAZY_QUIET_MIN_NON_KING_PIECES &&
+            ttMove &&
+            !ttMove.isCapture() &&
+            !this.hasPromotionReadyPawn();
+
+        if (lazyQuietGenerationSuppressedByTtMove) {
+            this.lazyQuietTtMoveSuppressedNodes++;
+        }
+
         const moves =
             useLazyQuietGeneration
                 ? this.legalMoveGenerator.generateCaptures()
@@ -3475,6 +3500,7 @@ export default class Search {
         this.lazyMovePickerNodes = 0;
         this.lazyQuietGenerationCalls = 0;
         this.lazyQuietGenerationSkips = 0;
+        this.lazyQuietTtMoveSuppressedNodes = 0;
         this.qttProbes = 0;
         this.qttHits = 0;
         this.qttCutoffs = 0;

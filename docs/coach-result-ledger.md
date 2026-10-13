@@ -2288,3 +2288,262 @@
 - Paired A/B: `analysis-runs\evaluation-cache-vs-6d9396e-20g-st1-20261012` scored `15 - 4 - 1 [0.775]`; candidate White `6 - 3 - 1`, Black `9 - 1 - 0`. Treat as a positive non-regression smoke, not an Elo estimate.
 - ShallowBlue smoke: `analysis-runs\evaluation-cache-shallowblue1618-20g-st3-20261012` scored `10 - 10 - 0 [0.500]` at fixed 3 seconds per move. Every game was won by White (Coach White `10 - 0 - 0`, Coach Black `0 - 10 - 0`), so this is a strongly color-biased opening-policy sample rather than evidence that an exact cache changes Black play. All 20 games replayed cleanly; 1,515 Coach moves yielded 18 selected swings, chiefly existing long endgame conversion/mate entries on the Black side.
 - Decision: accept narrowly. This is a measured, bounded, collision-safe pure static-evaluation cache rather than an incremental-evaluation rewrite. It provides repeatable +5.9% control-adjusted speed while preserving fixed-depth decisions and all correctness sentinels. The color-biased 3-second smoke is non-regression support only; future candidate matches should use varied paired openings before treating that opponent result as a strength estimate.
+
+## 2026-10-12 - Balanced Opening Diagnostic and Cache-Capacity Follow-Up
+
+- Status: diagnostic completed; cache-size variant rejected before match testing.
+- Opening evidence: extended `tools\\generate-opening-continuation-fens.mjs` with `--per-opening-limit` so a global cap cannot silently consume the first few openings. Its focused tests pass. The initial 40-position scan and a balanced 30-position scan spanning all ten curated opening families both returned zero eligible non-mate Coach-vs-SF19 candidates at Coach depth 8 / SF19 depth 12. Do not loosen the root-gap filter merely to create a patch target; these rows are chiefly agreement or flat root alternatives.
+- Static-cache telemetry: added read-only per-search probes, hits, stores, and direct-map collision counts to `Search`, exposed through the cutoff profiler. The accepted 65,536-entry cache on the primary corpus recorded 401,404 probes, 106,329 hits (26.49%), and 84,998 collisions (21.18%). A temporary 131,072-entry variant preserved exact decisions and reduced collisions to 47,054 (11.72%), avoiding 7,365 evaluations (2.50% of evaluation calls).
+- Rejection: two stability-short identical-build controls were outside the predeclared 0.5% noise limit (+0.547% and -0.709% speed gain). More importantly, the maximum extra avoided evaluation work from doubling cache capacity is too small to justify a memory-growth candidate without a clearly stable, greater-than-1% speed result. Restore the accepted 65,536-entry capacity; retain the collision telemetry for future architecture work.
+- Next target: pivot from direct reference-move scans and simple cache sizing. Mine an internally confirmed, non-flat root/child disagreement packet or measure a structurally different high-share search cost before proposing another patch.
+
+## 2026-10-12 - Primitive Static-Evaluation Cache Storage Candidate
+
+- Status: rejected and reverted before opponent smoke.
+- Candidate: replace the accepted direct-mapped cache's miss-time JavaScript object allocation with parallel `BigUint64Array`, `Float64Array`, and occupancy arrays. The key, index, collision behavior, root lifetime, and rollback semantics were otherwise unchanged.
+- Correctness and speed: perft plus engine regressions passed 108/108 (68 diagnostic skips). Exact-identity full benchmarks against `6d9396e` gained +6.823% and +7.127% on independent seeds; the final full identical-build control was stable at -0.479% speed gain. Every benchmark position retained exact move, score, nodes, leaf count, PV, and root table.
+- Paired A/B: `analysis-runs\\candidate-static-eval-primitive-array-vs-6d9396e-20g-st1-20261012`, 20 fixed-1s games over deterministic paired openings, scored `5 - 8 - 7 [0.425]`. Candidate White was `3 - 3 - 4`; Black was `2 - 5 - 3`. This is a clear short-match non-regression failure despite fixed-depth equivalence, plausibly because its materially different allocation/GC timing changes practical time-limited search.
+- Decision: restore object-backed cache storage. Retain only the cache collision counters and profiler exposure. Do not retry typed-array or cache-layout changes without a stronger time-control rationale and direct 5+0 evidence.
+
+## 2026-10-12 - Depth-2 Late Quiet Pruning Probe
+
+- Status: rejected immediately; no candidate benchmark or match.
+- Evidence revisited: current primary telemetry shows depth-2 late moves failing low 5,686 / 5,715 times (99.49%) and consuming 13,782 descendant nodes in the representative `quiet-defense` profile. This looked worth a bounded formulation check, but was not enough to justify changing the accepted policy without preserving its established lane.
+- Probe: widening the single `LATE_MOVE_PRUNING_DEPTH` constant from 1 to 2 replaced rather than extended the current depth-1 behavior. It failed the direct helper sentinel and removed the existing measured node saving from the fixed-depth regression position.
+- Decision: restore depth 1. A future depth-2 experiment would need a separate additive policy, direct telemetry for its complete guard intersection, and fresh exact-root evidence; do not simply widen the accepted depth constant.
+
+## 2026-10-12 - Conservative Additive Depth-2 Late Quiet Candidate
+
+- Status: rejected and reverted at exact-identity screening.
+- Telemetry: profiler-only guard instrumentation found 41,197 depth-2 nodes satisfying all existing depth-1 safety guards when evaluated hypothetically. This confirmed that a simple widening was too broad.
+- Candidate: retained the accepted depth-1 lane unchanged; at depth 2, required move 12 or later and a 400cp static deficit, while retaining the scout, non-root, non-check, non-repetition, non-mate, material-rich, non-promotion, non-killer, and promotion-ready-pawn exclusions. Focused helper coverage added the new boundary cases; affected regression and profiler suite passed 80 with 68 diagnostic skips.
+- Exact screen: `analysis-runs\\candidate-depth2-lmp-20261012\\stability-short-seed26101221.json` was +5.059% faster, but `promotion-race` changed exact fixed-depth identity. This is disqualifying for this semantic-preserving pruning candidate.
+- Decision: revert. Do not retune depth-2 late pruning from this same aggregate signal without a position-level explanation for the promotion-race failure and a new safety condition that excludes it without merely fitting that FEN.
+
+## 2026-10-12 - Deduplicated Practical Loss Root/Child Audit
+
+- Status: diagnostic exhausted; no engine candidate.
+- Source: 50-game ShallowBlue 1618 practical time/depth evidence from `coach-3afde24-shallowblue50-time-depth-20261007`. Strict material-rich non-mate loss-transition selection returned 0 rows for both Coach colors. An unfiltered classification pass selected 24 transitions, which deduplicated to 21 unique FENs; four games shared the same 17-piece rook ending at move 35.
+- Audit: `analysis-runs\\current-practical-rootchild-20261012\\audit-d8-c8` used Coach root depth 8, child depth 8, root limit 8, and 100cp hidden-spread/disagreement thresholds. Results: 6 hidden-child spreads, 4 true flats, 6 mate-child rows, 3 child spreads, 1 subthreshold spread, and 1 root-child disagreement.
+- Key outcome: the recurring 17-piece position had a 437cp hidden child spread but Coach root and child both chose `g1g2`; it is not a root-choice patch source. The sole root-child disagreement was `game29-ply107-Kh7`, a sparse 8-piece near-mate ending, with `g6h7` preferred by child search over root best `g6f7` by 518cp. Exclude it under the non-mate/material policy rather than reopening root-tie or endgame mate work.
+- Decision: this practical lane provides no eligible current candidate. Do not relax the material/mate policy merely to promote its sole survivor.
+
+## 2026-10-12 - QSearch Quiet-Forcing Generation Diagnostic
+
+- Status: diagnostic exhausted; no candidate.
+- Motivation: first-ply qsearch currently generates captures, then generates all legal moves again to retain quiet checks and promotions. This looked like a possible high-share move-generation cost outside the accepted lazy main-search quiet generation and material-rich qsearch TT.
+- Tooling: cutoff profiler now counts first-qsearch-ply calls, retained quiet forcing moves, and calls containing at least one. Focused profiler tests passed 6/6.
+- Evidence: `analysis-runs\\qsearch-quiet-forcing-diagnostics-20261012\\primary.json` recorded 38,883 first-qsearch-ply calls, 55,049 quiet forcing moves, and 17,732 calls with one or more forcing move: 45.60% hit rate, 1.42 forcing moves per call. The contribution is especially high in quiet-defense, game8, queen-rook-mate, and promotion-race, all safety-sensitive corpus positions.
+- Decision: do not skip or broadly defer the second pass. It is materially productive, and the earlier native quiet-only generation follow-up was already rejected for negative benchmark performance. Preserve telemetry and pivot away from this source.
+
+## 2026-10-12 - Bounded False-Mate Sentinel Recheck
+
+- Status: correctness lane clean; no new candidate.
+- Recheck: the accepted sparse mixed-material quiet-queen sentinel (`8/4NKP1/5P1k/3R3P/2q5/8/8/8 b - - 18 76`) completed at depth 11 in 59.3s with a normal centipawn score. Its qsearch material-boundary and sparse qsearch-TT fallback companions also passed.
+- Decision: do not reopen broad root mate-PV verification, root-tie depth, or broad quiet-check policies. Those variants are already documented as practical regressions, and no new bounded internal inconsistency is present in the maintained sentinel.
+
+## 2026-10-12 - Paired ShallowBlue Validation and Unique Root Evidence
+
+- Status: diagnostic active; no patch yet.
+- Fair match: `analysis-runs\\coach-30fc376-shallowblue1618-20g-st3-varied-openings-20261012` used twenty fixed-3-second games, four concurrent games, and the curated ten-opening suite with `-repeat` so each opening was played with both colors. Baseline `30fc376` scored `4 - 14 - 2 [0.250]`: White `3 - 5 - 2 [0.400]`, Black `1 - 9 - 0 [0.100]`. This corrects the earlier all-White-win smoke's color bias and is diagnostic evidence, not an Elo estimate.
+- Reference pass: SF19 depth-8 analysis sampled 160 Coach decisions. After excluding mate comparisons and deduplicating repeated paired-game FENs, `deduped-child-intake` retained 19 of 34 unique root-disagreement rows. Do not spend confirmation budget on duplicate paired rows.
+- First clean depth signal: `game2-before-24...Kd7` (`2k4r/5ppp/p7/3B2P1/2R5/5K2/r5P1/7R b - - 0 24`) differs from SF19 by 434cp without a mate score. Coach selects `c8d7` through depth 11, but at depth 12 flips to `c8d8`, which its own score prefers by 68cp. The match-time report averages 8.68 depth at fixed 3 seconds per move, so this is a speed-to-depth/search-efficiency signal, not normal clock-allocation evidence.
+- Decision: keep mining the deduplicated packet for a recurring, explainable microarchitecture source before changing search. Do not add a fixed-FEN rule or alter generic time management from this one late-depth flip.
+
+## 2026-10-12 - QSearch TT Capacity-Cap Follow-Up
+
+- Status: rejected as a no-op at Coach's normal Hash setting.
+- Trigger: the `Kd7`/`Kd8` depth-flip profile shows 6.78% qsearch-TT foreign collisions, unlike the sparse main TT. A temporary 16 MB cap was screened with the three focused qsearch-TT correctness sentinels, all passing.
+- Result: no profile metric, root identity, node count, or reuse count changed at 32 MB Hash. The qsearch table is sized as `Hash / 4`, so it is already 8 MB at the normal 32 MB configuration; increasing only the 8 MB ceiling cannot allocate more memory.
+- Decision: restore the 8 MB cap. Do not promote a cap-only qsearch-table change. Any later memory-allocation candidate must explicitly trade main versus qsearch Hash, preserve total configured memory, and first show a repeatable fixed-depth benefit.
+
+## 2026-10-12 - Paired-Match Root-Depth Packet Follow-Up
+
+- Status: diagnostic exhausted; no candidate.
+- The only clear non-mate late-depth change in the deduplicated match packet is `game2-before-24...Kd7`: `c8d7` through depth 11, then `c8d8` at depth 12 with a 68cp internal advantage. Its depth-8 profile confirms high qsearch reuse but also 89.9% first-ply quiet-forcing incidence, excluding broad qsearch move skipping.
+- Two additional high-difference rows did not reproduce the same structure. `game13-before-28.Qd3` remains a broad root tie through depth 10; `game16-before-30...Kf8` remains a four-way equal-score root table through depth 12. They do not justify root-tie selection work or a generalized endgame rule.
+- Decision: do not fit a speed or time-control rule to the lone Kd7/Kd8 horizon flip. Pivot to a new SF19 diagnostic corpus filtered for stable non-flat disagreement before proposing another search candidate.
+
+## 2026-10-12 - Balanced Early-Opening SF19 Diagnostic
+
+- Status: diagnostic exhausted; no candidate.
+- Corpus: `analysis-runs\\sf19-stable-nonflat-opening-corpus-20261012\\opening-continuations.fens` contains 30 balanced opening continuations, limited to three positions per curated opening family with at least 16 total and six non-pawn pieces.
+- Result: `compare-d8-vs-d12` compared Coach depth 8 against SF19 depth 12 with MultiPV 4, a 100cp Coach internal gap requirement, and mate-class exclusion. It found zero candidates.
+- Decision: preserve the non-flat gate. Do not lower the 100cp internal-gap threshold merely to create a patch target. Pivot to later continuation positions with a distinct tactical/evidence policy, not another early-opening sample.
+
+## 2026-10-12 - Later-Game Paired-PGN SF19 Diagnostic
+
+- Status: diagnostic exhausted; no candidate.
+- Source: 60 later-game Coach decisions (moves 35-80) sampled from the fair paired match were compared with SF19 at depth 8. After mate exclusion, FEN deduplication, a 150cp difference threshold, and bounded-root intake, nine rows remained.
+- Deep checks: the strongest row, `game17-before-35.Rb3` (535cp reference difference, five root ties at depth 8), remains a five-way equal-score table through depth 12. The least-flat survivor, `game17-before-47.Rf2` (251cp, three depth-8 ties), becomes a broad equal-score table by depth 12. Both are low-material losing positions and neither establishes a stable alternate root move.
+- Decision: do not reopen root-table/tie-selection work from these rows; that family has already produced practical regressions. The next evidence source must be a structurally different, non-root-flat search cost or correctness signal.
+
+## 2026-10-12 - Countermove Ordering Design Screen
+
+- Status: rejected and fully reverted before benchmarking.
+- Motivation: profiles repeatedly show high first-move cutoff rates and many generated-but-unsearched moves; Coach has killers and from-to history but no response-to-previous-move ordering.
+- Prototype result: a feature-gated quiet countermove bonus was wired below killers and above ordinary history. Focused qsearch/root sentinels immediately exposed that the needed search-path context is not owned by every search reset path. Repairing it correctly would require lifecycle changes beyond a narrow ordering experiment and risks state leakage across iterations.
+- Verification after revert: focused qsearch-TT, fixed-depth-root, late-pruning, and false-mate tests passed 5/5 (one slow sentinel skipped by pattern).
+- Decision: do not pursue countermove/continuation history as a small patch. Revisit only as a dedicated search-state refactor with independent correctness coverage.
+
+## 2026-10-12 - QSearch TT Threshold-8 Candidate
+
+- Status: rejected and reverted before match testing.
+- Candidate: lower the accepted qsearch-TT material gate from 10 to 8 non-king pieces while preserving table size, key, bounds, repetition bypass, and sparse fallback.
+- Safety: full engine regression passed 74/74 active tests (68 diagnostics skipped). The slow sparse queen-check false-mate sentinel passed 4/4 in 58.0 seconds, including qsearch sparse-conversion fallback checks.
+- Exact benchmark: against detached accepted baseline `30fc376`, both stability-short seeds retained exact move, score, PV, root table, node, and leaf identity on all four primary positions. Timing was negative in both independent runs: -0.258% (seed 26101241) and -0.649% (seed 26101242), with promotion-race slower in each run.
+- Decision: restore the 10-piece threshold. The additional low-material qsearch TT probing/store work costs more than the reuse it yields on the maintained corpus; do not run a match.
+
+## 2026-10-12 - QSearch TT Threshold-12 Candidate
+
+- Status: rejected and reverted at exact benchmark screening.
+- Candidate: raise the accepted qsearch-TT material gate from 10 to 12 non-king pieces to remove low-yield table overhead while retaining dense middlegame reuse.
+- Focused qsearch/fixed-depth tests passed 4/4 active checks. The first exact stability-short benchmark was +0.668% faster overall, but `promotion-race` changed fixed-depth identity.
+- Decision: restore the 10-piece threshold. The speed result cannot compensate for a semantic change in a cache-scope candidate; do not tune the threshold around one corpus FEN.
+
+## 2026-10-12 - QSearch TT Threshold-9 Candidate
+
+- Status: rejected and reverted after paired baseline gate.
+- Candidate: lower qsearch-TT eligibility from 10 to 9 non-king pieces. Full engine plus perft suites passed 108/108 active tests, and the sparse false-mate sentinel passed 4/4 in 100.3 seconds.
+- Exact benchmark: two independent stability-short runs retained exact identity on all four primary positions, gaining +0.607% and +1.667%; an identical-build control was stable at -0.408%, so the speed evidence was sufficient to advance.
+- Paired A/B: `analysis-runs\\candidate-qsearch-tt-threshold9-vs-30fc376-20g-st1-20261012` scored `6 - 9 - 5 [0.425]` against detached accepted baseline `30fc376`. Candidate White was `3 - 3 - 4`; Black was `3 - 6 - 1`.
+- Decision: reject before independent-opponent smoke. The time-limited paired match is a practical non-regression failure despite exact fixed-depth equivalence and measured speed; restore the accepted 10-piece threshold.
+
+## 2026-10-12 - Aspiration Window 50cp Screen
+
+- Status: rejected and reverted at exact benchmark screening.
+- Candidate: widen the fixed aspiration window from +/-25cp to +/-50cp while retaining the existing full-window re-search on a miss.
+- Result: the first exact stability-short run changed search identity on all four primary positions, so no timing result is valid. A fixed wider root window changes the practical alpha-beta tree even though the fallback produces a legal result.
+- Decision: restore +/-25cp. Do not tune aspiration width as an exact-identity speed candidate without a separately designed SearchStable acceptance policy and deeper time-control evidence.
+
+## 2026-10-12 - Non-Winning Root-Plateau Time Gate
+
+- Status: rejected and reverted after independent 5+0 smoke.
+- Candidate: for clock-based searches only, keep the existing depth-7 broad-root-plateau early stop only when Coach is ahead by at least 100cp; otherwise continue iterating. On the maintained plateau FEN, the candidate reached depth 8 and selected `e4d6` rather than baseline early-stop `c8f5`. Time-management tests passed 15/15; full engine plus perft suites passed 108/108 active tests.
+- Paired baseline gate: `candidate-plateau-winning-gate-vs-30fc376-20g-5m0-20261012` scored `6 - 5 - 9 [0.525]`, a narrow non-regression only.
+- Independent opponent smoke: `candidate-plateau-winning-gate-shallowblue1618-20g-5m0-20261012` scored `0 - 19 - 1 [0.025]` versus ShallowBlue 1618, White `0 - 9 - 1`, Black `0 - 10 - 0`.
+- Decision: restore unconditional clock-based plateau early stopping. Spending extra time on non-winning broad root plateaus is catastrophically harmful in practical 5+0 play; do not revive this rule without fundamentally different evidence.
+
+### Correction: true 5+0 time control
+
+- The first two artifacts labeled `5m0` used CuteChess `tc=5+0`, which means five seconds, not five minutes. Their reported 0.07s average move time confirms this. They are invalid as five-minute evidence.
+- The corrected command uses `tc=5:00+0`. The true five-minute paired baseline gate `candidate-plateau-winning-gate-vs-30fc376-20g-true5m0-20261012` was stopped after 12 completed games at `1 - 6 - 5 [0.292]`, a decisive regression. This corrected result is the authoritative practical rejection; the candidate remains reverted.
+- Durable command rule: CuteChess requires `tc=5:00+0` for five minutes with no increment. Never use `tc=5+0` when requesting 5+0 chess.
+
+## 2026-10-12 - Corrected True-5+0 Baseline Evidence
+
+- Status: fresh evidence source active.
+- Match: `baseline-30fc376-shallowblue1618-20g-true5m0-20261012` used the corrected CuteChess `tc=5:00+0` syntax, paired ten-opening suite, four concurrent games, and 20 total games. Accepted baseline `30fc376` scored `7 - 11 - 2 [0.400]`: White `4 - 5 - 1 [0.450]`, Black `3 - 6 - 1 [0.350]`.
+- Mining: all games replayed cleanly; 1,532 Coach moves produced 40 swings and 21 selected records, including 10 centipawn drops, 10 entered-losing-mate transitions, and one mate-score change. This is the current authoritative long-control source; prior artifacts using `tc=5+0` are five-second games, not five-minute evidence.
+- Next: filter the 42 selected FENs for non-mate, non-flat root/child disagreements before proposing a search or evaluation candidate.
+
+## 2026-10-12 - Corrected Long-Control Root/Child Audit
+
+- Status: diagnostic exhausted; no eligible candidate.
+- Audit: 40 deduplicated before/after long-control swing FENs were searched at root depth 8 and child depth 8 with root limit 8. Class counts: 23 mate-child, 8 child-spread, 4 hidden-child-spread, 3 subthreshold, 1 true flat, and 1 root-child disagreement.
+- Sole disagreement: `game20-ply140-Kc4-before` is a six-piece near-mate ending (`8/3K4/7P/5Q2/3B4/2Pk4/r7/8 b - - 2 70`); root chose `d3d2` while child chose `d3c4` by 551cp. Exclude it under the maintained non-mate/material policy rather than reopening sparse mate/endgame logic.
+- Decision: the corrected true-5+0 loss corpus provides no safe main-search candidate. Preserve it as the authoritative long-control baseline and pivot to a structurally different, non-mate evidence source.
+
+## 2026-10-12 - Depth-1 Late Quiet Pruning Index-6 Screen
+
+- Status: rejected and reverted at exact benchmark screen.
+- Candidate: retain every accepted depth-1 late-quiet pruning guard but begin one move earlier (seventh move instead of eighth).
+- Evidence trigger: tactical-ordering profile shows 661,956 / 668,767 late quiet moves failing low (98.98%) and 42.4% of descendant node work in late moves.
+- Result: first exact stability-short run was faster but changed identity on all four primary positions. This is disqualifying and confirms the accepted eighth-move boundary is meaningful.
+- Decision: restore index 7. Do not further lower the accepted depth-1 index without a new position-level safety criterion, not aggregate fail-low statistics.
+
+## 2026-10-12 - Quiet TT Lazy-Generation Candidate
+
+- Status: practical gate restart required; no acceptance decision.
+- Evidence: profiling found 1,951 material-rich nodes in the primary corpus where a quiet TT move alone disabled the accepted capture-first lazy generator. The candidate searches that known-full-hash quiet TT move first, then captures, and only materializes remaining quiets if no cutoff occurs. It is rollback-gated by `COACH_LAZY_QUIET_TT_MOVE_GENERATION=0`.
+- Local gates: focused and full regression/perft suites passed, including exact root-table identity. `run-slow-tests.cmd /position rollback` passed all 4 active slow suites and six selected rollback positions. Two exact stability-short runs against detached `30fc376` were +1.541% and +1.425% faster; a stable +0.227% slower identical-build control gives +1.710% control-adjusted mean speed, with 4/4 positions positive in both candidate runs.
+- Paired-match incident: the first 20-game fixed-1s candidate-vs-baseline run used ten paired PGN openings and reached a partial `4 - 2 - 5 [0.591]` after 11 games, but the four active games stopped updating their PGN and all eight child engines remained alive. The verified stalled CuteChess tree was terminated. This partial score is invalid and must not be used for acceptance or rejection.
+- Rerun policy: use the same paired openings and seed family, plus a documented CuteChess `-maxmoves` draw adjudication cap, so a batch of undrawn long endgames cannot stall the candidate gate.
+
+### Paired-match harness follow-up
+
+- A capped retry (`-maxmoves 120`) launched the expected four games and eight engines but again produced no completed PGN game after an extended interval. It was terminated as invalid. Do not interpret either partial run as a playing-strength result.
+- Next action: reproduce fixed-time behavior with a tiny two-game smoke and inspect UCI traffic/time control before restarting any 20-game candidate gate. The candidate remains `locally-passed / practical-unverified`.
+
+### Final practical screen and decision
+
+- Harness diagnosis: two-game fixed-time smokes proved `st=0.1` and `st=1` both work with the expected color swap and `-maxmoves` adjudication. The issue was the practical wall-clock cost of the earlier four-concurrent long-game batches, not an invalid UCI clock. A serial fixed-0.1-second screen was used as a bounded practical non-regression gate.
+- Result: `analysis-runs\candidate-lazy-quiet-tt-vs-30fc376-20g-st0p1-serial-max80-20261012` completed all 20 paired games: candidate `3 - 5 - 12 [0.450]`; White `2 - 1 - 7 [0.550]`; Black `1 - 4 - 5 [0.350]`. Six draws reached the symmetric 80-full-move cap.
+- Decision: reject and revert the quiet-TT staged-generation candidate. Its exact fixed-depth identity and +1.710% control-adjusted speed were not sufficient to clear the practical short-clock gate. Retain only the read-only quiet-TT suppression telemetry; do not retry direct TT-move staging without an explanation for the time-limited regression.
+
+## 2026-10-12 - Attack-Ray Pair-Comparison Candidate
+
+- Status: rejected and reverted after paired-baseline gate.
+- Candidate: replace the two-element `Array.includes` lookup in `Attack.rayAttack()` with direct comparisons against the selected ray-attacker pair. It is behavior-identical at fixed depth and targets a documented hot path.
+- Correctness: the full regression suite passed with no failure markers, and `run-slow-tests.cmd /position rollback` passed all four active suites, including the mined SF2400 collapse positions.
+- Exact speed evidence: against detached accepted baseline `30fc376`, the first stability-short run was +3.351% faster and the second +2.887% faster with exact identity. The identical-build control was 0.434% slower, for a +3.553% control-adjusted mean. All primary positions remained positive; there was no one-position domination.
+- Paired A/B: `analysis-runs\\candidate-attack-pair-compare-vs-30fc376-20g-st0p1-serial-max80-20261012` completed all 20 paired games at fixed 0.1 seconds per move: candidate `2 - 5 - 13 [0.425]`; White `2 - 2 - 6 [0.500]`; Black `0 - 3 - 7 [0.350]`. Seven draws reached the symmetric 80-full-move cap.
+- Decision: reject before the independent-opponent gate. The candidate has unusually strong exact speed evidence but practical short-clock regression, especially as Black. Restore `Array.includes`; do not retry direct pair comparisons without new evidence explaining the color-skewed regression.
+
+## 2026-10-12 - Corrected True-5+0 Time/Depth and Root-Plateau Audit
+
+- Status: diagnostic exhausted; no time-management candidate.
+- Source: the corrected true-5+0 baseline PGN was summarized in `analysis-runs\\time-management-true5m0-diagnostic-20261012`. Across 1,532 Coach moves, average depth was 7.73 and average move time 3.05s; the costly early positions repeatedly consumed 10-18 seconds while reaching only depths 6-9.
+- Audit: 20 material-rich slow positions from moves 9-25 were examined with `explain-root-plateau` at depth 8. Fourteen had four or more equal top root scores but a child-score spread of at least 100cp (up to 763cp); the remaining six were not four-way ties.
+- Decision: do not broaden or lower the existing clock-only root-plateau stop, and do not cap these repeated early positions. The apparent root flatness hides large child differences on almost every long-think target. This independently confirms the earlier practical rejections of broad early-core time trims and the non-winning plateau restriction.
+
+## 2026-10-12 - Corrected True-5+0 Slow-Position SF19 Follow-Up
+
+- Status: diagnostic exhausted; no candidate.
+- Source: the 20 material-rich, moves-9-to-25 slow positions from the corrected true-5+0 packet were compared at Coach depth 8 versus SF19 depth 12 with MultiPV 4, mate/extreme-score exclusion, and a 100cp Coach-internal-gap requirement.
+- Result: zero candidates. Every row either agreed with SF19 or classified as `small-coach-gap`; the SF-preferred move was within 3cp of Coach's root choice in every disagreement. Several apparent reference score differences therefore reflect different but equally scored Coach root moves, not a stable missed alternative.
+- Decision: the costly early positions are neither safely clock-trimmable nor a search/evaluation correction source. Preserve the packet as corrected long-control evidence and pivot away from this opening-time/plateau family.
+
+## 2026-10-12 - Deep Zero-History LMR Screen
+
+- Status: rejected and reverted at controlled benchmark screening.
+- Candidate: retain all existing LMR safety exclusions and add a second reduction only for depth-7-or-greater, move-8-or-later, quiet non-check scout moves whose from-to history remained zero in the current root search. A rollback switch and focused LMR/tactical suite passed 75 active tests with zero failures.
+- Benchmark: `analysis-runs\\candidate-history-aware-lmr-20261012\\stability-short-seed26101291.json` retained SearchStable identity on all four primary positions, but none of those depth-4 fixed searches reached the new depth-7 gate. The candidate therefore supplied no tree or node reduction and was 0.158% slower overall from guard overhead.
+- Decision: restore the existing one-ply LMR. Do not create a special deep-only benchmark merely to advance an unmeasured reduction; a future history-aware reduction needs observed activation on a representative maintained corpus and a recurring tactical reason for its threshold.
+
+## 2026-10-12 - Lucas Tactical-Regression Anchor SF19 Recheck
+
+- Status: diagnostic exhausted; no current candidate.
+- Source: all 16 local `lucas-sts-regression` anchors were rechecked with current Coach at depth 8 versus SF19 at depth 12 with MultiPV 4, mate/extreme-score exclusion, and the maintained 100cp Coach-internal-gap requirement.
+- Result: zero candidates. Five anchors agree directly with SF19; every remaining row is `small-coach-gap`, with the SF-preferred move either tied or within 39cp of Coach's root score. Several historical Lucas move differences therefore no longer represent an actionable current root-choice error.
+- Decision: do not resurrect a Lucas-specific root override or relax the 100cp gate to force a patch. The next evidence source must not be another historical root-move corpus; prefer a measured non-root cost or a current evaluator/search invariant.
+
+## 2026-10-13 - Static-Evaluation Cache Capacity 128k
+
+- Status: accepted-narrow / local commit pending.
+- Baseline: accepted `30fc376`, whose exact static-evaluation cache uses 65,536 direct-mapped entries. The candidate doubles only that root-local cache to 131,072 entries; `COACH_STATIC_EVAL_CACHE_ENTRIES=65536` is the rollback switch.
+- Evidence trigger: capacity telemetry on the primary corpus recorded 403,436 probes, 107,585 hits (26.67%), and 85,711 collision misses (21.25%). Doubling the capacity reduces direct-map eviction pressure without changing keys, scores, cache lifetime, or search policy.
+- Correctness: full `run-tests.cmd` completed with no failures (74 active engine regression tests plus the supporting tool suites), and `run-slow-tests.cmd /position rollback` passed all four active slow suites. Fixed-depth benchmark identity remained Exact for move, score, PV, root table, nodes, and leaves on every sampled position.
+- Controlled speed: the identical-build control was 0.034% slower and classified stable. Independent candidate runs were +1.570% and +0.900% faster; the benchmark summary accepted the candidate with a +1.270% control-adjusted mean, 2/2 positive exact runs, and no domination failure.
+- Practical gates: the internal paired baseline match completed `0 - 0 - 20 [0.500]`, the expected no-regression result for an exact cache variant. The corrected varied-opening ShallowBlue 1618 fixed-3-second gate at `analysis-runs\\candidate-static-eval-cache-128k-shallowblue1618-20g-st3-varied-openings-corrected-20261013` scored `10 - 5 - 5 [0.625]`; White `7 - 0 - 3`, Black `3 - 5 - 2`. The separate first opponent attempt is invalid because it omitted CuteChess `timemargin=1000` and every game ended on an opponent flag; do not use that 20-0 result.
+- Decision: accept narrowly. This is a bounded pure-cache capacity increase with strong exact-speed evidence, no correctness drift, and a clean non-regressing opponent smoke. Treat the ShallowBlue score as smoke evidence only because it remains color-skewed and is a single 20-game sample.
+
+## 2026-10-13 - Clock-Cushion Time-Management Design Screen
+
+- Status: deferred; no code candidate.
+- Trigger: Sir Slice observed a book-off Arena 10-minute match in which Coach often retained a substantial clock lead over ShallowBlue. The `19 - 1` arena score is not strength evidence because the game sequence repeated without an opening policy, but the clock pattern is worth preserving as a future diagnostic question.
+- Architecture check: Coach receives both `wtime` and `btime`, but `allocateMoveTime()` correctly uses only the side-to-move clock. It constructs one immutable search deadline before `Search.bestMove()` starts. Therefore it cannot know that the opponent's immediately preceding move caused an evaluation drop until Coach has already searched, and it cannot extend that deadline from inside the current iterative-deepening loop.
+- Decision: do not implement a broad "opponent has less time, spend more" multiplier. Prior broad early-time and non-winning plateau extensions regressed badly in corrected true-5+0 evidence. A credible future candidate requires the Arena PGN (or comparable clock/depth artifact), plus an explicitly designed two-stage search/deadline mechanism that activates only on demonstrated root uncertainty or a current-search score swing.
+
+## 2026-10-13 - Kd7/Kd8 Late-Depth Flip Follow-Up
+
+- Status: diagnostic exhausted as an independent search-policy candidate.
+- Recheck: the lone clean non-mate depth transition remains `game2-before-24...Kd7`, where Coach changes from `c8d7` through depth 11 to the internally preferred `c8d8` at depth 12. It is not yet a recurring position class.
+- Profile: the depth-12 run is expensive in generation (63.2% of measured phase time), but it also reports very high static-cache collision pressure: 13,163,974 probes, 3,288,831 hits (24.98%), and 9,809,607 direct-map collisions (74.52%). The already-accepted 128k exact-cache capacity increase directly addresses this measured non-policy cost.
+- Decision: do not add a special late-depth reduction, root override, or qsearch skip from one flip. The history-aware LMR screen had no representative activation and was slower; qsearch quiet-forcing is especially active on this FEN. Revisit only if a fresh corpus finds a recurring stable flip after the capacity candidate is committed.
+
+## 2026-10-13 - 128k Cache ShallowBlue Swing Mining
+
+- Status: fresh match evidence mined; no new candidate.
+- Source: the corrected 20-game fixed-3-second ShallowBlue gate for the accepted 128k cache candidate replayed 1,152 Coach decisions cleanly. The miner selected 21 swings: 12 mate-score changes, 2 entered-losing-mate transitions, and 7 centipawn drops.
+- Non-mate review: the seven centipawn drops collapse to three sparse endgames. The repeated `game10/game12 ...Kh7` FEN is a seven-way low-material root-tie family through depths 4-7; the apparent separation only appears at depth 8 and repeats the already-rejected root-policy/endgame pattern. The `game20 ...Kd4` rook ending has only two tied king moves through depth 8. Neither provides a stable alternate move or a recurring engine mechanism.
+- Decision: retain the match as valid cache-candidate smoke evidence, but do not patch root-tie, low-material, mate, or static evaluation policy from its swing report. The next evidence source must be structurally different from repeated sparse endgames and promotion conversions.
+
+## 2026-10-13 - Arena 10-Minute Clock-Cushion Audit
+
+- Status: time-use observation confirmed; no time-management candidate yet.
+- Source: `C:\\Program Files (x86)\\Arena\\Tournaments\\101226_10min_CCvsShallowBlue.pgn`, analyzed under `analysis-runs\\arena-10min-coach-vs-shallowblue-20261012-time-diagnostic`.
+- Match quality: the apparent `19 - 1` is not strength evidence. After game 1, Arena repeated two deterministic no-book lines: one Coach-White win and one Coach-Black win. The score must not be used as an Elo or candidate-acceptance result.
+- Clock evidence: the repeated Coach-White line ends with Coach at about 483s versus ShallowBlue at 183s, a five-minute cushion. The repeated Coach-Black line ends with Coach at about 285s versus ShallowBlue at 79s, a roughly 3.5-minute cushion. Across all 20 games, Coach averaged 5.33s/move at depth 7.66; ShallowBlue averaged 11.25s/move at depth 7.82.
+- Interpretation: Coach is materially faster in this Arena configuration, but the evidence does not show harmful underthinking. Coach already spends 25-28 seconds on selected complex moves, no low-clock/low-depth combination appears, and both repeated lines are wins. Do not add a blanket opponent-clock multiplier or sacrifice Coach's proven clock advantage.
+- Next condition: revisit only with varied-opening clocked games containing repeated Coach losses or stable depth-8 move flips while Coach has a large verified cushion. A future design must use current-search uncertainty, not the opponent clock alone.
