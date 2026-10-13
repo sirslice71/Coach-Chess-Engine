@@ -10,11 +10,11 @@ estimate; a July 2026 Lucas Chess R position-test report was 1587 Elo, and
 later changes have not been independently rated by CCRL.
 Author: Sir Slice, USA
 Open source: yes, MIT License
-Source and homepage: https://github.com/sirslice71/Coach-Current
+Source and homepage: https://github.com/sirslice71/Coach-Chess-Engine
 Implementation: JavaScript chess engine, bundled as a self-contained Windows
 x64 UCI executable with Node SEA.
 Credits: built and maintained by Sir Slice with AI-assisted development.
-Download: [GitHub release link]
+Download: https://github.com/sirslice71/Coach-Chess-Engine/releases/tag/v1.0.0
 
 The submitted executable is Coach-1.0.0.exe. It is a single-threaded UCI
 engine with a default 256 MB hash. It does not require Node.js to be installed.
