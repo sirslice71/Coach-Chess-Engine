@@ -285,6 +285,73 @@ function searchBestMove(fen, depth) {
 
 }
 
+function pawnStructureSnapshot(fen, cacheEnabled) {
+
+    const {
+        evaluation
+    } = createEngine(fen);
+
+    const previous = Evaluation.PAWN_STRUCTURE_CACHE;
+    Evaluation.PAWN_STRUCTURE_CACHE = cacheEnabled;
+
+    try {
+
+        return {
+            score: evaluation.evaluatePawnStructure(),
+            evaluation,
+            total: evaluation.evaluate().total
+        };
+
+    }
+
+    finally {
+
+        Evaluation.PAWN_STRUCTURE_CACHE = previous;
+
+    }
+
+}
+
+test("pawn-layout cache preserves dynamic passed-pawn terms", () => {
+
+    const clearFront =
+        "4k3/8/8/8/8/8/P3K3/8 w - - 0 1";
+    const blockedFront =
+        "4k3/8/8/8/8/r7/P3K3/8 w - - 0 1";
+
+    const clearCached = pawnStructureSnapshot(clearFront, true);
+    const clearUncached = pawnStructureSnapshot(clearFront, false);
+    const blockedCached = pawnStructureSnapshot(blockedFront, true);
+    const blockedUncached = pawnStructureSnapshot(blockedFront, false);
+
+    assert.deepEqual(clearCached.score, clearUncached.score);
+    assert.equal(clearCached.total, clearUncached.total);
+    assert.deepEqual(blockedCached.score, blockedUncached.score);
+    assert.equal(blockedCached.total, blockedUncached.total);
+
+    const {
+        board,
+        evaluation
+    } = createEngine(clearFront);
+
+    const first = evaluation.evaluatePawnStructure();
+
+    FEN.import(board, blockedFront);
+
+    const second = evaluation.evaluatePawnStructure();
+
+    assert.ok(
+        evaluation.pawnStructureHits > 0,
+        "same pawn layout should reuse cached structural facts"
+    );
+    assert.notEqual(
+        first.passed,
+        second.passed,
+        "blocker-sensitive passed-pawn value must stay dynamic"
+    );
+
+});
+
 test("static evaluation cache is exact, collision-safe, and can be disabled", () => {
     const {
         board,

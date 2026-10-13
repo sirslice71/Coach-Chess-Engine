@@ -47,11 +47,28 @@ const BISHOP_MOBILITY_DIRECTIONS = [
 
 ];
 
+const PAWN_STRUCTURE_CACHE_ENTRIES = 1 << 15;
+
 export default class Evaluation {
+
+    static PAWN_STRUCTURE_CACHE =
+        typeof process === "undefined" ||
+        process.env?.COACH_PAWN_STRUCTURE_CACHE !== "0";
 
     constructor(board) {
 
         this.board = board;
+
+        this.pawnStructureTable =
+            new Array(PAWN_STRUCTURE_CACHE_ENTRIES);
+
+        this.pawnStructureMask =
+            PAWN_STRUCTURE_CACHE_ENTRIES - 1;
+
+        this.pawnStructureProbes = 0;
+        this.pawnStructureHits = 0;
+        this.pawnStructureStores = 0;
+        this.pawnStructureCollisions = 0;
 
     }
 
@@ -1300,99 +1317,21 @@ export default class Evaluation {
 
         };
 
-        //----------------------------------
-        // White
-        //----------------------------------
-
-        const whiteFiles = new Uint8Array(8);
-
-        for (const square of this.board.whitePieces.pawns) {
-
-            whiteFiles[square & 7]++;
-
-        }
-
-        //----------------------------------
-        // Black
-        //----------------------------------
-
-        const blackFiles = new Uint8Array(8);
-
-        for (const square of this.board.blackPieces.pawns) {
-
-            blackFiles[square & 7]++;
-
-        }
-
-        //----------------------------------
-        // Passed Pawn Squares
-        //
-        // Computed once per side up front so the
-        // per-pawn loops below can look up passed
-        // status (and each other's passed pawns, for
-        // the connected-passed bonus) without
-        // recomputing the detection loop.
-        //----------------------------------
-
+        const structure = this.pawnStructureFacts();
         const phase = this.gamePhase();
 
-        const whitePassedSquares =
-            this.computePassedPawnSquares(
-                this.board.whitePieces.pawns,
-                this.board.blackPieces.pawns,
-                true
-            );
+        score.isolated = structure.isolated;
+        score.doubled = structure.doubled;
+        score.connected = structure.connected;
 
-        const blackPassedSquares =
-            this.computePassedPawnSquares(
-                this.board.blackPieces.pawns,
-                this.board.whitePieces.pawns,
-                false
-            );
+        const whitePassedSquares = structure.whitePassedSquares;
+        const blackPassedSquares = structure.blackPassedSquares;
 
         //----------------------------------
         // White Pawns
         //----------------------------------
 
         for (const square of this.board.whitePieces.pawns) {
-
-            const file = square & 7;
-
-            //----------------------------------
-            // Doubled
-            //----------------------------------
-
-            if (whiteFiles[file] > 1) {
-
-                score.doubled += Eval.DOUBLED_PAWN;
-
-            }
-
-            //----------------------------------
-            // Isolated
-            //----------------------------------
-
-            const left =
-
-                file > 0
-
-                    ? whiteFiles[file - 1]
-
-                    : 0;
-
-            const right =
-
-                file < 7
-
-                    ? whiteFiles[file + 1]
-
-                    : 0;
-
-            if (left === 0 && right === 0) {
-
-                score.isolated += Eval.ISOLATED_PAWN;
-
-            }
 
             //----------------------------------
             // Passed Pawn
@@ -1422,40 +1361,6 @@ export default class Evaluation {
 
             }
 
-            //----------------------------------
-            // Connected Pawn
-            //----------------------------------
-
-            const leftConnected =
-
-                this.board.whitePieces.pawns.some(
-
-                    pawn =>
-
-                        (pawn & 7) === file - 1 &&
-
-                        Math.abs((pawn >> 3) - (square >> 3)) <= 1
-
-                );
-
-            const rightConnected =
-
-                this.board.whitePieces.pawns.some(
-
-                    pawn =>
-
-                        (pawn & 7) === file + 1 &&
-
-                        Math.abs((pawn >> 3) - (square >> 3)) <= 1
-
-                );
-
-            if (leftConnected || rightConnected) {
-
-                score.connected += Eval.CONNECTED_PAWN;
-
-            }
-
         }
 
         //----------------------------------
@@ -1463,44 +1368,6 @@ export default class Evaluation {
         //----------------------------------
 
         for (const square of this.board.blackPieces.pawns) {
-
-            const file = square & 7;
-
-            //----------------------------------
-            // Doubled
-            //----------------------------------
-
-            if (blackFiles[file] > 1) {
-
-                score.doubled -= Eval.DOUBLED_PAWN;
-
-            }
-
-            //----------------------------------
-            // Isolated
-            //----------------------------------
-
-            const left =
-
-                file > 0
-
-                    ? blackFiles[file - 1]
-
-                    : 0;
-
-            const right =
-
-                file < 7
-
-                    ? blackFiles[file + 1]
-
-                    : 0;
-
-            if (left === 0 && right === 0) {
-
-                score.isolated -= Eval.ISOLATED_PAWN;
-
-            }
 
             //----------------------------------
             // Passed Pawn
@@ -1530,40 +1397,6 @@ export default class Evaluation {
 
             }
 
-            //----------------------------------
-            // Connected Pawn
-            //----------------------------------
-
-            const leftConnected =
-
-                this.board.blackPieces.pawns.some(
-
-                    pawn =>
-
-                        (pawn & 7) === file - 1 &&
-
-                        Math.abs((pawn >> 3) - (square >> 3)) <= 1
-
-                );
-
-            const rightConnected =
-
-                this.board.blackPieces.pawns.some(
-
-                    pawn =>
-
-                        (pawn & 7) === file + 1 &&
-
-                        Math.abs((pawn >> 3) - (square >> 3)) <= 1
-
-                );
-
-            if (leftConnected || rightConnected) {
-
-                score.connected -= Eval.CONNECTED_PAWN;
-
-            }
-
         }
 
         score.total =
@@ -1583,6 +1416,133 @@ export default class Evaluation {
             score.backward;
 
         return score;
+
+    }
+
+    pawnStructureFacts() {
+
+        if (!Evaluation.PAWN_STRUCTURE_CACHE) {
+            return this.buildPawnStructureFacts();
+        }
+
+        const key = this.pawnStructureKey();
+        const index = Number(key & BigInt(this.pawnStructureMask));
+        const entry = this.pawnStructureTable[index];
+
+        this.pawnStructureProbes++;
+
+        if (entry && entry.key === key) {
+            this.pawnStructureHits++;
+            return entry.facts;
+        }
+
+        if (entry) {
+            this.pawnStructureCollisions++;
+        }
+
+        const facts = this.buildPawnStructureFacts();
+
+        this.pawnStructureTable[index] = { key, facts };
+        this.pawnStructureStores++;
+
+        return facts;
+
+    }
+
+    pawnStructureKey() {
+
+        let key = 0n;
+        const pieceKeys = this.board.zobrist.pieces;
+
+        for (const square of this.board.whitePieces.pawns) {
+            key ^= pieceKeys[0][square];
+        }
+
+        for (const square of this.board.blackPieces.pawns) {
+            key ^= pieceKeys[6][square];
+        }
+
+        return key;
+
+    }
+
+    buildPawnStructureFacts() {
+
+        const whitePawns = this.board.whitePieces.pawns;
+        const blackPawns = this.board.blackPieces.pawns;
+        const whiteFiles = new Uint8Array(8);
+        const blackFiles = new Uint8Array(8);
+
+        for (const square of whitePawns) {
+            whiteFiles[square & 7]++;
+        }
+
+        for (const square of blackPawns) {
+            blackFiles[square & 7]++;
+        }
+
+        const whitePassedSquares =
+            this.computePassedPawnSquares(whitePawns, blackPawns, true);
+        const blackPassedSquares =
+            this.computePassedPawnSquares(blackPawns, whitePawns, false);
+
+        let isolated = 0;
+        let doubled = 0;
+        let connected = 0;
+
+        for (const square of whitePawns) {
+            const file = square & 7;
+            const rank = square >> 3;
+
+            if (whiteFiles[file] > 1) {
+                doubled += Eval.DOUBLED_PAWN;
+            }
+
+            if (
+                (file === 0 || whiteFiles[file - 1] === 0) &&
+                (file === 7 || whiteFiles[file + 1] === 0)
+            ) {
+                isolated += Eval.ISOLATED_PAWN;
+            }
+
+            if (whitePawns.some(pawn =>
+                Math.abs((pawn & 7) - file) === 1 &&
+                Math.abs((pawn >> 3) - rank) <= 1
+            )) {
+                connected += Eval.CONNECTED_PAWN;
+            }
+        }
+
+        for (const square of blackPawns) {
+            const file = square & 7;
+            const rank = square >> 3;
+
+            if (blackFiles[file] > 1) {
+                doubled -= Eval.DOUBLED_PAWN;
+            }
+
+            if (
+                (file === 0 || blackFiles[file - 1] === 0) &&
+                (file === 7 || blackFiles[file + 1] === 0)
+            ) {
+                isolated -= Eval.ISOLATED_PAWN;
+            }
+
+            if (blackPawns.some(pawn =>
+                Math.abs((pawn & 7) - file) === 1 &&
+                Math.abs((pawn >> 3) - rank) <= 1
+            )) {
+                connected -= Eval.CONNECTED_PAWN;
+            }
+        }
+
+        return {
+            whitePassedSquares,
+            blackPassedSquares,
+            isolated,
+            doubled,
+            connected
+        };
 
     }
 

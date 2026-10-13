@@ -2547,3 +2547,23 @@
 - Clock evidence: the repeated Coach-White line ends with Coach at about 483s versus ShallowBlue at 183s, a five-minute cushion. The repeated Coach-Black line ends with Coach at about 285s versus ShallowBlue at 79s, a roughly 3.5-minute cushion. Across all 20 games, Coach averaged 5.33s/move at depth 7.66; ShallowBlue averaged 11.25s/move at depth 7.82.
 - Interpretation: Coach is materially faster in this Arena configuration, but the evidence does not show harmful underthinking. Coach already spends 25-28 seconds on selected complex moves, no low-clock/low-depth combination appears, and both repeated lines are wins. Do not add a blanket opponent-clock multiplier or sacrifice Coach's proven clock advantage.
 - Next condition: revisit only with varied-opening clocked games containing repeated Coach losses or stable depth-8 move flips while Coach has a large verified cushion. A future design must use current-search uncertainty, not the opponent clock alone.
+
+## 2026-10-13 - Static-Evaluation Cache Capacity 256k Follow-Up
+
+- Status: rejected and reverted before match testing.
+- Baseline: accepted `3f0f1cb` with the 131,072-entry exact static-evaluation cache.
+- Change: a 262,144-entry direct-mapped cache, with `COACH_STATIC_EVAL_CACHE_ENTRIES=131072` as rollback.
+- Correctness: active engine regressions passed `74/74`; both controlled benchmark runs retained exact move, score, node, leaf, PV, and root-table identity on every primary position.
+- Controlled speed: a stable control had only `+0.161%` timing bias. Candidate runs averaged roughly `+0.9%`, below the acceptance bar, and both carried a promotion-race regression (`-1.22%`, `-1.05%`).
+- Decision: restore the accepted 128k capacity. The gain is too small and uneven to justify a larger cache footprint.
+
+## 2026-10-13 - Pawn-Layout Structural Cache Candidate
+
+- Status: accepted-narrow / local commit pending.
+- Baseline: accepted `3f0f1cb` (131,072-entry exact static-evaluation cache), preserved at `<USERPROFILE>\OneDrive\Desktop\Coach Current - 128k-cache-baseline`.
+- Change: `Evaluation` now keeps a bounded 32,768-entry direct-mapped cache for pawn-layout-only facts: passed-pawn detection, file counts, isolated, doubled, and connected terms. It deliberately recomputes phase, attacks, king support, blockers, stopper quality, promotion danger, and final passed-pawn bonuses on every evaluation. `COACH_PAWN_STRUCTURE_CACHE=0` restores the direct path.
+- Correctness: the focused sentinel proves that the same pawn layout with a changed blocker reuses only structural facts and retains a different dynamic passed-pawn score. `run-tests.cmd` completed without failures (`75` active engine-regression tests, plus project tool suites); the focused rollback slow sentinel was run to completion locally.
+- Controlled speed: stable identical-build control bias was `+0.189%`. Independent exact-identity runs at seeds `26101372` and `26101373` were faster on all four primary positions: `+3.36/+4.49/+3.91/+2.16%` and `+4.17/+5.40/+3.77/+1.29%` respectively. No move, score, node, leaf, PV, or root-table identity changed.
+- Paired A/B: `analysis-runs\candidate-pawn-layout-cache-vs-3f0f1cb-20g-st0p1-serial-max80-20261013` completed `0 - 0 - 20 [0.500]`; every game was a threefold draw, with equal colors.
+- ShallowBlue smoke: `analysis-runs\candidate-pawn-layout-cache-shallowblue1618-20g-st3-varied-openings-20261013` completed all 20 paired-opening games at fixed 3 seconds per move, seed `26101375`, concurrency 4, exit `0`: Coach scored `13 - 7 - 0 [0.650]`; White `9 - 1 - 0`, Black `4 - 6 - 0`. This clears the practical non-regression gate, but the color split and 20-game sample mean it is smoke evidence, not a rating claim.
+- Decision: accept narrowly. This is a bounded, rollback-gated, semantics-preserving cache with repeatable broad speed gains and clean practical gates. It is ready for focused staging, commit, and push only with Sir Slice's explicit authorization.
