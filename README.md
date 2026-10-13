@@ -2,7 +2,9 @@
 
 > Strong enough to compete. Smart enough to teach.
 
-Coach is an open-source JavaScript chess engine built to play strong chess and explain why its moves are good.
+Coach is an open-source JavaScript chess engine built to play strong chess,
+with a browser interface and UCI engine mode. The interface is still under
+active development.
 
 Open `index.html` in a modern browser to run the current interface. Engine code and detailed project documentation live under [`js/`](js/README.md).
 
