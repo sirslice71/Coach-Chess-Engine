@@ -6,8 +6,8 @@ release. Replace only the download placeholder before posting.
 ```text
 Engine: Coach 1.0.0
 Estimated strength: provisional 1500-1600 Elo. This is not a CCRL-calibrated
-estimate; a July 2026 Lucas Chess R position-test report was 1587 Elo, and
-later changes have not been independently rated by CCRL.
+estimate; the October 2026 Lucas Chess R position-test report was 1585 Elo,
+and Coach has not yet been independently rated by CCRL.
 Author: Sir Slice, USA
 Open source: yes, MIT License
 Source and homepage: https://github.com/sirslice71/Coach-Chess-Engine
