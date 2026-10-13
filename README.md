@@ -1,17 +1,27 @@
-# Coach Chess Engine
+# Coach
 
 > Strong enough to compete. Smart enough to teach.
 
-Coach is a browser-based JavaScript chess engine built to play strong chess and explain why its moves are good.
+Coach is an open-source JavaScript chess engine built to play strong chess and explain why its moves are good.
 
 Open `index.html` in a modern browser to run the current interface. Engine code and detailed project documentation live under [`js/`](js/README.md).
 
+## Acknowledgments
+
+Coach's early development and strength testing relied heavily on
+[ShallowBlue v2.0.0](https://github.com/GunshipPenguin/shallow-blue). Early
+Coach versions rarely beat it; improving until Coach could score confidently
+above 50% in matches against ShallowBlue became a personal development goal
+for Coach author Sir Slice. Thank you to the ShallowBlue project for being a
+valuable and consistent testing opponent.
+
 ## UCI engine mode
 
-Coach can also run as a basic Node-based UCI engine.
+Coach can also run as a UCI engine.
 
 - Manual entry: `node uci.js`
 - Windows launcher: `coach-uci.cmd`
+- Self-contained Windows release: `npm run build:ccrl` (creates `Coach-1.0.0.exe`)
 
 Setup and current limitations are documented in [`js/docs/UCI.md`](js/docs/UCI.md).
 

@@ -22,13 +22,32 @@ quit
 
 ## Windows launchers
 
+For a distributable, self-contained engine executable, build the CCRL release:
+
+```text
+npm install
+npm run build:ccrl
+```
+
+This produces:
+
+```text
+dist\Coach-1.0.0-windows-x64\Coach-1.0.0.exe
+```
+
+The packaged executable includes the Node runtime and bundled Coach sources. It does
+not require Node.js to be installed on the tester's machine. It reports a 256 MB
+default hash size and is single-threaded by design.
+
+## Development launchers
+
 For Windows GUIs, use:
 
 ```text
 coach-uci.cmd
 ```
 
-For GUIs that require an `.exe` file, use:
+For development GUIs that require an `.exe` file, use:
 
 ```text
 coach-uci.exe
@@ -81,7 +100,7 @@ coach-uci.exe
 
 next to `uci.js`.
 
-For this launcher version, Node.js must still be installed and available on PATH at runtime.
+For this development launcher version, Node.js must still be installed and available on PATH at runtime.
 
 If Fritz or PowerShell cannot find Node.js:
 
@@ -143,11 +162,11 @@ coach-uci.exe
 If Coach lives at:
 
 ```text
-<USERPROFILE>\OneDrive\Desktop\Coach Current
+<path-to-Coach>
 ```
 
 then the Fritz engine path should be:
 
 ```text
-<USERPROFILE>\OneDrive\Desktop\Coach Current\coach-uci.exe
+<path-to-Coach>\coach-uci.exe
 ```

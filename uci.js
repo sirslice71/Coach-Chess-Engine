@@ -10,7 +10,7 @@ const rl = readline.createInterface({
     terminal: false
 });
 
-for await (const line of rl) {
+rl.on("line", line => {
 
     let responses = [];
 
@@ -36,7 +36,6 @@ for await (const line of rl) {
 
     if (session.quitRequested) {
         rl.close();
-        break;
     }
 
-}
+});

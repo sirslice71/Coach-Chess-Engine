@@ -1,4 +1,4 @@
-# Coach Chess Engine ♟️
+# Coach
 
 > **Strong enough to compete. Smart enough to teach.**
 
@@ -160,20 +160,20 @@ Coach Lab is intended to become the heart of Coach's development process.
 
 # Project Status
 
-Current Version
+Release Version
 
-**0.7 Alpha**
+**1.0.0**
 
 Estimated Playing Strength
 
-**~1200–1400 Elo**
+**Not yet CCRL-calibrated. A July 2026 Lucas Chess R position-test run
+reported 1587 Elo; treat it as a position-test estimate, not a tournament
+rating.**
 
 Current Development Focus
 
-- Opening understanding
-- King safety
-- Piece activity
-- Game phase evaluation
+- Public release and CCRL testing
+- Tournament-quality opening and time-management evidence
 - Coach Lab expansion
 
 ---

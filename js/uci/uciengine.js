@@ -7,11 +7,12 @@ import Search, { SearchTimeout } from "../engine/search.js";
 import TranspositionTable from "../engine/transpositiontable.js";
 import { SearchConstants } from "../engine/searchconstants.js";
 import { Piece } from "../core/piece.js";
+import { UCI_ENGINE_NAME } from "./version.js";
 import {
     algebraic,
 } from "../core/square.js";
 
-const UCI_HASH_DEFAULT_MB = 32;
+const UCI_HASH_DEFAULT_MB = 256;
 const UCI_HASH_MIN_MB = 1;
 const UCI_HASH_MAX_MB = 512;
 const UCI_MOVE_OVERHEAD_DEFAULT_MS = 50;
@@ -22,19 +23,12 @@ const UCI_MAX_MOVES_TO_GO = 100;
 //----------------------------------
 // Engine Identity
 //
-// Static build/version identifier, deliberately not derived
-// from `git rev-parse` or any other dynamic source -- Arena
-// launches coach-uci.exe (a thin C# wrapper around `node
-// uci.js`) in all sorts of working directories and packaged
-// layouts where a `.git` folder may not even be present, so a
-// dynamic lookup would risk making UCI startup fragile. Bump
-// this string by hand when it's useful to tell builds apart in
-// Arena's engine list; it has no effect on search, eval,
-// movegen, timing, or the TT.
+// The public UCI identity lives in version.js instead of being
+// derived from Git metadata. GUIs can launch Coach from packaged
+// layouts without a .git folder, and release tooling imports the
+// same source of truth for its file names.
 //----------------------------------
 
-const UCI_ENGINE_VERSION = "2026.07.07";
-const UCI_ENGINE_NAME = `Coach Chess Engine ${UCI_ENGINE_VERSION}`;
 
 //----------------------------------
 // Time Management: Game Phase

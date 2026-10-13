@@ -13,6 +13,7 @@ Desktop.ini
 node_modules/
 coverage/
 dist/
+build/
 *.log
 
 # Coach Analysis Lab run output (tools/coach-analysis-lab.mjs)

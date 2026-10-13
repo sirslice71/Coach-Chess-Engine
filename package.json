@@ -1,0 +1,13 @@
+{
+  "name": "coach-chess-engine",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:ccrl": "node tools/build-ccrl-release.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10",
+    "postject": "1.0.0-alpha.6"
+  }
+}

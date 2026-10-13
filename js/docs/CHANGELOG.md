@@ -4,6 +4,23 @@ All notable changes to Coach will be documented here.
 
 ---
 
+# v1.0.0 - Public Engine Release
+Released: October 2026
+
+## Added
+
+- Self-contained Windows x64 UCI executable build.
+- Default 256 MB UCI hash configuration.
+- MIT license and public-source release metadata.
+
+## Changed
+
+- Public engine identity is now `Coach 1.0.0`.
+- Release documentation now distinguishes historical position-test estimates
+  from a future CCRL-calibrated rating.
+
+---
+
 # v0.3.0 - Foundation
 Released: June 2026
 

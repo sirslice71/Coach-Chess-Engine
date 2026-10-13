@@ -1,7 +1,7 @@
 # ==========================================
-# COACH CHESS ENGINE ROADMAP
-# Version 0.7 Alpha
-# Last Updated: July 2026
+# COACH ROADMAP
+# Version 1.0.0
+# Last Updated: October 2026
 # ==========================================
 
 # Vision
@@ -28,7 +28,8 @@ Every release should improve one or more of:
 
 Estimated Strength
 
-~1200-1400 Elo
+Not yet CCRL-calibrated. The July 2026 Lucas Chess R position test reported
+1587 Elo; this is not a tournament rating.
 
 Current Personality
 
@@ -49,11 +50,11 @@ Primary Weaknesses
 # PRODUCTION BASELINE (Verified)
 # ==========================================
 
-Production: <USERPROFILE>\OneDrive\Desktop\Coach Current
+Production: Coach repository root
 Branch: main
-HEAD: 5daef89 "Make SearchStable summary policy tree-aware"
-Upstream: origin/main, synchronized
-Status: clean, nothing staged
+Release baseline: Coach 1.0.0
+Upstream: origin/main
+Status: release preparation
 
 Merged since the last roadmap update:
 
@@ -88,7 +89,7 @@ Status: Active validation — do not merge until the full 200-game
 result, PGN review, and final tests are complete.
 
 Candidate worktree:
-<USERPROFILE>\OneDrive\Desktop\Coach Candidates\Coach Reverse Futility Final
+<path-to-candidate>\Coach Reverse Futility Final
 
 Branch: candidate/reverse-futility-final
 Based on production: 5daef89
@@ -163,7 +164,7 @@ Findings:
 - No forced-castling rule
 
 Diagnostic worktree:
-<USERPROFILE>\OneDrive\Desktop\Coach Diagnostics\Coach Castling Search Trace
+<path-to-diagnostics>\Coach Castling Search Trace
 
 Branch: diagnostics/castling-search-trace
 
@@ -374,7 +375,7 @@ Current PST
 [x] debugKnightPST()
 
 # ==========================================
-# VERSION 0.7 GOALS
+# ARCHIVED VERSION 0.7 GOALS
 # ==========================================
 
 Target Strength

@@ -181,11 +181,11 @@ export function buildHeaders({ humanSide, result }) {
     const white =
         humanSide > 0
             ? "Human"
-            : "Coach Chess Engine";
+            : "Coach";
 
     const black =
         humanSide > 0
-            ? "Coach Chess Engine"
+            ? "Coach"
             : "Human";
 
     return [

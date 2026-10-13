@@ -6,7 +6,7 @@ Project: Coach Chess Engine
 
 ## Project Owner / Lead Developer
 
-**Sir Slice / Sir Slice**
+**Sir Slice**
 
 Responsibilities:
 - Project direction

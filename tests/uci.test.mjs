@@ -267,16 +267,16 @@ test("UCI process handshake and depth-1 search return protocol-safe output", asy
             .map(line => line.trim())
             .filter(Boolean);
 
-    assert.ok(lines.includes("id name Coach Chess Engine 2026.07.07"));
+    assert.ok(lines.includes("id name Coach 1.0.0"));
     assert.ok(lines.includes("id author Sir Slice"));
-    assert.ok(lines.includes("option name Hash type spin default 32 min 1 max 512"));
+    assert.ok(lines.includes("option name Hash type spin default 256 min 1 max 512"));
     assert.ok(lines.includes("option name Move Overhead type spin default 50 min 0 max 1000"));
     assert.ok(lines.includes("option name Clear Hash type button"));
     assert.ok(lines.includes("uciok"));
     assert.ok(lines.includes("readyok"));
 
     assert.ok(
-        lines.indexOf("option name Hash type spin default 32 min 1 max 512") <
+        lines.indexOf("option name Hash type spin default 256 min 1 max 512") <
         lines.indexOf("uciok")
     );
     assert.ok(
@@ -1362,7 +1362,7 @@ test("setoption Hash updates internal TT size safely", () => {
 
     assert.equal(
         session.hashSizeMB,
-        32
+        256
     );
 
     session.handleCommand(
@@ -1420,7 +1420,7 @@ test("setoption Hash clamps low, high, and non-numeric values safely", () => {
 
     assert.equal(
         session.hashSizeMB,
-        32
+        256
     );
 
 });

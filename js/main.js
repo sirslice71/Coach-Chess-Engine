@@ -31,7 +31,7 @@ import CoachLab
 import Logger from "./dev/logger.js";
 
 
-Logger.info("Coach v0.5 Alpha");
+Logger.info("Coach v1.0.0");
 
 const board = new Board();
 const moveGenerator = new MoveGenerator(board);
