@@ -5,7 +5,7 @@
 <meta name="viewport"
       content="width=device-width, initial-scale=1.0">
 
-<title>Coach Chess Engine</title>
+<title>Coach 1.0.0 Chess Engine</title>
 
 <link rel="stylesheet" href="style.css">
 </head>
@@ -16,7 +16,7 @@
 
     <aside id="leftPanel">
 
-        <h2>Coach</h2>
+        <h2>Coach <span class="appVersion">1.0.0</span></h2>
 
         <div class="controls">
 
@@ -57,15 +57,15 @@
 
         <div class="difficulty">
 
-            <label>Coach Strength</label>
+            <label>Coach Search</label>
 
             <select id="difficulty">
 
-                <option value="2">Beginner</option>
-                <option value="4">Intermediate</option>
-                <option value="5" selected>Strong</option>
-                <option value="6">Expert</option>
-                <option value="8">Deep</option>
+                <option value="2">Depth 2 (Fast)</option>
+                <option value="4">Depth 4</option>
+                <option value="5" selected>Depth 5 (Default)</option>
+                <option value="6">Depth 6</option>
+                <option value="8">Depth 8 (Slow)</option>
 
             </select>
 
@@ -111,32 +111,6 @@
         
             <div id="engine-panel"></div>
 
-            <hr>
-
-            <div id="developerPanel">
-
-            <h4>Evaluation Breakdown</h4>
-
-            <hr>
-
-            <div>Material: <span id="devMaterial">0.00</span></div>
-
-            <div>Opening: <span id="devOpening">0.00</span></div>
-
-            <div>Piece Squares: <span id="devPieceSquares">0.00</span></div>
-
-            <div>Position: <span id="devPosition">0.00</span></div>
-
-            <div>King: <span id="devKing">0.00</span></div>
-
-            <div>Pawns: <span id="devPawns">0.00</span></div>
-
-            <div>Mobility: <span id="devMobility">0.00</span></div>
-
-            <div>Tactics: <span id="devTactics">0.00</span></div>
-            
-            </div>
-
         </div>
 
     </aside>
@@ -161,12 +135,17 @@
 
             <button class="sideTab"
                     id="labTabBtn"
-                    type="button">Lab</button>
+                    type="button">Import</button>
 
         </div>
 
         <section id="gamePanel"
                  class="sidePane active">
+
+        <div id="gameStatus"
+             class="gameStatus"
+             role="status"
+             aria-live="polite">Ready.</div>
 
         <h3>Move History</h3>
 
@@ -174,37 +153,25 @@
 
         <h3>Captured Pieces</h3>
 
-        <div id="capturedWhite"></div>
-
-        <div id="capturedBlack"></div>
-
-        <h3>Review Tools</h3>
-
-        <div class="reviewActions">
-
-            <button id="infiniteAnalysisBtn"
-                    type="button">Start Analysis</button>
-
-            <button id="stopAnalysisBtn"
-                    type="button">Stop Analysis</button>
-
-            <button id="gameAnalysisBtn"
-                    type="button">Analyze Game</button>
-
+        <div class="capturedGroup">
+            <span>White pieces lost</span>
+            <div id="capturedWhite"></div>
         </div>
 
-        <div id="gameAnalysisOutput"
-             class="analysisOutput"></div>
+        <div class="capturedGroup">
+            <span>Black pieces lost</span>
+            <div id="capturedBlack"></div>
+        </div>
 
         </section>
 
         <section id="labPanel"
                  class="sidePane">
 
-            <h3>Coach Lab</h3>
+            <h3>Analysis Import</h3>
 
             <label class="filePicker">
-                <span>Analysis JSON</span>
+                <span>Coach analysis JSON</span>
                 <input id="labFileInput"
                        type="file"
                        accept="application/json,.json">

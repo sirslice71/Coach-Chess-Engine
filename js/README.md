@@ -132,9 +132,9 @@ These tools make debugging, evaluation tuning, and search analysis significantly
 
 # Coach Lab
 
-One of Coach's defining features.
-
-Coach Lab is an analysis system that explains **why** Coach prefers a move.
+Coach Lab is a developer diagnostic system for inspecting the evaluation
+signals behind Coach's move choices. It is not yet a player-facing move
+explanation feature.
 
 Example:
 
@@ -142,7 +142,8 @@ Example:
 chess.lab("e2-e4")
 ```
 
-Coach Lab compares evaluation categories before and after a move, helping developers understand exactly which heuristics influenced the decision.
+Coach Lab compares evaluation categories before and after a move, helping
+developers inspect which heuristics influenced the score.
 
 Long-term goals include:
 
@@ -166,8 +167,8 @@ Release Version
 
 Estimated Playing Strength
 
-**Not yet CCRL-calibrated. A July 2026 Lucas Chess R position-test run
-reported 1587 Elo; treat it as a position-test estimate, not a tournament
+**Not yet CCRL-calibrated. An October 2026 Lucas Chess R position-test run
+reported 1585 Elo; treat it as a position-test estimate, not a tournament
 rating.**
 
 Current Development Focus

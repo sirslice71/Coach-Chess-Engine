@@ -543,20 +543,42 @@ function startNewGameAs(humanSide) {
 
 function undoLastMoveFromUi() {
 
-    gameController.undoLastMove();
+    if (!gameController.undoLastMove()) {
+        ui.setGameStatus("No player move to undo.", "neutral");
+    }
 
 }
 
 function showHintFromUi() {
 
-    const result =
-        search.bestMove(4);
+    if (!gameController.isHumanTurn()) {
+        ui.setGameStatus("Hints are available on your turn.", "neutral");
+        return;
+    }
 
-    console.log(
-        "Coach Suggests:",
-        result.notation,
-        result.evaluation
-    );
+    ui.setGameStatus("Finding a hint...", "working");
+
+    setTimeout(() => {
+
+        if (!gameController.isHumanTurn()) {
+            ui.setGameStatus("The position changed before the hint was ready.", "neutral");
+            return;
+        }
+
+        const result =
+            search.bestMove(4, { quiet: true });
+
+        ui.enginePanel.update(result);
+        ui.enginePanel.setStatus("Hint");
+        ui.showHint(result.move);
+        ui.setGameStatus(
+            result.notation
+                ? `Hint: ${result.notation} (${Number(result.evaluation).toFixed(2)})`
+                : "No legal move is available.",
+            result.notation ? "success" : "neutral"
+        );
+
+    }, 20);
 
 }
 
@@ -571,90 +593,6 @@ function resignFromUi() {
     }
 
     gameController.resignHuman();
-
-}
-
-function setGameAnalysisOutput(text) {
-
-    const output =
-        document.getElementById("gameAnalysisOutput");
-
-    if (output) {
-        output.innerHTML = text;
-    }
-
-}
-
-function startInfiniteAnalysisFromUi() {
-
-    const result =
-        gameController.startInfiniteAnalysis();
-
-    if (result && result.result !== "PASS") {
-
-        setGameAnalysisOutput(
-            `<p>${result.message}</p>`
-        );
-
-    }
-
-}
-
-function stopInfiniteAnalysisFromUi() {
-
-    gameController.stopInfiniteAnalysis();
-
-}
-
-function analyzeGameFromUi() {
-
-    setGameAnalysisOutput(
-        "<p>Analyzing game...</p>"
-    );
-
-    setTimeout(() => {
-
-        const report =
-            gameController.analyzeGameQuick(3);
-
-        if (report.result !== "PASS") {
-
-            setGameAnalysisOutput(
-                `<p>${report.message}</p>`
-            );
-
-            return;
-
-        }
-
-        if (report.findingCount === 0) {
-
-            setGameAnalysisOutput(
-                "<p>No major missed opportunities found in the quick pass.</p>"
-            );
-
-            return;
-
-        }
-
-        const rows =
-            report.findings
-                .map(finding => `
-                    <div class="analysisFinding">
-                        <strong>${finding.moveNumber}. ${finding.played}</strong>
-                        <span>Try ${finding.suggested}; swing ${finding.swing.toFixed(2)}</span>
-                        <small>Before ${finding.beforeEval}, after ${finding.afterEval}</small>
-                    </div>
-                `)
-                .join("");
-
-        setGameAnalysisOutput(`
-            <p>Quick depth-${report.depth} review found ${report.findingCount}
-            candidate improvement${report.findingCount === 1 ? "" : "s"}.</p>
-            ${rows}
-        `);
-
-    }, 20);
 
 }
 
@@ -716,21 +654,6 @@ bindButtons(
 bindButtons(
     ["resignBtn"],
     resignFromUi
-);
-
-bindButtons(
-    ["infiniteAnalysisBtn"],
-    startInfiniteAnalysisFromUi
-);
-
-bindButtons(
-    ["stopAnalysisBtn"],
-    stopInfiniteAnalysisFromUi
-);
-
-bindButtons(
-    ["gameAnalysisBtn"],
-    analyzeGameFromUi
 );
 
 function setMoveInputMode(mode) {
@@ -795,6 +718,8 @@ if (moveHintsToggle) {
     });
 
 }
+
+ui.setGameStatus("Ready.", "neutral");
 
 function isTextEditingTarget(element) {
 

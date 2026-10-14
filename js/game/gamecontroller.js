@@ -324,6 +324,13 @@ export default class GameController {
         );
         this.ui.enginePanel.setStatus("Ready");
 
+        this.ui.setGameStatus?.(
+            this.humanSide > 0
+                ? "Your turn as White."
+                : "Coach is thinking...",
+            this.humanSide > 0 ? "neutral" : "working"
+        );
+
         this.scheduleCoachMove(depth);
 
     }
@@ -408,6 +415,10 @@ export default class GameController {
 
             return false;
 
+        }
+
+        if (!this.currentResult().gameOver) {
+            this.ui.setGameStatus?.("Your turn.", "neutral");
         }
 
         //----------------------------------
@@ -977,6 +988,25 @@ export default class GameController {
 
     }
 
+    reviewToPly(ply) {
+
+        this.stopInfiniteAnalysis();
+
+        if (this.coachMovePending || this.gameMoves.length === 0) {
+            return false;
+        }
+
+        this.goToPly(ply);
+        this.showReviewEvaluation();
+        this.ui.setGameStatus?.(
+            `Reviewing position after ply ${this.positionCursor}.`,
+            "neutral"
+        );
+
+        return true;
+
+    }
+
     reviewNextMove() {
 
         this.stopInfiniteAnalysis();
@@ -1028,20 +1058,38 @@ export default class GameController {
         this.stopInfiniteAnalysis();
         this.goToCurrentPosition();
 
-        if (this.gameMoves.length === 0) {
+        let lastHumanMoveIndex = -1;
+
+        for (let index = this.gameMoves.length - 1; index >= 0; index--) {
+
+            const side =
+                this.gameMoves[index]?.side === "White" ? 1 : -1;
+
+            if (side === this.humanSide) {
+                lastHumanMoveIndex = index;
+                break;
+            }
+
+        }
+
+        if (lastHumanMoveIndex < 0) {
             return false;
         }
 
-        this.board.undoMove();
-        this.gameMoves.pop();
+        this.goToPly(lastHumanMoveIndex);
+        this.gameMoves =
+            this.gameMoves.slice(0, lastHumanMoveIndex);
         this.positionCursor = this.gameMoves.length;
+        this.coachMovePending = false;
+        this.manualResult = null;
 
         this.ui.draw();
         this.ui.updateMoveHistory(
             this.gameMoves,
             this.positionCursor
         );
-        this.showReviewEvaluation();
+        this.ui.enginePanel.clear();
+        this.ui.setGameStatus?.("Your previous move was undone.", "success");
 
         return true;
 
@@ -1049,16 +1097,10 @@ export default class GameController {
 
     showReviewEvaluation() {
 
-        this.ui.enginePanel.setStatus("Searching...");
+        const evaluation =
+            this.search.evaluation.evaluate().total / 100;
 
-        const result =
-            this.search.bestMove(
-                this.ui.currentCoachDepth(),
-                { quiet: true }
-            );
-
-        this.ui.enginePanel.update(result);
-        this.ui.enginePanel.setStatus("Review");
+        this.ui.enginePanel.showStaticEvaluation(evaluation);
 
     }
 

@@ -54,7 +54,7 @@ aside{
 
     background:var(--panel);
 
-    border-radius:12px;
+    border-radius:8px;
 
     padding:20px;
 
@@ -62,7 +62,7 @@ aside{
 
     flex-direction:column;
 
-    gap:18px;
+    gap:14px;
 
     box-shadow:0 0 15px rgba(0,0,0,.35);
 
@@ -124,7 +124,7 @@ button:active{
 
     flex-direction:column;
 
-    gap:10px;
+    gap:8px;
 
 }
 
@@ -286,34 +286,6 @@ select{
 
 }
 
-#thinkingStatus{
-
-    color:var(--green);
-
-    margin-top:8px;
-
-}
-
-#pvLine{
-
-    margin-top:12px;
-
-    font-family:monospace;
-
-    font-size:14px;
-
-}
-
-#evalScore{
-
-    margin-top:12px;
-
-    font-size:18px;
-
-    font-weight:bold;
-
-}
-
 #moveHistory{
 
     flex:1;
@@ -327,6 +299,45 @@ select{
     padding:10px;
 
     font-family:monospace;
+
+}
+
+.appVersion{
+
+    color:#b8bec7;
+    font-size:13px;
+    font-weight:600;
+
+}
+
+.gameStatus{
+
+    min-height:42px;
+    padding:10px 12px;
+    border-left:3px solid #7b8491;
+    background:var(--panel2);
+    color:#d9dde3;
+    font-size:13px;
+    line-height:1.35;
+
+}
+
+.gameStatus[data-tone="working"]{
+
+    border-left-color:var(--accent);
+
+}
+
+.gameStatus[data-tone="success"]{
+
+    border-left-color:var(--green);
+
+}
+
+.gameStatus[data-tone="result"]{
+
+    border-left-color:#f0c75e;
+    color:#fff;
 
 }
 
@@ -611,11 +622,37 @@ select{
 
     color:var(--text);
 
+    width:auto;
+
+    padding:4px 6px;
+
+    border-radius:4px;
+
+    background:transparent;
+
+    font:inherit;
+
+    text-align:left;
+
     white-space:nowrap;
 
     overflow:hidden;
 
     text-overflow:ellipsis;
+
+}
+
+.moveHistoryMove:hover:not(:disabled){
+
+    transform:none;
+    background:rgba(255,255,255,.08);
+
+}
+
+.moveHistoryMove:disabled{
+
+    cursor:default;
+    color:#80858d;
 
 }
 
@@ -646,69 +683,50 @@ select{
 
     gap:4px;
 
+    align-items:center;
+
 }
 
-.reviewActions{
+.capturedGroup{
 
     display:grid;
-
-    grid-template-columns:1fr;
-
-    gap:8px;
+    gap:5px;
 
 }
 
-.analysisOutput{
+.capturedGroup > span{
 
-    min-height:72px;
+    color:#b8bec7;
+    font-size:11px;
 
-    max-height:220px;
+}
 
-    overflow:auto;
+.capturedPiece{
 
-    padding:10px;
+    width:30px;
+    height:30px;
+    object-fit:contain;
 
-    background:var(--panel2);
+}
 
-    border:1px solid rgba(255,255,255,.08);
+.capturedEmpty{
 
-    border-radius:8px;
-
-    color:#cfd3d8;
-
+    color:#858b94;
     font-size:12px;
-
-    line-height:1.35;
-
-}
-
-.analysisOutput p{
-
-    margin-bottom:8px;
+    font-style:italic;
 
 }
 
-.analysisFinding{
+.hintFrom{
 
-    display:grid;
-
-    gap:3px;
-
-    padding:8px 0;
-
-    border-top:1px solid rgba(255,255,255,.08);
+    outline:4px solid #f0c75e;
+    outline-offset:-4px;
 
 }
 
-.analysisFinding strong{
+.hintTo{
 
-    color:#fff;
-
-}
-
-.analysisFinding small{
-
-    color:#aeb6c2;
+    box-shadow:inset 0 0 0 5px rgba(73,209,125,.9);
 
 }
 
@@ -724,23 +742,60 @@ select{
 
     }
 
+    aside,
+    main{
+
+        flex-shrink:0;
+
+    }
+
+    main{
+
+        order:1;
+
+    }
+
+    #leftPanel{
+
+        order:2;
+
+    }
+
+    #rightPanel{
+
+        order:3;
+
+    }
+
     aside{
 
         width:640px;
 
     }
 
+    #rightPanel{
+
+        min-height:auto;
+
+    }
+
+    #rightPanel .sidePane{
+
+        flex:none;
+
+    }
+
+    #moveHistory{
+
+        flex:none;
+        height:220px;
+        min-height:160px;
+
+    }
+
 }
 
 @media(max-width:720px){
-
-    canvas{
-
-        width:95vw;
-
-        height:95vw;
-
-    }
 
     aside{
 
@@ -769,8 +824,11 @@ Chess Board
 
     display:grid;
 
-    grid-template-columns:repeat(8,80px);
-    grid-template-rows:repeat(8,80px);
+    width:min(640px, calc(100vw - 40px), calc(100vh - 40px));
+    aspect-ratio:1;
+
+    grid-template-columns:repeat(8,1fr);
+    grid-template-rows:repeat(8,1fr);
 
     border:3px solid #444;
     border-radius:10px;
@@ -878,8 +936,8 @@ Chess Board
 
     display:block;
 
-    width:76px;
-    height:76px;
+    width:95%;
+    height:95%;
 
     margin:auto;
 
@@ -1009,40 +1067,6 @@ Chess Board
 
 }
 
-/*====================================
-Developer Panel
-====================================*/
-
-#developerPanel{
-
-    margin-top:10px;
-
-    padding:10px;
-
-    border-radius:8px;
-
-    background:#202225;
-
-    font-family:Consolas, monospace;
-
-    font-size:14px;
-
-    display:flex;
-
-    flex-direction:column;
-
-    gap:6px;
-
-}
-
-#developerPanel span{
-
-    color:#67d967;
-
-    font-weight:bold;
-
-}
-
 #engine-panel {
 
     width: 100%;
@@ -1051,7 +1075,7 @@ Developer Panel
 
     padding: 12px;
 
-    margin-bottom: 16px;
+    margin-bottom: 0;
 
     border: 1px solid #666;
 
@@ -1062,26 +1086,6 @@ Developer Panel
     color: white;
 
     font-family: Consolas, monospace;
-
-}
-
-#engine-panel table{
-
-    width:100%;
-
-}
-
-#engine-panel td {
-
-    padding: 4px 2px;
-
-}
-
-#engine-panel td:first-child {
-
-    font-weight: bold;
-
-    width: 45%;
 
 }
 

@@ -9,6 +9,30 @@ import EngineDebug from "../dev/enginedebug.js";
 import EnginePanel
     from "./enginepanel.js";
 
+export function capturedPiecesFromMoves(gameMoves = []) {
+
+    const captured = {
+        white: [],
+        black: []
+    };
+
+    for (const entry of gameMoves) {
+
+        const piece = Number(entry?.captured || Piece.EMPTY);
+
+        if (piece > Piece.EMPTY) {
+            captured.white.push(piece);
+        }
+        else if (piece < Piece.EMPTY) {
+            captured.black.push(piece);
+        }
+
+    }
+
+    return captured;
+
+}
+
 export default class UI {
 
     constructor(board, legalMoveGenerator) {
@@ -20,6 +44,12 @@ export default class UI {
         this.boardElement = document.getElementById("board");
         this.moveHistoryElement =
             document.getElementById("moveHistory");
+        this.gameStatusElement =
+            document.getElementById("gameStatus");
+        this.capturedWhiteElement =
+            document.getElementById("capturedWhite");
+        this.capturedBlackElement =
+            document.getElementById("capturedBlack");
 
         this.selectedSquare = -1;
 
@@ -57,11 +87,11 @@ export default class UI {
 
     initialize() {
 
-	console.log("UI INITIALIZED");
-
         this.createBoard();
 
         this.draw();
+
+        this.updateMoveHistory([], 0);
 
     }
 
@@ -388,6 +418,8 @@ export default class UI {
                 // Auto Coach Move
                 //----------------------------------
 
+                this.setGameStatus("Coach is thinking...", "working");
+
                 window.chess.gameController.scheduleCoachMove(
                     this.currentCoachDepth()
                 );
@@ -414,17 +446,54 @@ export default class UI {
 
     showGameOver(result) {
 
-        console.log("");
+        const outcome =
+            result.winner > 0
+                ? "White wins"
+                : result.winner < 0
+                    ? "Black wins"
+                    : "Draw";
 
-        console.log("==========================");
+        this.setGameStatus(
+            `${outcome}. ${result.reason} (${result.result}).`,
+            "result"
+        );
 
-        console.log("GAME OVER");
+    }
 
-        console.log(result.reason);
+    setGameStatus(message, tone = "neutral") {
 
-        console.log(result.result);
+        if (!this.gameStatusElement) {
+            return;
+        }
 
-        console.log("==========================");
+        this.gameStatusElement.textContent = message;
+        this.gameStatusElement.dataset.tone = tone;
+
+    }
+
+    showHint(move) {
+
+        this.clearHint();
+
+        if (!move) {
+            return;
+        }
+
+        const from =
+            this.boardSquareToDisplaySquare(move.fromSquare);
+        const to =
+            this.boardSquareToDisplaySquare(move.toSquare);
+
+        this.boardElement.children[from]?.classList.add("hintFrom");
+        this.boardElement.children[to]?.classList.add("hintTo");
+
+    }
+
+    clearHint() {
+
+        [...this.boardElement.children].forEach(square => {
+            square.classList.remove("hintFrom", "hintTo");
+        });
 
     }
 
@@ -455,6 +524,8 @@ export default class UI {
             square.draggable = false;
             square.classList.remove("dragging");
             square.classList.remove("dropTarget");
+            square.classList.remove("hintFrom");
+            square.classList.remove("hintTo");
 
             if (piece === Piece.EMPTY)
                 continue;
@@ -472,8 +543,6 @@ export default class UI {
                 this.canDragPiece(boardSquare);
 
         }
-
-        this.updateDeveloperPanel();
 
     }
 
@@ -498,6 +567,12 @@ export default class UI {
         );
 
         this.draw();
+        this.setGameStatus(
+            mode === "click"
+                ? "Click move input selected."
+                : "Drag move input selected.",
+            "neutral"
+        );
 
     }
 
@@ -511,6 +586,13 @@ export default class UI {
         );
 
         this.clearSelection();
+
+        this.setGameStatus(
+            this.moveHintsEnabled
+                ? "Move hints enabled."
+                : "Move hints hidden.",
+            "neutral"
+        );
 
         if (
             this.moveHintsEnabled &&
@@ -575,6 +657,8 @@ export default class UI {
     }
 
     clearSelection() {
+
+        this.clearHint();
 
         [...this.boardElement.children].forEach(square => {
 
@@ -641,40 +725,12 @@ export default class UI {
 
     }
 
-    updateDeveloperPanel() {
-
-        const evalScore = window.chess.eval();
-
-        document.getElementById("devMaterial").textContent =
-            (evalScore.material.total / 100).toFixed(2);
-
-        document.getElementById("devOpening").textContent =
-            (evalScore.opening.total / 100).toFixed(2);
-
-        document.getElementById("devPosition").textContent =
-            (evalScore.position.total / 100).toFixed(2);
-
-        document.getElementById("devKing").textContent =
-            (evalScore.king.total / 100).toFixed(2);
-
-        document.getElementById("devPawns").textContent =
-            (evalScore.pawns.total / 100).toFixed(2);
-
-        document.getElementById("devMobility").textContent =
-            (evalScore.mobility.total / 100).toFixed(2);
-
-        document.getElementById("devTactics").textContent =
-            (evalScore.tactics.total / 100).toFixed(2);
-
-        document.getElementById("devPieceSquares").textContent =
-            (evalScore.position.pieceSquares / 100).toFixed(2);
-
-    }
-
     updateMoveHistory(
         gameMoves = [],
         activePly = gameMoves.length
     ) {
+
+        this.updateCapturedPieces(gameMoves);
 
         if (!this.moveHistoryElement) {
             return;
@@ -732,10 +788,12 @@ export default class UI {
                 `${Math.floor(index / 2) + 1}.`;
 
             const whiteText =
-                document.createElement("span");
+                document.createElement("button");
 
             whiteText.className =
                 "moveHistoryMove";
+
+            whiteText.type = "button";
 
             if (activePly === index + 1) {
                 whiteText.classList.add("active");
@@ -744,11 +802,22 @@ export default class UI {
             whiteText.textContent =
                 whiteMove ? whiteMove.move : "";
 
+            whiteText.disabled = !whiteMove;
+
+            if (whiteMove) {
+                whiteText.addEventListener(
+                    "click",
+                    () => window.chess?.gameController?.reviewToPly(index + 1)
+                );
+            }
+
             const blackText =
-                document.createElement("span");
+                document.createElement("button");
 
             blackText.className =
                 "moveHistoryMove";
+
+            blackText.type = "button";
 
             if (activePly === index + 2) {
                 blackText.classList.add("active");
@@ -756,6 +825,15 @@ export default class UI {
 
             blackText.textContent =
                 blackMove ? blackMove.move : "...";
+
+            blackText.disabled = !blackMove;
+
+            if (blackMove) {
+                blackText.addEventListener(
+                    "click",
+                    () => window.chess?.gameController?.reviewToPly(index + 2)
+                );
+            }
 
             row.appendChild(moveNumber);
             row.appendChild(whiteText);
@@ -769,6 +847,55 @@ export default class UI {
 
         this.moveHistoryElement.scrollTop =
             this.moveHistoryElement.scrollHeight;
+
+    }
+
+    updateCapturedPieces(gameMoves = []) {
+
+        const captured =
+            capturedPiecesFromMoves(gameMoves);
+
+        this.renderCapturedPieces(
+            this.capturedWhiteElement,
+            captured.white
+        );
+        this.renderCapturedPieces(
+            this.capturedBlackElement,
+            captured.black
+        );
+
+    }
+
+    renderCapturedPieces(element, pieces) {
+
+        if (!element) {
+            return;
+        }
+
+        element.innerHTML = "";
+
+        if (pieces.length === 0) {
+
+            const empty = document.createElement("span");
+
+            empty.className = "capturedEmpty";
+            empty.textContent = "None";
+            element.appendChild(empty);
+            return;
+
+        }
+
+        for (const piece of pieces) {
+
+            const image = document.createElement("img");
+
+            image.className = "capturedPiece";
+            image.src = this.pieceImages[piece];
+            image.alt = "Captured chess piece";
+            image.draggable = false;
+            element.appendChild(image);
+
+        }
 
     }
 
