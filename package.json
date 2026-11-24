@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:ccrl": "node tools/build-ccrl-release.mjs"
+    "build:ccrl": "node tools/build-ccrl-release.mjs",
+    "build:ccrl:node": "node tools/build-ccrl-node-release.mjs"
   },
   "devDependencies": {
     "esbuild": "0.25.10",

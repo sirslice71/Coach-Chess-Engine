@@ -18,6 +18,11 @@ Download: https://github.com/sirslice71/Coach-Chess-Engine/releases/tag/v1.0.0
 
 The submitted executable is Coach-1.0.0.exe. It is a single-threaded UCI
 engine with a default 256 MB hash. It does not require Node.js to be installed.
+
+For testers who already have Node.js 18 or newer, the release also provides
+`Coach-1.0.0-node.zip`. Extract it and run `node uci.js`; the bundled `uci.js`
+is self-contained and does not require the repository source tree or
+`npm install`.
 ```
 
 ## Release Checklist
@@ -30,6 +35,7 @@ engine with a default 256 MB hash. It does not require Node.js to be installed.
 - [x] `npm run build:ccrl` creates
   `dist\\Coach-1.0.0-windows-x64\\Coach-1.0.0.exe`.
 - [x] Release folder includes a SHA-256 checksum for the executable.
+- [x] `npm run build:ccrl:node` creates a compact, self-contained Node.js ZIP.
 - [x] The packaged executable completed a UCI handshake and depth-1 search
   with Node removed from `PATH`.
 - [ ] Make the GitHub repository public.

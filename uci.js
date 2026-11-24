@@ -10,6 +10,20 @@ const rl = readline.createInterface({
     terminal: false
 });
 
+let shuttingDown = false;
+
+function shutdown() {
+
+    if (shuttingDown) {
+        return;
+    }
+
+    shuttingDown = true;
+    rl.close();
+    process.stdin.pause();
+
+}
+
 rl.on("line", line => {
 
     let responses = [];
@@ -35,7 +49,11 @@ rl.on("line", line => {
     }
 
     if (session.quitRequested) {
-        rl.close();
+        shutdown();
     }
 
+});
+
+rl.on("close", () => {
+    process.stdin.pause();
 });

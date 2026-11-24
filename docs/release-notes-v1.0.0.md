@@ -5,6 +5,7 @@ Coach 1.0.0 is the first public, self-contained UCI release of Coach.
 ## Highlights
 
 - Windows x64 UCI executable with no separate Node.js installation required.
+- Compact Node.js bundle for testers who already have Node.js 18 or newer.
 - Default 256 MB hash setting for tournament testers.
 - Single-threaded operation with transparent UCI options.
 - Open-source release under the MIT License.
@@ -20,13 +21,18 @@ you to the ShallowBlue project for providing a valuable, consistent opponent.
 ## Verification
 
 - Full project regression suite passed.
-- UCI suite passed 45/45 tests.
+- UCI and process-lifecycle suite passed 48/48 tests.
 - Packaged executable completed `uci`, `isready`, and a depth-1 search with
   Node removed from `PATH`.
+- The direct Node engine exits on both `quit` and closed stdin; repeated launch
+  cycles leave no engine processes running.
+- The compatibility launcher terminates its child Node process if the launcher
+  is forcibly closed.
 
 ## Included Files
 
 - `Coach-1.0.0.exe`
+- `Coach-1.0.0-node.zip` (optional compact Node.js distribution)
 - `README.txt`
 - `SHA256SUMS.txt`
 

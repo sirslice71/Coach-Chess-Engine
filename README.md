@@ -21,9 +21,11 @@ valuable and consistent testing opponent.
 
 Coach can also run as a UCI engine.
 
-- Manual entry: `node uci.js`
+- Direct Node.js entry: `node uci.js`
 - Windows launcher: `coach-uci.cmd`
 - Self-contained Windows release: `npm run build:ccrl` (creates `Coach-1.0.0.exe`)
+- Compact Node.js release: `npm run build:ccrl:node` (creates a self-contained
+  `Coach-1.0.0-node.zip` bundle; Node.js 18+ required)
 
 Setup and current limitations are documented in [`js/docs/UCI.md`](js/docs/UCI.md).
 
